@@ -91,6 +91,12 @@
   }
 
   // ---------- Einsatzplanung ----------
+  // Zeit eines Plan-Eintrags: eigene Zeit (z. B. nach Stundentausch) oder die Zeit der Schicht
+  function planZeit(state, s) {
+    if (s.zeit) return s.zeit;
+    const f = (state.filialen || []).find((x) => x.id === s.filiale);
+    return f ? schichtZeit(f, s.datum, s.schicht) : null;
+  }
   function schichtenAm(state, datum, filter) {
     return (state.plan || []).filter((s) => s.datum === datum && (!filter || filter(s)));
   }
@@ -99,8 +105,7 @@
     let min = 0;
     for (const s of state.plan || []) {
       if (s.personId !== personId || !tage.includes(s.datum)) continue;
-      const f = (state.filialen || []).find((x) => x.id === s.filiale);
-      const z = f && schichtZeit(f, s.datum, s.schicht);
+      const z = planZeit(state, s);
       if (z) min += z.ende - z.start;
     }
     return min / 60;
@@ -121,7 +126,7 @@
       const schon = schichtenAm(state, datum, (s) => s.personId === p.id);
       for (const s of schon) {
         const f2 = state.filialen.find((x) => x.id === s.filiale);
-        const z2 = f2 && schichtZeit(f2, datum, s.schicht);
+        const z2 = planZeit(state, s);
         if (s.filiale === filialeId && s.schicht === schichtId) { moeglich = false; gruende.push("schon eingeteilt"); }
         else if (z && z2 && z2.start < z.ende && z.start < z2.ende) { moeglich = false; gruende.push(`schon ${f2.kurz || f2.name}`); }
         else if (s.filiale !== filialeId) gruende.push(`am Tag auch in ${f2.kurz || f2.name}`);
@@ -169,6 +174,76 @@
     }
     return neu;
   }
+  // ---------- Tauschbörse ----------
+  // Ein Angebot gibt eine ganze Schicht oder einen Teil davon (Stunden am Anfang oder Ende) ab.
+  // Ein Kollege übernimmt sie, oder tauscht sie gegen eine eigene ganze Schicht. Die Shopleitung bestätigt.
+  function teilPruefen(z, teil) {
+    if (!teil) return null;
+    if (!(teil.ende > teil.start) || teil.start < z.start || teil.ende > z.ende) return "Die Stunden liegen nicht in der Schicht.";
+    if (teil.start === z.start && teil.ende === z.ende) return null;
+    if (teil.start !== z.start && teil.ende !== z.ende) return "Abgeben geht nur am Anfang oder Ende der Schicht.";
+    if (teil.ende - teil.start < 60) return "Mindestens 1 Stunde abgeben.";
+    return null;
+  }
+  function personPasst(state, p, filialeId, datum, zeit, ohneIds) {
+    const gruende = [], hinweise = [];
+    if (!darfInFiliale(p, filialeId)) gruende.push("darf in dieser Filiale nicht eingesetzt werden");
+    const abw = abwesenheitAm(state, p.id, datum);
+    if (abw) gruende.push(abw.art === "krank" ? "krank gemeldet" : "im Urlaub");
+    for (const s of schichtenAm(state, datum, (x) => x.personId === p.id && !ohneIds.includes(x.id))) {
+      const z2 = planZeit(state, s);
+      if (z2 && zeit && z2.start < zeit.ende && zeit.start < z2.ende) gruende.push("hat zu der Zeit schon Dienst");
+    }
+    const w = wunschAm(state, p.id, datum);
+    if (w && w.art === "nicht") hinweise.push("hat für den Tag „kann nicht“ angegeben");
+    const soll = p.wochenstunden || 0, std = stundenInWoche(state, p.id, montag(datum));
+    if (soll && std + (zeit.ende - zeit.start) / 60 > soll) hinweise.push(`käme auf ${Math.round((std + (zeit.ende - zeit.start) / 60) * 10) / 10} von ${soll} Std.`);
+    return { gruende, hinweise };
+  }
+  function tauschPruefen(state, angebot, nehmerId, gegenId) {
+    const s = (state.plan || []).find((x) => x.id === angebot.schichtId);
+    const nehmer = (state.personen || []).find((p) => p.id === nehmerId);
+    if (!s || !nehmer) return { moeglich: false, gruende: ["Schicht oder Person nicht gefunden"], hinweise: [] };
+    if (nehmerId === angebot.vonId) return { moeglich: false, gruende: ["eigene Schicht"], hinweise: [] };
+    const ganz = planZeit(state, s);
+    const fehler = teilPruefen(ganz, angebot.teil);
+    if (fehler) return { moeglich: false, gruende: [fehler], hinweise: [] };
+    const zeit = angebot.teil || ganz;
+    const ohne = [];
+    let gegen = null;
+    if (gegenId) {
+      gegen = state.plan.find((x) => x.id === gegenId);
+      if (!gegen || gegen.personId !== nehmerId) return { moeglich: false, gruende: ["Gegen-Schicht gehört nicht dir"], hinweise: [] };
+      if (angebot.teil) return { moeglich: false, gruende: ["Tauschen geht nur mit ganzen Schichten"], hinweise: [] };
+      ohne.push(gegen.id);
+    }
+    const a = personPasst(state, nehmer, s.filiale, s.datum, zeit, ohne);
+    if (gegen) {
+      const geber = state.personen.find((p) => p.id === angebot.vonId);
+      const b = personPasst(state, geber, gegen.filiale, gegen.datum, planZeit(state, gegen), [s.id]);
+      a.gruende.push(...b.gruende.map((g) => `${geber.vorname}: ${g}`));
+      a.hinweise.push(...b.hinweise.map((g) => `${geber.vorname}: ${g}`));
+    }
+    return { moeglich: !a.gruende.length, gruende: a.gruende, hinweise: a.hinweise };
+  }
+  // Führt einen bestätigten Tausch im Plan aus (verändert state.plan) und gibt die geänderten Einträge zurück.
+  function tauschAusfuehren(state, angebot, neueId) {
+    const s = state.plan.find((x) => x.id === angebot.schichtId);
+    const ganz = planZeit(state, s);
+    if (angebot.gegenId) {
+      const g = state.plan.find((x) => x.id === angebot.gegenId);
+      const p1 = s.personId; s.personId = g.personId; g.personId = p1; s.quelle = g.quelle = "tausch";
+      return [s, g];
+    }
+    const t = angebot.teil;
+    if (!t || (t.start === ganz.start && t.ende === ganz.ende)) { s.personId = angebot.nehmerId; s.quelle = "tausch"; return [s]; }
+    const rest = t.start === ganz.start ? { start: t.ende, ende: ganz.ende } : { start: ganz.start, ende: t.start };
+    s.zeit = rest;
+    const neu = { id: neueId(), filiale: s.filiale, datum: s.datum, schicht: s.schicht, personId: angebot.nehmerId, zeit: { start: t.start, ende: t.ende }, quelle: "tausch" };
+    state.plan.push(neu);
+    return [s, neu];
+  }
+
   // Krankmeldung: welche geplanten Schichten werden dadurch offen?
   function betroffeneSchichten(state, personId, von, bis) {
     return (state.plan || []).filter((s) => s.personId === personId && zwischen(s.datum, von, bis));
@@ -401,6 +476,7 @@
   return {
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
+    planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,

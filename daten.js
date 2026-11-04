@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v2";
+  const SCHLUESSEL = "frooters_demo_v3";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -129,7 +129,7 @@
     ];
 
     const state = {
-      version: 2, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [],
+      version: 3, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600 },
       hygiene: { bereiche, geraetetypen, geraete, regeln, massnahmen, zuteilung: {}, durchfuehrungen: [], nachkontrollen: [], abweichungen: [] },
       rezepte: { warengruppen, rezepte, allergene: ALLERGENE },
@@ -158,6 +158,14 @@
       state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "weiter", zeit: `${sc.datum}T${L.minZuZeit(z.start + 195)}:00` });
       state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "gehen", zeit: `${sc.datum}T${L.minZuZeit(z.ende + vers + 4)}:00` });
     }
+    // Tauschbörse: ein offenes Angebot (nur Stunden) und eine Anfrage, die die Shopleitung bestätigen muss
+    const kuenftig = (vorname) => state.plan.filter((x) => x.personId === pid(vorname) && x.datum > heuteIso).sort((a, b) => a.datum.localeCompare(b.datum));
+    const lenaS = kuenftig("Lena")[0];
+    if (lenaS) { const z = L.planZeit(state, lenaS); state.tausch.push({ id: id("x"), schichtId: lenaS.id, vonId: pid("Lena"), teil: { start: z.ende - 120, ende: z.ende }, notiz: "Arzttermin am Nachmittag", status: "offen", zeit: heuteIso + "T08:30" }); }
+    const tomS = kuenftig("Tom")[0];
+    if (tomS) { const fremdOk = (p) => !L.schichtenAm(state, tomS.datum, (x) => x.personId === p).length && !L.abwesenheitAm(state, p, tomS.datum);
+      const nehmer = ["Leonie", "Jonas", "Mia"].map(pid).find(fremdOk);
+      if (nehmer) state.tausch.push({ id: id("x"), schichtId: tomS.id, vonId: pid("Tom"), teil: null, notiz: "Familienfeier", status: "angefragt", nehmerId: nehmer, gegenId: null, zeit: heuteIso + "T07:45", anfrage: heuteIso + "T09:15" }); }
     state.pinnwand.push({ id: id("n"), filiale: "och", vonId: pid("Sandra"), text: "Neue Mango-Sauce ist da. Bitte zuerst die alte aufbrauchen.", zeit: heuteIso + "T09:00", wichtig: true });
     state.pinnwand.push({ id: id("n"), filiale: null, vonId: pid("Inhaber"), text: "Willkommen in der neuen frooters Team-App (Testversion).", zeit: heuteIso + "T08:00", wichtig: false });
     state.naechsteId = n + 1;

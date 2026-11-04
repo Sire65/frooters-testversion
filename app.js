@@ -1,4 +1,4 @@
-const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 2) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 3) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -40,6 +40,12 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
   function meldung(t) { let m = $(".meldung"); if (!m) { m = document.createElement("div"); m.className = "meldung"; m.setAttribute("role", "status"); document.body.appendChild(m); } m.textContent = t; clearTimeout(meldTimer); meldTimer = setTimeout(() => m.remove(), 2600); }
   const zeitTxt = (s) => s ? `${L.minZuZeit(s.start)}–${L.minZuZeit(s.ende)}` : "";
   const schichtTxt = (fil, datum, sch) => `${L.schicht(sch).name} ${zeitTxt(L.schichtZeit(fil, datum, sch))}`;
+  const planTxt = (s) => `${L.schicht(s.schicht).name} ${zeitTxt(L.planZeit(S, s))}${s.zeit ? " (Teil)" : ""}`;
+  const tausche = () => (S.tausch = S.tausch || []);
+  const angebotZeit = (a) => a.teil || L.planZeit(S, S.plan.find((x) => x.id === a.schichtId));
+  // Offene Angebote, die eine Person übernehmen könnte (andere Person, Filiale passt, Tag noch nicht vorbei)
+  const angeboteFuer = (p) => tausche().filter((a) => a.status === "offen" && a.vonId !== p.id && (() => { const s = S.plan.find((x) => x.id === a.schichtId); return s && s.datum >= heute() && L.darfInFiliale(p, s.filiale); })());
+  const tauschAnfragen = (fid) => tausche().filter((a) => a.status === "angefragt" && (S.plan.find((x) => x.id === a.schichtId) || {}).filiale === fid);
   const datumLang = (s) => { const d = L.ausIso(s); return `${L.TAG_NAME[L.wochentag(s)]}, ${d.getDate()}.${d.getMonth() + 1}.`; };
   const offeneAntraege = (fid) => S.abwesenheiten.filter((a) => a.status === "beantragt" && (person(a.personId) || {}).stammfiliale === fid);
   const offeneSchichten = (fid, von, tage) => {
@@ -67,13 +73,14 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
     quiz: "Kennst du unsere Rezepte? 10 Fragen, los geht's!",
     pinnwand: "Kurze Infos für den Shop. Wichtige Zettel stehen oben.",
     plan: "Tipp auf + um jemanden einzuteilen. Springer aus anderen Filialen siehst du mit grauem Rand.",
-    antraege: "Urlaubsanträge deines Teams. Genehmigte Tage werden im Plan automatisch frei.",
+    antraege: "Urlaubsanträge und Schichttausch deines Teams. Genehmigter Urlaub wird im Plan frei, ein bestätigter Tausch ändert den Plan sofort.",
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
     ma: "Hier pflegst du die Mitarbeiter. Springer bekommen einen Haken bei jeder Filiale, in der sie aushelfen dürfen.",
     regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
     auswertung: "Jede Filiale einzeln und alle zusammen.",
+    tausch: "Du kannst nicht? Biete deine Schicht oder ein paar Stunden an. Ein Kollege übernimmt oder tauscht, deine Shopleitung bestätigt. Erst dann ändert sich der Plan.",
     export: "Die Stempelzeiten eines Monats als Liste für den Steuerberater. Offene Tage ohne Gehen sind markiert, die musst du vorher klären.",
     rezeptpflege: "Hier pflegst du die Rezepte für alle Filialen. Allergene trägst du bei der Zutat ein, die App rechnet sie für das Rezept zusammen.",
     filialen: "Öffnungszeiten, Besetzung und Sortiment je Filiale. Beim mobilen Stand legst du die Einsatztage mit Ort an.",
@@ -127,6 +134,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("⏱️", "Stechuhr", st === "da" ? "Eingestempelt" : st === "pause" ? "In Pause" : "Kommen · Gehen", "stechuhr")}
         ${kachel("🤒", "Krank melden", "Shopleitung wird informiert", "krank")}
         ${kachel("🏖️", "Urlaub", "Antrag stellen", "urlaub")}
+        ${kachel("🔁", "Tauschbörse", "Schichten und Stunden tauschen", "tausch", angeboteFuer(p).filter((a) => L.tauschPruefen(S, a, p.id).moeglich).length)}
       </div></div>`;
     }
     k += `<div class="abschnitt"><h2>${f.art === "mobil" ? "Mobiler Stand" : "Shop"} ${esc(f.kurz)}${f.pilot ? " · Pilot" : ""}</h2><div class="kacheln">
@@ -140,7 +148,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
       const offen = offeneSchichten(f.id, d, 7).length;
       k += `<div class="abschnitt"><h2>Shopleitung ${esc(f.kurz)}</h2><div class="kacheln">
         ${kachel("📅", "Einsatzplan", "Woche planen", "plan")}
-        ${kachel("✅", "Anträge", "Urlaub genehmigen", "antraege", offeneAntraege(f.id).length)}
+        ${kachel("✅", "Anträge", "Urlaub und Tausch", "antraege", offeneAntraege(f.id).length + tauschAnfragen(f.id).length)}
         ${kachel("🚨", "Krank & offen", "Schichten besetzen", "offen", offen + leitungsMeldungen(f.id).length)}
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
         ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
@@ -167,7 +175,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
     k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
     const heuteKarte = uebergreifend() ? (berater() ? frootie(FROOTIE_TIPPS.berater) : "") : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
       ${krank ? `<p class="hinweis">Du bist ${krank.art === "krank" ? "krank gemeldet" : "im Urlaub"} bis ${L.datumKurz(krank.bis)}.</p>` : ""}
-      ${meine.length ? meine.map((s) => `<p>🗓️ <b>${schichtTxt(filiale(s.filiale), d, s.schicht)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
+      ${meine.length ? meine.map((s) => `<p>🗓️ <b>${planTxt(s)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
       ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
     </div>`;
@@ -183,7 +191,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
       const abw = L.abwesenheitAm(S, p.id, d);
       const pub = sch.every((s) => S.veroeffentlicht[`${s.filiale}|${L.montag(d)}`]);
       return `<div class="zeile ${d === heute() ? "st-faellig" : ""}"><span class="punkt ${sch.length ? "gruen" : ""}"></span><span><b>${datumLang(d)}</b>
-        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${schichtTxt(filiale(s.filiale), d, s.schicht)} · ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
+        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${planTxt(s)}${tausche().some((a) => a.schichtId === s.id && (a.status === "offen" || a.status === "angefragt")) ? " · 🔁 angeboten" : ""} · ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
         <span class="marke-s ${sch.length && !pub ? "gelb" : ""}">${sch.length ? (pub ? "fest" : "Entwurf") : ""}</span></div>`;
     }).join("");
     const std = L.stundenInWoche(S, p.id, mo);
@@ -230,6 +238,25 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
         <div class="feld"><label for="u-notiz">Bemerkung (freiwillig)</label><input type="text" id="u-notiz" maxlength="120"></div>
         <button class="btn gross" data-act="urlaub">🏖️ Urlaub beantragen</button></div>
       <div class="abschnitt"><h2>Meine Anträge</h2><div class="liste">${meine.length ? meine.map((a) => `<div class="zeile"><span class="punkt ${farbe[a.status]}"></span><span>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}<small>${esc(a.notiz || "")}</small></span><span class="marke-s ${farbe[a.status]}">${a.status}</span></div>`).join("") : '<p class="leer">Noch keine Anträge.</p>'}</div></div>`;
+  };
+
+  V.tausch = () => {
+    const p = ICH(), d = heute();
+    const fremd = angeboteFuer(p);
+    const meine = tausche().filter((a) => a.vonId === p.id || a.nehmerId === p.id).sort((a, b) => b.zeit.localeCompare(a.zeit)).slice(0, 10);
+    const eigene = S.plan.filter((s) => s.personId === p.id && s.datum >= d && s.datum <= L.plusTage(d, 21)).sort((a, b) => a.datum.localeCompare(b.datum));
+    const statusTxt = { offen: ["wartet auf Kollegen", "gelb"], angefragt: ["wartet auf Shopleitung", "gelb"], genehmigt: ["bestätigt", "gruen"], abgelehnt: ["abgelehnt", "rot"], zurueck: ["zurückgezogen", ""] };
+    const zeile = (a) => { const s = S.plan.find((x) => x.id === a.schichtId); const z = angebotZeit(a); return `${datumLang(s.datum)} · ${L.minZuZeit(z.start)}–${L.minZuZeit(z.ende)} · ${esc(filiale(s.filiale).kurz)}${a.teil ? " · nur Stunden" : ""}`; };
+    return `${titel("Tauschbörse")}${frootie(FROOTIE_TIPPS.tausch)}
+      <div class="abschnitt"><h2>Angebote von Kollegen</h2><div class="liste">${fremd.length ? fremd.map((a) => { const chk = L.tauschPruefen(S, a, p.id);
+        return `<div class="karte"><p><b>${esc(name(person(a.vonId)))}</b> gibt ab: ${zeile(a)}</p>${a.notiz ? `<p class="muted">„${esc(a.notiz)}“</p>` : ""}
+          ${chk.gruende.map((t) => `<p class="hinweis rot">Geht nicht: ${esc(t)}</p>`).join("")}${chk.hinweise.map((t) => `<p class="hinweis">${esc(t)}</p>`).join("")}
+          <div class="reihe"><button class="btn" data-act="tausch-nehmen" data-id="${a.id}" ${chk.moeglich ? "" : "disabled"}>Übernehmen</button>${a.teil ? "" : `<button class="btn zwei" data-act="tausch-gegen" data-id="${a.id}">Tauschen gegen …</button>`}</div></div>`; }).join("") : '<p class="leer">Gerade keine Angebote.</p>'}</div></div>
+      <div class="abschnitt"><h2>Schicht oder Stunden anbieten</h2><div class="liste">${eigene.length ? eigene.map((s) => { const lauf = tausche().find((a) => a.schichtId === s.id && (a.status === "offen" || a.status === "angefragt"));
+        return `<div class="zeile"><span class="punkt ${lauf ? "gelb" : "gruen"}"></span><span><b>${datumLang(s.datum)}</b><small>${planTxt(s)} · ${esc(filiale(s.filiale).kurz)}</small></span>${lauf ? '<span class="marke-s gelb">angeboten</span>' : `<button class="chip" data-act="tausch-anbieten" data-id="${s.id}">Anbieten</button>`}</div>`; }).join("") : '<p class="leer">Keine Schichten in den nächsten 3 Wochen.</p>'}</div></div>
+      ${meine.length ? `<div class="abschnitt"><h2>Meine Tausche</h2><div class="liste">${meine.map((a) => { const [t, f] = statusTxt[a.status] || ["", ""];
+        return `<div class="zeile"><span class="punkt ${f}"></span><span>${a.vonId === p.id ? "Abgegeben" : "Übernommen"}: ${zeile(a)}<small>${a.nehmerId && a.vonId === p.id ? "an " + esc(name(person(a.nehmerId))) : a.vonId !== p.id ? "von " + esc(name(person(a.vonId))) : ""}</small></span>
+          ${a.status === "offen" && a.vonId === p.id ? `<button class="chip" data-act="tausch-zurueck" data-id="${a.id}">zurückziehen</button>` : `<span class="marke-s ${f}">${t}</span>`}</div>`; }).join("")}</div></div>` : ""}`;
   };
 
   V.stechuhr = () => {
@@ -388,7 +415,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
           const leute = L.schichtenAm(S, d, (s) => s.filiale === f.id && s.schicht === sch.id);
           return `<div class="slot"><div class="kopfz"><span><span class="punkt ${ab.ampel}" style="display:inline-block;vertical-align:-2px"></span> ${einzeln ? "Einsatz" : sch.name}</span><span>${zeitTxt(L.schichtZeit(f, d, sch.id))} · ${ab.ist}/${ab.soll}</span></div>
             <div class="namen">${leute.map((s) => { const p = person(s.personId); const fehlt = L.abwesenheitAm(S, s.personId, d);
-              return `<button class="name ${p.stammfiliale !== f.id ? "springer" : ""} ${fehlt ? "fehlt" : ""}" data-act="plan-weg" data-id="${s.id}" title="Antippen zum Entfernen">${esc(p.vorname)}${p.stammfiliale !== f.id ? " ↔" : ""}${fehlt ? (fehlt.art === "krank" ? " 🤒" : " 🏖️") : ""}</button>`; }).join("")}
+              return `<button class="name ${p.stammfiliale !== f.id ? "springer" : ""} ${fehlt ? "fehlt" : ""}" data-act="plan-weg" data-id="${s.id}" title="Antippen zum Entfernen">${esc(p.vorname)}${s.zeit ? ` ${L.minZuZeit(s.zeit.start)}–${L.minZuZeit(s.zeit.ende)}` : ""}${p.stammfiliale !== f.id ? " ↔" : ""}${fehlt ? (fehlt.art === "krank" ? " 🤒" : " 🏖️") : ""}</button>`; }).join("")}
               <button class="name plus" data-act="plan-plus" data-datum="${d}" data-schicht="${sch.id}">+ einteilen</button></div></div>`; }).join("")}</div>`;
     }).join("");
     return `${titel("Einsatzplan " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.plan)}
@@ -410,11 +437,20 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
   V.antraege = () => {
     const f = FIL(), a = offeneAntraege(f.id);
     const erledigt = S.abwesenheiten.filter((x) => x.art === "urlaub" && x.status !== "beantragt" && (person(x.personId) || {}).stammfiliale === f.id).slice(-5).reverse();
+    const ta = tauschAnfragen(f.id);
     return `${titel("Anträge " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.antraege)}
+      ${ta.length ? `<div class="abschnitt"><h2>Schichttausch</h2><div class="liste">${ta.map((x) => { const sch = S.plan.find((y) => y.id === x.schichtId); const z = angebotZeit(x); const chk = L.tauschPruefen(S, x, x.nehmerId, x.gegenId); const g = x.gegenId && S.plan.find((y) => y.id === x.gegenId);
+        return `<div class="karte"><p><b>${esc(name(person(x.vonId)))}</b> → <b>${esc(name(person(x.nehmerId)))}</b></p>
+          <p>${datumLang(sch.datum)} · ${L.schicht(sch.schicht).name} ${L.minZuZeit(z.start)}–${L.minZuZeit(z.ende)}${x.teil ? " (nur diese Stunden)" : ""}</p>
+          ${g ? `<p>Im Tausch gegen: ${datumLang(g.datum)} · ${planTxt(g)} in ${esc(filiale(g.filiale).kurz)}</p>` : ""}
+          ${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
+          ${chk.gruende.map((t) => `<p class="hinweis rot">${esc(t)}</p>`).join("")}${chk.hinweise.map((t) => `<p class="hinweis">${esc(t)}</p>`).join("")}
+          <div class="reihe"><button class="btn" data-act="tausch-ok" data-id="${x.id}" ${chk.moeglich ? "" : "disabled"}>✓ Bestätigen</button><button class="btn drei" data-act="tausch-nein" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("")}</div></div>` : ""}
+      <div class="abschnitt"><h2>Urlaub</h2>
       <div class="liste">${a.length ? a.map((x) => { const betr = L.betroffeneSchichten(S, x.personId, x.von, x.bis).length;
         return `<div class="karte"><p><b>${esc(name(person(x.personId)))}</b> möchte Urlaub vom ${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</p>${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
         ${betr ? `<p class="hinweis">Im Plan stehen in dieser Zeit ${betr} Schicht${betr > 1 ? "en" : ""}. Sie werden beim Genehmigen frei.</p>` : ""}
-        <div class="reihe"><button class="btn" data-act="genehmigen" data-id="${x.id}">✓ Genehmigen</button><button class="btn drei" data-act="ablehnen" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Anträge. 🎉</p>'}</div>
+        <div class="reihe"><button class="btn" data-act="genehmigen" data-id="${x.id}">✓ Genehmigen</button><button class="btn drei" data-act="ablehnen" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Urlaubsanträge. 🎉</p>'}</div></div>
       ${erledigt.length ? `<div class="abschnitt"><h2>Zuletzt entschieden</h2><div class="liste">${erledigt.map((x) => `<div class="zeile"><span class="punkt ${x.status === "genehmigt" ? "gruen" : "rot"}"></span><span>${esc(name(person(x.personId)))}<small>${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</small></span><span class="marke-s">${x.status}</span></div>`).join("")}</div></div>` : ""}`;
   };
   V.offen = () => {
@@ -474,7 +510,7 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
     const leute = [...new Set([...L.schichtenAm(S, d, (s) => s.filiale === f.id).map((s) => s.personId), ...S.stempel.filter((s) => s.filiale === f.id && s.zeit.startsWith(d)).map((s) => s.personId)])].map(person).filter(Boolean);
     return `${titel("Stempelzeiten heute")}
       <div class="liste">${leute.length ? leute.map((p) => { const e = L.stempelAm(S, p.id, d); const st = L.stempelStatus(e); const sum = L.stempelSumme(e, jetztIso()); const geplant = L.schichtenAm(S, d, (s) => s.personId === p.id && s.filiale === f.id);
-        return `<div class="zeile"><span class="punkt ${st === "da" ? "gruen" : st === "pause" ? "gelb" : ""}"></span><span><b>${esc(name(p))}</b><small>Plan: ${geplant.map((s) => schichtTxt(f, d, s.schicht)).join(", ") || "–"} · Ist: ${e.length ? e.map((x) => x.zeit.slice(11, 16)).join(" · ") : "noch nicht gestempelt"}</small></span><span class="klein">${Math.floor(sum.arbeit / 60)}:${String(sum.arbeit % 60).padStart(2, "0")} Std.</span></div>`; }).join("") : '<p class="leer">Heute ist niemand eingeteilt.</p>'}</div>`;
+        return `<div class="zeile"><span class="punkt ${st === "da" ? "gruen" : st === "pause" ? "gelb" : ""}"></span><span><b>${esc(name(p))}</b><small>Plan: ${geplant.map((s) => planTxt(s)).join(", ") || "–"} · Ist: ${e.length ? e.map((x) => x.zeit.slice(11, 16)).join(" · ") : "noch nicht gestempelt"}</small></span><span class="klein">${Math.floor(sum.arbeit / 60)}:${String(sum.arbeit % 60).padStart(2, "0")} Std.</span></div>`; }).join("") : '<p class="leer">Heute ist niemand eingeteilt.</p>'}</div>`;
   };
   V.team = () => {
     const f = FIL();
@@ -725,6 +761,62 @@ const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in
       if (pp && pp.art === "messwert") { pp.max = Number($("#r-max").value); pp.krit = Number($("#r-krit").value); }
       speichern(); meldung("Regel gespeichert. Gilt ab sofort in allen passenden Filialen."); gehe("regeln");
     },
+    "tausch-anbieten": (el) => {
+      const s = S.plan.find((x) => x.id === el.dataset.id), z = L.planZeit(S, s);
+      fenster = `<div class="reihe zw"><h2>Anbieten: ${datumLang(s.datum)}</h2><button class="chip" data-act="zu">✕</button></div>
+        <p class="muted">${planTxt(s)} · ${esc(filiale(s.filiale).kurz)}</p>
+        <div class="wahl"><button class="an" data-act="tausch-art" data-art="ganz" id="ta-ganz">Ganze Schicht</button><button data-act="tausch-art" data-art="teil" id="ta-teil">Nur Stunden</button></div>
+        <div id="ta-zeit" hidden><p class="klein muted">Stunden am Anfang oder am Ende der Schicht, mindestens 1 Stunde.</p>
+          <div class="gitter2"><div class="feld"><label for="ta-von">Von</label><input type="time" id="ta-von" value="${L.minZuZeit(Math.max(z.start, z.ende - 120))}"></div><div class="feld"><label for="ta-bis">Bis</label><input type="time" id="ta-bis" value="${L.minZuZeit(z.ende)}"></div></div></div>
+        <div class="feld"><label for="ta-notiz">Nachricht an Kollegen (freiwillig)</label><input type="text" id="ta-notiz" maxlength="120" placeholder="z. B. Arzttermin"></div>
+        <button class="btn gross" data-act="tausch-senden" data-id="${s.id}">🔁 In die Tauschbörse stellen</button>`;
+      zeichnen();
+    },
+    "tausch-art": (el) => { const teil = el.dataset.art === "teil"; $("#ta-zeit").hidden = !teil; $("#ta-ganz").classList.toggle("an", !teil); $("#ta-teil").classList.toggle("an", teil); },
+    "tausch-senden": (el) => {
+      const s = S.plan.find((x) => x.id === el.dataset.id), z = L.planZeit(S, s);
+      let teil = null;
+      if (!$("#ta-zeit").hidden) {
+        teil = { start: L.zeitZuMin($("#ta-von").value || "00:00"), ende: L.zeitZuMin($("#ta-bis").value || "00:00") };
+        const f = L.teilPruefen(z, teil); if (f) return meldung(f);
+        if (teil.start === z.start && teil.ende === z.ende) teil = null;
+      }
+      tausche().push({ id: neueId("x"), schichtId: s.id, vonId: ICH().id, teil, notiz: $("#ta-notiz").value.trim(), status: "offen", zeit: jetztIso() });
+      speichern(); fenster = null; meldung("In der Tauschbörse. Passende Kollegen sehen dein Angebot."); zeichnen();
+    },
+    "tausch-zurueck": (el) => { tausche().find((a) => a.id === el.dataset.id).status = "zurueck"; speichern(); zeichnen(); },
+    "tausch-nehmen": (el) => {
+      const a = tausche().find((x) => x.id === el.dataset.id), chk = L.tauschPruefen(S, a, ICH().id);
+      if (!chk.moeglich) return meldung(chk.gruende[0]);
+      Object.assign(a, { status: "angefragt", nehmerId: ICH().id, gegenId: null, anfrage: jetztIso() });
+      const s = S.plan.find((x) => x.id === a.schichtId);
+      S.meldungen = S.meldungen || []; S.meldungen.push({ id: neueId("m"), filiale: s.filiale, text: `🔁 ${name(ICH())} möchte von ${name(person(a.vonId))} übernehmen (${L.datumKurz(s.datum)}). Bitte unter Anträge bestätigen.`, zeit: jetztIso() });
+      speichern(); meldung("Angefragt. Deine Shopleitung bestätigt den Tausch."); zeichnen();
+    },
+    "tausch-gegen": (el) => {
+      const a = tausche().find((x) => x.id === el.dataset.id), p = ICH();
+      const eigene = S.plan.filter((s) => s.personId === p.id && s.datum >= heute() && !s.zeit && !tausche().some((t) => t.schichtId === s.id && ["offen", "angefragt"].includes(t.status)));
+      fenster = `<div class="reihe zw"><h2>Tauschen gegen …</h2><button class="chip" data-act="zu">✕</button></div><p class="muted">Welche deiner Schichten soll ${esc(person(a.vonId).vorname)} dafür übernehmen?</p>
+        <div class="liste">${eigene.map((s) => { const chk = L.tauschPruefen(S, a, p.id, s.id);
+          return `<button class="zeile" data-act="tausch-gegen-ok" data-id="${a.id}" data-gegen="${s.id}" ${chk.moeglich ? "" : 'disabled style="opacity:.5"'}><span class="punkt ${chk.moeglich ? "gruen" : "rot"}"></span><span><b>${datumLang(s.datum)}</b><small>${planTxt(s)} · ${esc(filiale(s.filiale).kurz)}${chk.gruende.length ? " · " + chk.gruende.map(esc).join(", ") : ""}${chk.hinweise.length ? " · " + chk.hinweise.map(esc).join(", ") : ""}</small></span><span>›</span></button>`; }).join("") || '<p class="leer">Du hast keine passende eigene Schicht.</p>'}</div>`;
+      zeichnen();
+    },
+    "tausch-gegen-ok": (el) => {
+      const a = tausche().find((x) => x.id === el.dataset.id), chk = L.tauschPruefen(S, a, ICH().id, el.dataset.gegen);
+      if (!chk.moeglich) return meldung(chk.gruende[0]);
+      Object.assign(a, { status: "angefragt", nehmerId: ICH().id, gegenId: el.dataset.gegen, anfrage: jetztIso() });
+      const s = S.plan.find((x) => x.id === a.schichtId);
+      S.meldungen = S.meldungen || []; S.meldungen.push({ id: neueId("m"), filiale: s.filiale, text: `🔁 ${name(ICH())} und ${name(person(a.vonId))} möchten Schichten tauschen (${L.datumKurz(s.datum)}). Bitte unter Anträge bestätigen.`, zeit: jetztIso() });
+      speichern(); fenster = null; meldung("Tausch angefragt. Deine Shopleitung bestätigt."); zeichnen();
+    },
+    "tausch-ok": (el) => {
+      const a = tausche().find((x) => x.id === el.dataset.id), chk = L.tauschPruefen(S, a, a.nehmerId, a.gegenId);
+      if (!chk.moeglich) return meldung("Geht nicht mehr: " + chk.gruende[0]);
+      L.tauschAusfuehren(S, a, () => neueId("s"));
+      Object.assign(a, { status: "genehmigt", entschieden: jetztIso(), vonLeitung: ICH().id });
+      speichern(); meldung("Bestätigt. Der Plan ist geändert."); zeichnen();
+    },
+    "tausch-nein": (el) => { const a = tausche().find((x) => x.id === el.dataset.id); Object.assign(a, { status: "offen", nehmerId: null, gegenId: null }); speichern(); meldung("Abgelehnt. Das Angebot ist wieder offen."); zeichnen(); },
     "einsatz-neu": (el) => {
       const fid = el.dataset.f, f = filiale(fid), d = $(`#e-${fid}-d`).value, o = $(`#e-${fid}-o`).value.trim(), v = $(`#e-${fid}-v`).value, b = $(`#e-${fid}-b`).value;
       if (!d || !o || !v || !b || b <= v) return meldung("Bitte Datum, Ort und Zeiten prüfen");
