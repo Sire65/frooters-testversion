@@ -1,8 +1,10 @@
 {
-  "version": "0.1.2",
+  "version": "0.2.0",
   "datum": "2026-11-04",
   "stufe": "DEV",
   "neu": [
-    "App startet auch dort, wo der Update-Dienst gesperrt ist (geteilter Link)"
+    "Filialen laut Fragebogen: Ochtrup (Pilot), Oberhausen, Sinsheim, Osnabrück, Road Runner (mobil)",
+    "Rollen Qualität & Pflege und Hygieneberater (nur lesen)",
+    "Sortiment je Filiale, Rezepte pflegen, Stundenliste für den Steuerberater"
   ]
 }

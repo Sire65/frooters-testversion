@@ -24,6 +24,10 @@
   // ---------- Filialen und Schichten ----------
   // Öffnungszeit eines Tages in Minuten { auf, zu } oder null (geschlossen). Sondertage gehen vor.
   function oeffnung(filiale, datum) {
+    if (filiale.art === "mobil") { // mobiler Stand: nur an Einsatztagen, mit Ort
+      const e = (filiale.einsaetze || []).find((x) => x.datum === datum);
+      return e ? { auf: zeitZuMin(e.von), zu: zeitZuMin(e.bis), ort: e.ort } : null;
+    }
     const s = filiale.sondertage && filiale.sondertage[datum];
     if (s === null) return null;
     const z = s || (filiale.oeffnung || {})[wochentag(datum)];
@@ -39,11 +43,13 @@
   function schichtZeit(filiale, datum, schichtId) {
     const o = oeffnung(filiale, datum);
     if (!o) return null;
+    // Kurzer Einsatz des mobilen Stands (bis 7 Std.): eine durchgehende Schicht statt Früh und Spät
+    if (filiale.art === "mobil" && o.zu - o.auf <= 420) return schichtId === "frueh" ? { start: o.auf - 30, ende: o.zu + 30 } : null;
     const s = schicht(schichtId);
     return { start: s.start(o), ende: s.ende(o) };
   }
   function bedarf(filiale, datum, schichtId) {
-    if (!oeffnung(filiale, datum)) return 0;
+    if (!oeffnung(filiale, datum) || !schichtZeit(filiale, datum, schichtId)) return 0;
     const b = filiale.bedarf || {};
     const tag = b[wochentag(datum)];
     if (tag && tag[schichtId] != null) return tag[schichtId];
@@ -56,8 +62,12 @@
     mitarbeiter: { name: "Mitarbeiter", stufe: 2 },
     stv: { name: "Stellv. Shopleitung", stufe: 3 },
     shopleitung: { name: "Shopleitung", stufe: 4 },
+    qualitaet: { name: "Qualität & Pflege", stufe: 8 },
+    berater: { name: "Hygieneberater (nur lesen)", stufe: 0 },
     zentrale: { name: "Inhaber / Zentrale", stufe: 9 },
   };
+  // Rollen ohne eigene Filiale, die alle Filialen sehen
+  const UEBERGREIFEND = ["zentrale", "qualitaet", "berater"];
   function istLeitung(p, filialeId) {
     if (!p) return false;
     if (p.rolle === "zentrale") return true;
@@ -65,7 +75,7 @@
   }
   // In welcher Filiale darf jemand eingesetzt werden? Stammfiliale immer, andere nur als Springer mit Haken.
   function darfInFiliale(p, filialeId) {
-    if (!p || p.aktiv === false || p.rolle === "zentrale") return false;
+    if (!p || p.aktiv === false || UEBERGREIFEND.includes(p.rolle)) return false;
     if (p.stammfiliale === filialeId) return true;
     return !!p.springer && (p.einsatzfilialen || []).includes(filialeId);
   }
@@ -194,6 +204,24 @@
     else if (summe.arbeit > 360 && summe.pause < p.pause6) h.push(`Über 6 Std. Arbeit: mindestens ${p.pause6} Min. Pause nötig.`);
     if (summe.arbeit > p.max) h.push(`Mehr als ${p.max / 60} Std. Arbeit an einem Tag.`);
     return h;
+  }
+
+  // Stundenliste für den Steuerberater: je Person und Tag Kommen, Gehen, Pause, Arbeit (Minuten). Offene Tage werden markiert.
+  function stundenliste(state, monat, filialeId) {
+    const zeilen = [];
+    const tage = [...new Set((state.stempel || []).filter((x) => x.zeit.slice(0, 7) === monat && (!filialeId || x.filiale === filialeId)).map((x) => `${x.personId}|${x.zeit.slice(0, 10)}`))].sort();
+    for (const k of tage) {
+      const [pid, datum] = k.split("|");
+      const e = stempelAm(state, pid, datum).filter((x) => !filialeId || x.filiale === filialeId);
+      const sum = stempelSumme(e);
+      const kommen = e.find((x) => x.art === "kommen"), gehen = [...e].reverse().find((x) => x.art === "gehen");
+      zeilen.push({ personId: pid, datum, filiale: e[0].filiale, kommen: kommen ? kommen.zeit.slice(11, 16) : "", gehen: gehen ? gehen.zeit.slice(11, 16) : "", pause: sum.pause, arbeit: sum.arbeit, offen: stempelStatus(e) !== "aus" });
+    }
+    return zeilen;
+  }
+  function csv(zeilen, kopf) {
+    const f = (v) => { const t = String(v == null ? "" : v); return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    return [kopf.join(";"), ...zeilen.map((z) => z.map(f).join(";"))].join("\r\n");
   }
 
   // ---------- Hygiene ----------
@@ -371,10 +399,10 @@
   }
 
   return {
-    TAGE, TAG_NAME, SCHICHTEN, ROLLEN, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
+    TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
-    stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise,
+    stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
     allergeneVon, mengeFuer, quiz, zufall, mischen,
   };

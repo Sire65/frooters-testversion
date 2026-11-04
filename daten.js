@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v1";
+  const SCHLUESSEL = "frooters_demo_v2";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -14,26 +14,44 @@
     let n = 0;
     const id = (p) => `${p}${++n}`;
     const offen = (mo, sa) => ({ mo, di: mo, mi: mo, do: mo, fr: sa || mo, sa: sa || mo, so: null });
+    // Filialen laut Fragebogen (04.11.2026): Ochtrup ist Pilot. Öffnungszeiten und Besetzung sind Beispiele, mit frooters abstimmen.
+    const frooters = ["froyo", "obst", "smoothie", "saft", "stiel", "warm", "quark", "snack"];
+    const mo0 = L.montag(heuteIso);
     const filialen = [
-      { id: "min", name: "Minden · Hagemeyer", kurz: "Minden", oeffnung: offen(["10:00", "19:00"], ["10:00", "19:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } } },
-      { id: "ess", name: "Essen · Limbecker Platz", kurz: "Essen", oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } } },
-      { id: "obh", name: "Oberhausen · Centro", kurz: "Oberhausen", oeffnung: offen(["10:00", "20:00"], ["10:00", "22:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } } },
+      { id: "och", name: "Ochtrup · Designer Outlet", kurz: "Ochtrup", marke: "frooters", pilot: true, oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "obh", name: "Oberhausen · Centro", kurz: "Oberhausen", marke: "frooters", oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "sin", name: "Sinsheim · Therme", kurz: "Sinsheim", marke: "frooters", oeffnung: Object.assign(offen(["11:00", "21:00"]), { so: ["11:00", "21:00"] }), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 }, so: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "osn", name: "Osnabrück · Bowls & Smoothie · Café", kurz: "Osnabrück", marke: "Bowls & Smoothie", oeffnung: offen(["10:00", "19:00"]), bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["bowl", "smoothie", "saft", "kaffee", "obst"] },
+      { id: "rr", name: "Road Runner · mobiler Stand", kurz: "Road Runner", marke: "frooters", art: "mobil", oeffnung: {}, bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["froyo", "smoothie", "obst"],
+        einsaetze: [
+          { datum: L.plusTage(mo0, 5), ort: "Wochenmarkt (Beispiel)", von: "09:00", bis: "15:00" },
+          { datum: L.plusTage(mo0, 11), ort: "Stadtfest (Beispiel)", von: "12:00", bis: "22:00" },
+          { datum: L.plusTage(mo0, 12), ort: "Stadtfest (Beispiel)", von: "11:00", bis: "22:00" },
+          { datum: L.plusTage(mo0, 19), ort: "Firmenfeier (Beispiel)", von: "14:00", bis: "20:00" },
+        ] },
     ];
     const P = (vorname, nachname, rolle, stamm, extra) => Object.assign({ id: id("p"), vorname, nachname, rolle, stammfiliale: stamm, springer: false, einsatzfilialen: [], wochenstunden: 30, pin: "1234", aktiv: true }, extra || {});
+    // Bezirksleitung macht laut Fragebogen der Inhaber selbst. Eine feste Person pflegt Rezepte und Hygiene, ein externer Berater liest mit.
     const personen = [
       P("Inhaber", "(Demo)", "zentrale", null, { wochenstunden: 0 }),
-      P("Sandra", "Becker", "shopleitung", "min", { wochenstunden: 38 }),
-      P("Tom", "Krüger", "stv", "min", { wochenstunden: 35 }),
-      P("Lena", "Hoffmann", "mitarbeiter", "min", { wochenstunden: 25 }),
-      P("Jonas", "Wagner", "aushilfe", "min", { wochenstunden: 10, springer: true, einsatzfilialen: ["ess"] }),
-      P("Mehmet", "Yilmaz", "shopleitung", "ess", { wochenstunden: 38 }),
-      P("Julia", "Schmitz", "stv", "ess", { wochenstunden: 32 }),
-      P("Paul", "Richter", "mitarbeiter", "ess", { wochenstunden: 25 }),
-      P("Sophie", "Klein", "aushilfe", "ess", { wochenstunden: 12, springer: true, einsatzfilialen: ["obh", "min"] }),
+      P("Petra", "Lange", "qualitaet", null, { wochenstunden: 0 }),
+      P("Hygieneberater", "(Demo)", "berater", null, { wochenstunden: 0 }),
+      P("Sandra", "Becker", "shopleitung", "och", { wochenstunden: 38 }),
+      P("Tom", "Krüger", "stv", "och", { wochenstunden: 35 }),
+      P("Lena", "Hoffmann", "mitarbeiter", "och", { wochenstunden: 25 }),
+      P("Leonie", "Fischer", "mitarbeiter", "och", { wochenstunden: 20 }),
+      P("Jonas", "Wagner", "aushilfe", "och", { wochenstunden: 12, springer: true, einsatzfilialen: ["rr", "osn"] }),
       P("Anna", "Wolf", "shopleitung", "obh", { wochenstunden: 38 }),
       P("Lukas", "Braun", "mitarbeiter", "obh", { wochenstunden: 30 }),
-      P("Emma", "Neumann", "aushilfe", "obh", { wochenstunden: 10, springer: true, einsatzfilialen: ["ess"] }),
       P("Can", "Öztürk", "mitarbeiter", "obh", { wochenstunden: 20 }),
+      P("Emma", "Neumann", "aushilfe", "obh", { wochenstunden: 10, springer: true, einsatzfilialen: ["rr"] }),
+      P("Mehmet", "Yilmaz", "shopleitung", "sin", { wochenstunden: 38 }),
+      P("Julia", "Schmitz", "stv", "sin", { wochenstunden: 32 }),
+      P("Paul", "Richter", "mitarbeiter", "sin", { wochenstunden: 25 }),
+      P("Sophie", "Klein", "aushilfe", "sin", { wochenstunden: 12 }),
+      P("Nina", "Vogel", "shopleitung", "osn", { wochenstunden: 38 }),
+      P("Ben", "Hartmann", "mitarbeiter", "osn", { wochenstunden: 30 }),
+      P("Mia", "Schulz", "aushilfe", "osn", { wochenstunden: 12, springer: true, einsatzfilialen: ["och", "rr"] }),
     ];
     const pid = (vorname) => personen.find((p) => p.vorname === vorname).id;
 
@@ -44,13 +62,16 @@
     const geraetetypen = [
       { id: "vitrine", name: "Kühlvitrine" }, { id: "tk", name: "Tiefkühler" }, { id: "froyo", name: "Froyo-Maschine" },
       { id: "eis", name: "Eismaschine" }, { id: "presse", name: "Saftpresse" }, { id: "mixer", name: "Mixer" }, { id: "waffel", name: "Waffeleisen" },
+      { id: "kaffee", name: "Kaffeemaschine" }, { id: "kuehlbox", name: "Kühlbox (mobil)" },
     ];
     const G = (filiale, typ, name) => ({ id: id("g"), filiale, typ, name, status: "aktiv" });
     const geraete = [
-      G("min", "vitrine", "Kühlvitrine 1 (links)"), G("min", "vitrine", "Kühlvitrine 2 (rechts)"), G("min", "tk", "Tiefkühler"), G("min", "froyo", "Froyo-Maschine"),
-      G("min", "presse", "Saftpresse"), G("min", "mixer", "Mixer"), G("min", "waffel", "Waffeleisen"),
-      G("ess", "vitrine", "Kühlvitrine"), G("ess", "tk", "Tiefkühler"), G("ess", "froyo", "Froyo-Maschine"), G("ess", "eis", "Eismaschine"), G("ess", "mixer", "Mixer"),
+      G("och", "vitrine", "Kühlvitrine 1 (links)"), G("och", "vitrine", "Kühlvitrine 2 (rechts)"), G("och", "tk", "Tiefkühler"), G("och", "froyo", "Froyo-Maschine"),
+      G("och", "presse", "Saftpresse"), G("och", "mixer", "Mixer"), G("och", "waffel", "Waffeleisen"),
       G("obh", "vitrine", "Kühlvitrine"), G("obh", "tk", "Tiefkühler"), G("obh", "froyo", "Froyo-Maschine"), G("obh", "presse", "Saftpresse"),
+      G("sin", "vitrine", "Kühlvitrine"), G("sin", "tk", "Tiefkühler"), G("sin", "froyo", "Froyo-Maschine"), G("sin", "eis", "Eismaschine"), G("sin", "mixer", "Mixer"),
+      G("osn", "vitrine", "Kühlvitrine"), G("osn", "tk", "Tiefkühler"), G("osn", "mixer", "Mixer"), G("osn", "presse", "Saftpresse"), G("osn", "kaffee", "Kaffeemaschine"),
+      G("rr", "kuehlbox", "Kühlbox 1"), G("rr", "froyo", "Froyo-Maschine mobil"), G("rr", "mixer", "Mixer"),
     ];
     const massnahmen = [
       { id: "m_kuehl", titel: "Kühlung zu warm", schritte: ["Tür und Dichtung prüfen, Gerät nicht überladen", "Ware prüfen: in Ordnung → in anderes Gerät umlagern, sonst verwerfen", "Shopleitung informieren, bei Bedarf Techniker rufen"], nachkontrolle: 30 },
@@ -77,12 +98,15 @@
       R("Theke und Arbeitsflächen reinigen", "theke", null, { art: "uhrzeiten", zeiten: ["13:00"] }, { art: "schicht", wert: "frueh" }, [{ art: "haken", text: "Gereinigt" }], "m_reinigung"),
       R("Boden und Abfall", "theke", null, { art: "schliessung", versatz: 0 }, { art: "schicht", wert: "spaet" }, [{ art: "haken", text: "Boden gewischt, Abfall entsorgt" }], "m_reinigung"),
       R("Kühlgeräte innen reinigen", "kuehl", "vitrine", { art: "wochentage", tage: ["mo"], zeit: "11:00" }, { art: "schicht", wert: "frueh" }, [{ art: "haken", text: "Ausgeräumt, gereinigt, eingeräumt" }], "m_reinigung", { pflicht: false }),
+      R("Kaffeemaschine reinigen", "saft", "kaffee", { art: "schliessung", versatz: 0 }, { art: "schicht", wert: "spaet" }, [{ art: "haken", text: "Brühgruppe und Milchsystem gereinigt" }], "m_reinigung"),
+      R("Temperatur Kühlbox", "kuehl", "kuehlbox", { art: "alle_std", std: 3 }, { art: "alle" }, [{ art: "messwert", text: "Temperatur", einheit: "°C", max: 7, krit: 8 }], "m_kuehl", { anleitung: "Kühlbox nur kurz öffnen, Thermometer in die Mitte, Wert ablesen." }),
       R("Schädlingskontrolle", "lager", null, { art: "monatlich", tagAb: 1, zeit: "11:00" }, { art: "rolle", wert: "shopleitung" }, [{ art: "auswahl", text: "Ergebnis", werte: ["kein Befall", "Befall"], schlecht: ["Befall"] }], "m_reinigung"),
     ];
     const warengruppen = [
       { id: "froyo", name: "Frozen Yogurt", sym: "🍦" }, { id: "obst", name: "Obstsalate", sym: "🍉" }, { id: "smoothie", name: "Smoothies", sym: "🥤" },
       { id: "saft", name: "Frische Säfte", sym: "🍊" }, { id: "stiel", name: "Eis am Stiel", sym: "🍭" }, { id: "warm", name: "Porridge & Milchreis", sym: "🥣" },
       { id: "quark", name: "Quark & Pudding", sym: "🍮" }, { id: "snack", name: "Waffeln & Snacks", sym: "🧇" },
+      { id: "bowl", name: "Bowls", sym: "🥗" }, { id: "kaffee", name: "Café", sym: "☕" },
     ];
     const Z = (name, menge, einheit, allergene) => ({ name, menge, einheit, allergene: allergene || [] });
     const Rz = (gruppe, name, beschreibung, zutaten, schritte, extra) => Object.assign({ id: id("z"), gruppe, name, beschreibung, groessen: ["S", "M", "L"], zutaten, schritte }, extra || {});
@@ -99,10 +123,13 @@
       Rz("warm", "Milchreis Kirsch", "Klassisch mit Kirschen.", [Z("Milchreis gekocht", { S: 150, M: 220, L: 300 }, "g", ["Milch"]), Z("Kirschen", { S: 40, M: 60, L: 80 }, "g")], ["Milchreis erwärmen", "Kirschen darauf"]),
       Rz("quark", "Quark Beere", "Leichter Quark mit Beeren.", [Z("Magerquark", { S: 120, M: 180, L: 240 }, "g", ["Milch"]), Z("Beerenmischung", { S: 40, M: 60, L: 80 }, "g"), Z("Mandelblättchen", { S: 5, M: 8, L: 10 }, "g", ["Schalenfrüchte"])], ["Quark glatt rühren", "Beeren darauf", "Mandeln darüber"]),
       Rz("snack", "Waffel Classic", "Frisch gebacken.", [Z("Waffelteig", 120, "g", ["Gluten", "Ei", "Milch"]), Z("Puderzucker", 5, "g")], ["Waffeleisen vorheizen", "Teig einfüllen, 3 Minuten backen", "Mit Puderzucker bestäuben"], { groessen: ["Stück"] }),
+      Rz("bowl", "Açaí Bowl", "Açaí-Basis mit Obst und Granola.", [Z("Açaí-Basis", { S: 150, M: 220, L: 300 }, "g"), Z("Banane", { S: 30, M: 45, L: 60 }, "g"), Z("Erdbeeren", { S: 30, M: 45, L: 60 }, "g"), Z("Granola", { S: 20, M: 30, L: 40 }, "g", ["Gluten", "Schalenfrüchte"])], ["Açaí-Basis cremig mixen", "In die Schale füllen", "Obst in Reihen anlegen", "Granola zuletzt, damit es knusprig bleibt"]),
+      Rz("bowl", "Smoothie Bowl Mango", "Mango-Smoothie zum Löffeln.", [Z("Mango gewürfelt", { S: 120, M: 180, L: 240 }, "g"), Z("Banane", { S: 40, M: 60, L: 80 }, "g"), Z("Kokosraspeln", { S: 5, M: 8, L: 10 }, "g"), Z("Chiasamen", { S: 3, M: 5, L: 7 }, "g")], ["Mango und Banane dick mixen", "In die Schale füllen", "Mit Kokos und Chia bestreuen"]),
+      Rz("kaffee", "Cappuccino", "Espresso mit Milchschaum.", [Z("Espresso", { S: 1, M: 1, L: 2 }, "Shot"), Z("Milch", { S: 120, M: 180, L: 240 }, "ml", ["Milch"])], ["Espresso beziehen", "Milch aufschäumen (60–65 °C)", "Schaum auf den Espresso geben"]),
     ];
 
     const state = {
-      version: 1, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [],
+      version: 2, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [],
       veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600 },
       hygiene: { bereiche, geraetetypen, geraete, regeln, massnahmen, zuteilung: {}, durchfuehrungen: [], nachkontrollen: [], abweichungen: [] },
       rezepte: { warengruppen, rezepte, allergene: ALLERGENE },
@@ -110,6 +137,7 @@
     // Wünsche für die nächste Woche, ein Urlaubsantrag, eine Krankmeldung
     const mo = L.montag(heuteIso), naechste = L.plusTage(mo, 7);
     state.wuensche.push({ id: id("w"), personId: pid("Lena"), datum: L.plusTage(naechste, 1), art: "nicht", schicht: "egal", notiz: "Arzttermin" });
+    state.wuensche.push({ id: id("w"), personId: pid("Mia"), datum: L.plusTage(mo, 11), art: "moechte", schicht: "spaet", notiz: "Road Runner Stadtfest" });
     state.wuensche.push({ id: id("w"), personId: pid("Jonas"), datum: L.plusTage(naechste, 5), art: "moechte", schicht: "frueh", notiz: "" });
     state.abwesenheiten.push({ id: id("a"), personId: pid("Paul"), art: "urlaub", von: L.plusTage(naechste, 2), bis: L.plusTage(naechste, 4), status: "beantragt", notiz: "Familienfeier" });
     // Plan dieser Woche automatisch füllen und veröffentlichen
@@ -120,7 +148,17 @@
       state.veroeffentlicht[`${f.id}|${mo}`] = true;
     }
     state.abwesenheiten.push({ id: id("a"), personId: pid("Lukas"), art: "krank", von: heuteIso, bis: L.plusTage(heuteIso, 1), status: "gemeldet", notiz: "" });
-    state.pinnwand.push({ id: id("n"), filiale: "min", vonId: pid("Sandra"), text: "Neue Mango-Sauce ist da. Bitte zuerst die alte aufbrauchen.", zeit: heuteIso + "T09:00", wichtig: true });
+    // Beispiel-Stempelzeiten der vergangenen Tage dieser Woche (für Stundenliste und Export)
+    for (const sc of state.plan) {
+      if (sc.datum >= heuteIso) continue;
+      const f = filialen.find((x) => x.id === sc.filiale), z = L.schichtZeit(f, sc.datum, sc.schicht);
+      const vers = (n % 7) - 3; n++;
+      state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "kommen", zeit: `${sc.datum}T${L.minZuZeit(z.start + vers)}:00` });
+      state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "pause", zeit: `${sc.datum}T${L.minZuZeit(z.start + 180)}:00` });
+      state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "weiter", zeit: `${sc.datum}T${L.minZuZeit(z.start + 195)}:00` });
+      state.stempel.push({ id: id("t"), personId: sc.personId, filiale: sc.filiale, art: "gehen", zeit: `${sc.datum}T${L.minZuZeit(z.ende + vers + 4)}:00` });
+    }
+    state.pinnwand.push({ id: id("n"), filiale: "och", vonId: pid("Sandra"), text: "Neue Mango-Sauce ist da. Bitte zuerst die alte aufbrauchen.", zeit: heuteIso + "T09:00", wichtig: true });
     state.pinnwand.push({ id: id("n"), filiale: null, vonId: pid("Inhaber"), text: "Willkommen in der neuen frooters Team-App (Testversion).", zeit: heuteIso + "T08:00", wichtig: false });
     state.naechsteId = n + 1;
     return state;

@@ -1,4 +1,4 @@
-const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.2.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 1) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 2) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -28,8 +28,14 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
   const ICH = () => person(sitzung.ich);
   const FIL = () => filiale(sitzung.filiale) || filiale(ICH() && ICH().stammfiliale) || S.filialen[0];
   const leitung = () => L.istLeitung(ICH(), FIL().id);
-  const zentrale = () => ICH() && ICH().rolle === "zentrale";
-  const meineFilialen = () => zentrale() ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
+  const rolle = () => (ICH() || {}).rolle;
+  const zentrale = () => rolle() === "zentrale";
+  const qualitaet = () => rolle() === "qualitaet" || zentrale();
+  const berater = () => rolle() === "berater";
+  const uebergreifend = () => L.UEBERGREIFEND.includes(rolle());
+  const meineFilialen = () => uebergreifend() ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
+  const sortiment = (f) => S.rezepte.warengruppen.filter((g) => !f.sortiment || f.sortiment.includes(g.id));
+  const ortTxt = (f, d) => { const o = L.oeffnung(f, d); return o && o.ort ? ` · 📍 ${esc(o.ort)}` : ""; };
   let meldTimer;
   function meldung(t) { let m = $(".meldung"); if (!m) { m = document.createElement("div"); m.className = "meldung"; m.setAttribute("role", "status"); document.body.appendChild(m); } m.textContent = t; clearTimeout(meldTimer); meldTimer = setTimeout(() => m.remove(), 2600); }
   const zeitTxt = (s) => s ? `${L.minZuZeit(s.start)}–${L.minZuZeit(s.ende)}` : "";
@@ -68,6 +74,10 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
     ma: "Hier pflegst du die Mitarbeiter. Springer bekommen einen Haken bei jeder Filiale, in der sie aushelfen dürfen.",
     regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
     auswertung: "Jede Filiale einzeln und alle zusammen.",
+    export: "Die Stempelzeiten eines Monats als Liste für den Steuerberater. Offene Tage ohne Gehen sind markiert, die musst du vorher klären.",
+    rezeptpflege: "Hier pflegst du die Rezepte für alle Filialen. Allergene trägst du bei der Zutat ein, die App rechnet sie für das Rezept zusammen.",
+    filialen: "Öffnungszeiten, Besetzung und Sortiment je Filiale. Beim mobilen Stand legst du die Einsatztage mit Ort an.",
+    berater: "Sie sehen die Hygiene-Dokumentation aller Filialen. Ändern oder abhaken können Sie nichts.",
   };
   function frootie(text) { return `<div class="frootie"><img src="frootie.svg" alt="Frootie"><div class="blase">${text}</div></div>`; }
 
@@ -83,7 +93,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
       <button class="marke" data-go="start" aria-label="Startseite"><img src="frootie.svg" alt=""><span class="wort">frooters <b>Team</b></span></button>
       <div class="rechts">${p ? `<button class="chip fil" ${mehr ? 'data-act="filiale-wahl"' : "disabled"} aria-label="Filiale wechseln">📍 ${esc(fil.kurz)}${mehr ? " ▾" : ""}</button>
       <button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>` : ""}</div></header>
-      <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser</div>`;
+      <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser · Pilot: Ochtrup</div>`;
   }
   function titel(t, zurueck) {
     return `<div class="titel">${zurueck !== false ? `<button class="zurueck" data-go="${zurueck || "start"}" aria-label="Zurück">←</button>` : ""}<h1>${t}</h1>
@@ -92,7 +102,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
   function kachel(sym, t, u, go, zahl) { return `<button class="kachel" data-go="${go}"><span class="sym" aria-hidden="true">${sym}</span><b>${t}</b><span>${u}</span>${zahl ? `<span class="zahl">${zahl}</span>` : ""}</button>`; }
 
   V.login = () => {
-    const gruppen = [{ id: null, name: "Zentrale" }, ...S.filialen];
+    const gruppen = [{ id: null, name: "Zentrale & Beratung" }, ...S.filialen];
     return `${titel("Wer bist du?", ICH() ? "start" : false)}
       ${frootie("Das ist die Testversion. Wähle eine Person, um die App aus ihrer Sicht zu sehen. In der echten App meldest du dich mit deinem persönlichen Zugang an.")}
       ${gruppen.map((g) => `<div class="abschnitt"><h2>${esc(g.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === g.id && p.aktiv !== false).map((p) =>
@@ -110,7 +120,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
     const pin = S.pinnwand.filter((n) => n.filiale === f.id || n.filiale === null).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit))[0];
     const krank = L.abwesenheitAm(S, p.id, d);
     let k = "";
-    if (!zentrale()) {
+    if (!uebergreifend()) {
       k += `<div class="abschnitt"><h2>Mein Bereich</h2><div class="kacheln">
         ${kachel("🗓️", "Mein Dienstplan", "Meine Schichten", "dienst")}
         ${kachel("📝", "Dienstwünsche", "Für die nächsten Wochen", "wuensche")}
@@ -119,11 +129,12 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🏖️", "Urlaub", "Antrag stellen", "urlaub")}
       </div></div>`;
     }
-    k += `<div class="abschnitt"><h2>Shop ${esc(f.kurz)}</h2><div class="kacheln">
-      ${kachel("🧼", "Hygiene heute", `${hs.erledigt + hs.abweichung} von ${hs.gesamt} erledigt`, "hygiene", hs.faellig + hs.ueberfaellig)}
-      ${kachel("📖", "Rezepte", "Nach Warengruppen", "rezepte")}
-      ${kachel("🎯", "Rezept-Quiz", "Wie gut kennst du sie?", "quiz")}
-      ${kachel("📌", "Pinnwand", "Infos für den Shop", "pinnwand")}
+    k += `<div class="abschnitt"><h2>${f.art === "mobil" ? "Mobiler Stand" : "Shop"} ${esc(f.kurz)}${f.pilot ? " · Pilot" : ""}</h2><div class="kacheln">
+      ${kachel("🧼", "Hygiene heute", hs.gesamt ? `${hs.erledigt + hs.abweichung} von ${hs.gesamt} erledigt` : (f.art === "mobil" ? "Heute kein Einsatz" : "Heute geschlossen"), "hygiene", berater() ? 0 : hs.faellig + hs.ueberfaellig)}
+      ${kachel("📖", "Rezepte", "Mit Allergenen", "rezepte")}
+      ${berater() ? "" : kachel("🎯", "Rezept-Quiz", "Wie gut kennst du sie?", "quiz")}
+      ${berater() ? "" : kachel("📌", "Pinnwand", "Infos für den Shop", "pinnwand")}
+      ${(berater() || rolle() === "qualitaet") ? kachel("🔍", "Hygiene-Kontrolle", "Letzte 7 Tage", "hygkontrolle", hl.filter((a) => a.status === "abweichung").length) : ""}
     </div></div>`;
     if (leitung()) {
       const offen = offeneSchichten(f.id, d, 7).length;
@@ -134,6 +145,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
         ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
+        ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
         ${kachel("👥", "Team", "Inklusive Springer", "team")}
       </div></div>`;
     }
@@ -143,12 +155,19 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("👤", "Mitarbeiter", "Stammdaten, Springer", "ma")}
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
+        ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+      </div></div>`;
+    }
+    if (rolle() === "qualitaet") {
+      k += `<div class="abschnitt"><h2>Qualität & Pflege</h2><div class="kacheln">
+        ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
+        ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
       </div></div>`;
     }
     k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
-    const heuteKarte = zentrale() ? "" : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
+    const heuteKarte = uebergreifend() ? (berater() ? frootie(FROOTIE_TIPPS.berater) : "") : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
       ${krank ? `<p class="hinweis">Du bist ${krank.art === "krank" ? "krank gemeldet" : "im Urlaub"} bis ${L.datumKurz(krank.bis)}.</p>` : ""}
-      ${meine.length ? meine.map((s) => `<p>🗓️ <b>${schichtTxt(filiale(s.filiale), d, s.schicht)}</b> in ${esc(filiale(s.filiale).kurz)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
+      ${meine.length ? meine.map((s) => `<p>🗓️ <b>${schichtTxt(filiale(s.filiale), d, s.schicht)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
       ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
     </div>`;
@@ -164,7 +183,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
       const abw = L.abwesenheitAm(S, p.id, d);
       const pub = sch.every((s) => S.veroeffentlicht[`${s.filiale}|${L.montag(d)}`]);
       return `<div class="zeile ${d === heute() ? "st-faellig" : ""}"><span class="punkt ${sch.length ? "gruen" : ""}"></span><span><b>${datumLang(d)}</b>
-        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${schichtTxt(filiale(s.filiale), d, s.schicht)} · ${esc(filiale(s.filiale).kurz)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
+        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${schichtTxt(filiale(s.filiale), d, s.schicht)} · ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
         <span class="marke-s ${sch.length && !pub ? "gelb" : ""}">${sch.length ? (pub ? "fest" : "Entwurf") : ""}</span></div>`;
     }).join("");
     const std = L.stundenInWoche(S, p.id, mo);
@@ -249,7 +268,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
     return `${titel("Hygiene " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.hygiene)}
       <div class="karte"><div class="reihe zw"><button class="chip" data-go="hygiene" data-arg="${L.plusTage(d, -1)}">‹</button><b>${datumLang(d)}</b><button class="chip" data-go="hygiene" data-arg="${L.plusTage(d, 1)}" ${d >= heute() ? "disabled" : ""}>›</button></div>
         ${liste.length ? `<div class="balken" aria-hidden="true"><span style="width:${s.quote || 0}%"></span></div>
-        <div class="summe"><span class="marke-s gruen">${s.erledigt} erledigt</span><span class="marke-s gelb">${s.faellig} fällig</span><span class="marke-s rot">${s.ueberfaellig} überfällig</span>${s.abweichung ? `<span class="marke-s rot">${s.abweichung} Abweichung</span>` : ""}<span class="marke-s">${s.spaeter} später</span></div>` : '<p class="muted">Heute ist der Shop geschlossen.</p>'}</div>
+        <div class="summe"><span class="marke-s gruen">${s.erledigt} erledigt</span><span class="marke-s gelb">${s.faellig} fällig</span><span class="marke-s rot">${s.ueberfaellig} überfällig</span>${s.abweichung ? `<span class="marke-s rot">${s.abweichung} Abweichung</span>` : ""}<span class="marke-s">${s.spaeter} später</span></div>` : '<p class="muted">${f.art === "mobil" ? "An diesem Tag hat der mobile Stand keinen Einsatz." : "An diesem Tag ist der Shop geschlossen."}</p>'}</div>
       <div class="wahl"><button class="${hygFilter === "alle" ? "an" : ""}" data-act="hygfilter" data-f="alle">Alle</button><button class="${hygFilter === "meine" ? "an" : ""}" data-act="hygfilter" data-f="meine">Für mich</button>
         ${bereiche.map((b) => `<button class="${hygFilter === b.id ? "an" : ""}" data-act="hygfilter" data-f="${b.id}">${esc(b.name)}</button>`).join("")}</div>
       <div class="liste">${sicht.length ? sicht.map(hygZeile).join("") : '<p class="leer">Keine Aufgaben in dieser Auswahl.</p>'}</div>`;
@@ -296,16 +315,17 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         ${m.schritte.map((t, i) => `<label class="haken"><input type="checkbox" data-schritt="${i}" ${entwurf.schritte[i] ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}
         ${m.nachkontrolle ? `<p class="hinweis">🔁 In ${m.nachkontrolle} Minuten wird automatisch eine Nachkontrolle angelegt.</p>` : ""}
         ${bew === "kritisch" ? '<p class="hinweis rot">Die Shopleitung wird sofort informiert.</p>' : ""}</div>` : ""}
-      <button class="btn gross" data-act="abhaken" ${bew === "offen" || !alleSchritte ? "disabled" : ""}>${bew === "offen" ? "Bitte alles ausfüllen" : !alleSchritte ? "Bitte Maßnahme abhaken" : "✓ Abhaken"}</button>
-      <button class="btn drei" data-act="nicht-moeglich">Nicht möglich …</button>`;
+      ${berater() ? '<p class="hinweis">Nur Ansicht: Abhaken kann nur das Team im Shop.</p>' : `<button class="btn gross" data-act="abhaken" ${bew === "offen" || !alleSchritte ? "disabled" : ""}>${bew === "offen" ? "Bitte alles ausfüllen" : !alleSchritte ? "Bitte Maßnahme abhaken" : "✓ Abhaken"}</button>
+      <button class="btn drei" data-act="nicht-moeglich">Nicht möglich …</button>`}`;
   };
 
   // ----- Rezepte und Quiz -----
   V.rezepte = () => {
-    const R = S.rezepte;
-    const liste = R.rezepte.filter((r) => rezeptGruppe === "alle" || r.gruppe === rezeptGruppe);
-    return `${titel("Rezepte")}${frootie(FROOTIE_TIPPS.rezepte)}
-      <div class="gruppen wahl"><button class="${rezeptGruppe === "alle" ? "an" : ""}" data-act="rgruppe" data-g="alle">Alle</button>${R.warengruppen.map((g) => `<button class="${rezeptGruppe === g.id ? "an" : ""}" data-act="rgruppe" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div>
+    const R = S.rezepte, gruppen = sortiment(FIL());
+    if (rezeptGruppe !== "alle" && !gruppen.some((g) => g.id === rezeptGruppe)) rezeptGruppe = "alle";
+    const liste = R.rezepte.filter((r) => gruppen.some((g) => g.id === r.gruppe) && (rezeptGruppe === "alle" || r.gruppe === rezeptGruppe));
+    return `${titel("Rezepte " + esc(FIL().kurz))}${frootie(FROOTIE_TIPPS.rezepte)}
+      <div class="gruppen wahl"><button class="${rezeptGruppe === "alle" ? "an" : ""}" data-act="rgruppe" data-g="alle">Alle</button>${gruppen.map((g) => `<button class="${rezeptGruppe === g.id ? "an" : ""}" data-act="rgruppe" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div>
       <button class="btn zwei" data-go="quiz">🎯 Rezept-Quiz starten</button>
       <div class="liste">${liste.map((r) => { const g = R.warengruppen.find((x) => x.id === r.gruppe); const al = L.allergeneVon(r);
         return `<button class="zeile" data-go="rezept" data-arg="${r.id}"><span style="font-size:1.6rem">${g.sym}</span><span><b>${esc(r.name)}</b><small>${esc(r.beschreibung)}${al.length ? ` · Allergene: ${al.map(esc).join(", ")}` : ""}</small></span><span>›</span></button>`; }).join("")}</div>
@@ -327,7 +347,7 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         <p class="klein muted">🎬 Arbeitsvideo folgt.</p></div>`;
   };
   V.quiz = () => {
-    if (!quizStand) quizStand = { fragen: L.quiz(S.rezepte.rezepte, S.rezepte.warengruppen, 10, Date.now() % 100000), nr: 0, punkte: 0, gewaehlt: null };
+    if (!quizStand) { const gr = sortiment(FIL()); quizStand = { fragen: L.quiz(S.rezepte.rezepte.filter((r) => gr.some((g) => g.id === r.gruppe)), gr, 10, Date.now() % 100000), nr: 0, punkte: 0, gewaehlt: null }; }
     const q = quizStand;
     if (q.nr >= q.fragen.length) {
       const lob = q.punkte >= 9 ? "Wow, Rezept-Profi! 🏆" : q.punkte >= 6 ? "Gut gemacht! 👍" : "Schau dir die Rezepte nochmal an, dann klappt es beim nächsten Mal. 💪";
@@ -361,11 +381,12 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
     const pub = S.veroeffentlicht[`${f.id}|${mo}`];
     const tage = L.woche(mo).map((d) => {
       const o = L.oeffnung(f, d);
-      if (!o) return `<div class="tag zu"><b>${datumLang(d)}</b><span class="muted klein">geschlossen</span></div>`;
-      return `<div class="tag"><div class="reihe zw"><b>${datumLang(d)}</b><span class="muted klein">${L.minZuZeit(o.auf)}–${L.minZuZeit(o.zu)}</span></div>
-        ${L.SCHICHTEN.map((sch) => { const ab = L.abdeckung(S, f.id, d, sch.id);
+      if (!o) return `<div class="tag zu"><b>${datumLang(d)}</b><span class="muted klein">${f.art === "mobil" ? "kein Einsatz" : "geschlossen"}</span></div>`;
+      return `<div class="tag"><div class="reihe zw"><b>${datumLang(d)}</b><span class="muted klein">${o.ort ? "📍 " + esc(o.ort) + " · " : ""}${L.minZuZeit(o.auf)}–${L.minZuZeit(o.zu)}</span></div>
+        ${L.SCHICHTEN.filter((sch) => L.schichtZeit(f, d, sch.id)).map((sch) => { const ab = L.abdeckung(S, f.id, d, sch.id);
+          const einzeln = !L.schichtZeit(f, d, "spaet");
           const leute = L.schichtenAm(S, d, (s) => s.filiale === f.id && s.schicht === sch.id);
-          return `<div class="slot"><div class="kopfz"><span><span class="punkt ${ab.ampel}" style="display:inline-block;vertical-align:-2px"></span> ${sch.name}</span><span>${zeitTxt(L.schichtZeit(f, d, sch.id))} · ${ab.ist}/${ab.soll}</span></div>
+          return `<div class="slot"><div class="kopfz"><span><span class="punkt ${ab.ampel}" style="display:inline-block;vertical-align:-2px"></span> ${einzeln ? "Einsatz" : sch.name}</span><span>${zeitTxt(L.schichtZeit(f, d, sch.id))} · ${ab.ist}/${ab.soll}</span></div>
             <div class="namen">${leute.map((s) => { const p = person(s.personId); const fehlt = L.abwesenheitAm(S, s.personId, d);
               return `<button class="name ${p.stammfiliale !== f.id ? "springer" : ""} ${fehlt ? "fehlt" : ""}" data-act="plan-weg" data-id="${s.id}" title="Antippen zum Entfernen">${esc(p.vorname)}${p.stammfiliale !== f.id ? " ↔" : ""}${fehlt ? (fehlt.art === "krank" ? " 🤒" : " 🏖️") : ""}</button>`; }).join("")}
               <button class="name plus" data-act="plan-plus" data-datum="${d}" data-schicht="${sch.id}">+ einteilen</button></div></div>`; }).join("")}</div>`;
@@ -482,13 +503,14 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
   };
   V.ma = () => `${titel("Mitarbeiter")}${frootie(FROOTIE_TIPPS.ma)}
     <button class="btn zwei" data-act="ma-neu">+ Mitarbeiter anlegen</button>
+    <div class="abschnitt"><h2>Zentrale & Beratung</h2><div class="liste">${S.personen.filter((p) => !p.stammfiliale).map((p) => `<div class="zeile"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · sieht alle Filialen</small></span><span></span></div>`).join("")}</div></div>
     ${S.filialen.map((f) => `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === f.id).map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · ${p.wochenstunden} Std.${p.springer ? ` · Springer: ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}`;
   V["ma-edit"] = () => {
     const p = person(arg);
     if (!p) return `${titel("Mitarbeiter", "ma")}<p class="leer">Nicht gefunden.</p>`;
     return `${titel("Mitarbeiter bearbeiten", "ma")}
       <div class="karte"><div class="gitter2"><div class="feld"><label for="m-vor">Vorname</label><input type="text" id="m-vor" value="${esc(p.vorname)}"></div><div class="feld"><label for="m-nach">Nachname</label><input type="text" id="m-nach" value="${esc(p.nachname)}"></div></div>
-        <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle</label><select id="m-rolle">${Object.entries(L.ROLLEN).filter(([k]) => k !== "zentrale").map(([k, r]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>
+        <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle</label><select id="m-rolle">${Object.entries(L.ROLLEN).filter(([k]) => !L.UEBERGREIFEND.includes(k)).map(([k, r]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>
           <div class="feld"><label for="m-stamm">Stammfiliale</label><select id="m-stamm">${S.filialen.map((f) => `<option value="${f.id}" ${p.stammfiliale === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div></div>
         <div class="feld"><label for="m-std">Wochenstunden laut Vertrag</label><input type="number" id="m-std" min="0" max="48" value="${p.wochenstunden}"></div>
         <label class="haken"><input type="checkbox" id="m-springer" ${p.springer ? "checked" : ""}><span><b>Springer</b>: darf in anderen Filialen aushelfen</span></label>
@@ -496,12 +518,61 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
         <label class="haken"><input type="checkbox" id="m-aktiv" ${p.aktiv !== false ? "checked" : ""}><span>aktiv (ausgetretene Mitarbeiter abwählen)</span></label>
         <button class="btn gross" data-act="ma-speichern" data-id="${p.id}">Speichern</button></div>`;
   };
-  V.filialen = () => `${titel("Filialen")}${S.filialen.map((f) => `<div class="karte"><h2>${esc(f.name)}</h2>
-    ${["mo", "di", "mi", "do", "fr", "sa", "so"].map((t) => { const z = f.oeffnung[t]; return `<div class="reihe"><span style="width:90px">${L.TAG_NAME[t]}</span>
-      <input type="time" style="width:auto" data-oz="${f.id}|${t}|0" value="${z ? z[0] : ""}" aria-label="${L.TAG_NAME[t]} auf"><span>–</span><input type="time" style="width:auto" data-oz="${f.id}|${t}|1" value="${z ? z[1] : ""}" aria-label="${L.TAG_NAME[t]} zu">${z ? "" : '<span class="muted klein">geschlossen</span>'}</div>`; }).join("")}
+  V.filialen = () => `${titel("Filialen")}${frootie(FROOTIE_TIPPS.filialen)}${S.filialen.map((f) => `<div class="karte"><div class="reihe zw"><h2>${esc(f.name)}</h2><span>${f.pilot ? '<span class="marke-s gruen">Pilot</span> ' : ""}<span class="marke-s">${esc(f.marke || "")}</span></span></div>
+    ${f.art === "mobil" ? `<p class="muted klein">Mobiler Stand: geöffnet nur an Einsatztagen.</p>
+      <div class="liste">${(f.einsaetze || []).slice().sort((a, b) => a.datum.localeCompare(b.datum)).map((e, i) => `<div class="zeile"><span class="punkt ${e.datum >= heute() ? "gruen" : ""}"></span><span><b>${datumLang(e.datum)}</b> ${e.von}–${e.bis}<small>📍 ${esc(e.ort)}</small></span><button class="chip" data-act="einsatz-weg" data-f="${f.id}" data-datum="${e.datum}">entfernen</button></div>`).join("") || '<p class="leer">Noch keine Einsätze.</p>'}</div>
+      <div class="gitter2"><div class="feld"><label for="e-${f.id}-d">Datum</label><input type="date" id="e-${f.id}-d" value="${L.plusTage(heute(), 7)}"></div><div class="feld"><label for="e-${f.id}-o">Ort</label><input type="text" id="e-${f.id}-o" maxlength="80" placeholder="z. B. Stadtfest Ochtrup"></div></div>
+      <div class="gitter2"><div class="feld"><label for="e-${f.id}-v">Von</label><input type="time" id="e-${f.id}-v" value="11:00"></div><div class="feld"><label for="e-${f.id}-b">Bis</label><input type="time" id="e-${f.id}-b" value="20:00"></div></div>
+      <button class="btn zwei" data-act="einsatz-neu" data-f="${f.id}">+ Einsatz anlegen</button>`
+    : ["mo", "di", "mi", "do", "fr", "sa", "so"].map((t) => { const z = f.oeffnung[t]; return `<div class="oz-zeile"><span>${L.TAG_NAME[t].slice(0, 2)}${z ? "" : ' <span class="muted klein">zu</span>'}</span>
+      <input type="time" data-oz="${f.id}|${t}|0" value="${z ? z[0] : ""}" aria-label="${L.TAG_NAME[t]} auf"><span>–</span><input type="time" data-oz="${f.id}|${t}|1" value="${z ? z[1] : ""}" aria-label="${L.TAG_NAME[t]} zu"></div>`; }).join("")}
     <div class="gitter2"><div class="feld"><label for="b-${f.id}-f">Besetzung Frühdienst</label><input type="number" min="0" max="9" id="b-${f.id}-f" data-bedarf="${f.id}|frueh" value="${f.bedarf.standard.frueh}"></div>
       <div class="feld"><label for="b-${f.id}-s">Besetzung Spätdienst</label><input type="number" min="0" max="9" id="b-${f.id}-s" data-bedarf="${f.id}|spaet" value="${f.bedarf.standard.spaet}"></div></div>
-    <p class="klein muted">Leere Zeiten = geschlossen. Samstags gilt eine eigene Besetzung (${f.bedarf.sa ? f.bedarf.sa.frueh + "/" + f.bedarf.sa.spaet : "wie Standard"}).</p></div>`).join("")}`;
+    <div class="feld"><span class="lbl">Sortiment (Warengruppen, die diese Filiale verkauft)</span><div class="wahl">${S.rezepte.warengruppen.map((g) => `<button class="${!f.sortiment || f.sortiment.includes(g.id) ? "an" : ""}" data-act="sortiment" data-f="${f.id}" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div></div>
+    ${f.art === "mobil" ? "" : `<p class="klein muted">Leere Zeiten = geschlossen.${f.bedarf.sa ? ` Samstags gilt eine eigene Besetzung (${f.bedarf.sa.frueh}/${f.bedarf.sa.spaet}).` : ""}</p>`}</div>`).join("")}`;
+  V.rezeptpflege = () => `${titel("Rezepte pflegen")}${frootie(FROOTIE_TIPPS.rezeptpflege)}
+    <button class="btn zwei" data-act="rezept-neu">+ Neues Rezept</button>
+    ${S.rezepte.warengruppen.map((g) => { const rs = S.rezepte.rezepte.filter((r) => r.gruppe === g.id); const fil = S.filialen.filter((f) => !f.sortiment || f.sortiment.includes(g.id)).map((f) => f.kurz);
+      return `<div class="abschnitt"><h2>${g.sym} ${esc(g.name)}</h2><p class="klein muted">verkauft in: ${fil.map(esc).join(", ") || "keiner Filiale"}</p><div class="liste">${rs.map((r) => `<button class="zeile" data-go="rezept-edit" data-arg="${r.id}"><span class="punkt gruen"></span><span><b>${esc(r.name)}</b><small>${r.zutaten.length} Zutaten · Allergene: ${L.allergeneVon(r).map(esc).join(", ") || "keine"}</small></span><span>›</span></button>`).join("") || '<p class="leer">Noch keine Rezepte.</p>'}</div></div>`; }).join("")}`;
+  V["rezept-edit"] = () => {
+    const r = S.rezepte.rezepte.find((x) => x.id === arg);
+    if (!r) return `${titel("Rezept", "rezeptpflege")}<p class="leer">Nicht gefunden.</p>`;
+    const zl = r.zutaten.map((z) => `${z.name} | ${typeof z.menge === "object" ? r.groessen.map((g) => z.menge[g]).join("/") : z.menge} | ${z.einheit} | ${z.allergene.join(", ")}`).join("\n");
+    return `${titel("Rezept bearbeiten", "rezeptpflege")}
+      <div class="karte"><div class="feld"><label for="rz-name">Name</label><input type="text" id="rz-name" value="${esc(r.name)}" maxlength="80"></div>
+        <div class="gitter2"><div class="feld"><label for="rz-gruppe">Warengruppe</label><select id="rz-gruppe">${S.rezepte.warengruppen.map((g) => `<option value="${g.id}" ${g.id === r.gruppe ? "selected" : ""}>${g.sym} ${esc(g.name)}</option>`).join("")}</select></div>
+          <div class="feld"><label for="rz-gr">Größen (mit Komma)</label><input type="text" id="rz-gr" value="${esc(r.groessen.join(", "))}"></div></div>
+        <div class="feld"><label for="rz-beschr">Beschreibung</label><input type="text" id="rz-beschr" value="${esc(r.beschreibung)}" maxlength="160"></div>
+        <div class="feld"><label for="rz-stand">Standzeit (freiwillig)</label><input type="text" id="rz-stand" value="${esc(r.standzeit || "")}" placeholder="z. B. 4 Std. in der Vitrine"></div></div>
+      <div class="karte"><h2>Zutaten</h2><p class="klein muted">Eine Zutat pro Zeile: <b>Name | Mengen je Größe mit / | Einheit | Allergene</b>. Beispiel: <i>Granola | 20/30/40 | g | Gluten, Schalenfrüchte</i></p>
+        <textarea id="rz-zut" rows="7">${esc(zl)}</textarea>
+        <p class="klein muted">Erlaubte Allergene: ${D.ALLERGENE.map(esc).join(", ")}</p></div>
+      <div class="karte"><h2>Zubereitung</h2><p class="klein muted">Ein Schritt pro Zeile.</p><textarea id="rz-schritte" rows="5">${esc(r.schritte.join("\n"))}</textarea></div>
+      <button class="btn gross" data-act="rezept-speichern" data-id="${r.id}">Speichern</button>`;
+  };
+  V.export = () => {
+    const f = FIL(), monat = arg || heute().slice(0, 7);
+    const vor = (() => { const [y, m] = monat.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+    const nach = (() => { const [y, m] = monat.split("-").map(Number); const d = new Date(y, m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+    const z = L.stundenliste(S, monat, f.id);
+    const hm = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+    const proPerson = {};
+    for (const x of z) proPerson[x.personId] = (proPerson[x.personId] || 0) + x.arbeit;
+    const offen = z.filter((x) => x.offen).length;
+    return `${titel("Stundenliste " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.export)}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="export" data-arg="${vor}">‹</button><b>${monat.slice(5)}/${monat.slice(0, 4)}</b><button class="chip" data-go="export" data-arg="${nach}" ${nach > heute().slice(0, 7) ? "disabled" : ""}>›</button></div>
+        ${offen ? `<p class="hinweis rot">${offen} Tag${offen > 1 ? "e" : ""} ohne „Gehen“. Bitte vor dem Export klären.</p>` : ""}
+        <div class="liste">${Object.entries(proPerson).map(([pid, m]) => `<div class="zeile"><span class="punkt gruen"></span><span><b>${esc(name(person(pid)))}</b><small>${z.filter((x) => x.personId === pid).length} Tage</small></span><span><b>${hm(m)} Std.</b></span></div>`).join("") || '<p class="leer">Keine Stempelzeiten in diesem Monat.</p>'}</div>
+        ${z.length ? `<div class="reihe"><button class="btn" data-act="export-csv" data-monat="${monat}">📤 CSV herunterladen</button><button class="btn drei" data-act="export-text" data-monat="${monat}">Als Text anzeigen</button></div>` : ""}
+        <textarea id="export-text" rows="8" readonly hidden aria-label="Stundenliste als Text"></textarea>
+        <p class="klein muted">Spalten: Name; Datum; Filiale; Kommen; Gehen; Pause (Min.); Arbeit (Std.); Hinweis. Trennzeichen Semikolon, passt für Excel und den Steuerberater.</p></div>`;
+  };
+  function exportCsv(monat) {
+    const f = FIL();
+    const z = L.stundenliste(S, monat, f.id);
+    return L.csv(z.map((x) => [name(person(x.personId)), L.datumKurz(x.datum).slice(3) + monat.slice(0, 4), filiale(x.filiale).kurz, x.kommen, x.gehen, x.pause, (x.arbeit / 60).toFixed(2).replace(".", ","), x.offen ? "Gehen fehlt" : ""]),
+      ["Name", "Datum", "Filiale", "Kommen", "Gehen", "Pause (Min.)", "Arbeit (Std.)", "Hinweis"]);
+  }
   V.regeln = () => {
     const H = S.hygiene;
     return `${titel("Hygieneregeln (alle Filialen)")}${frootie(FROOTIE_TIPPS.regeln)}
@@ -542,11 +613,15 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
-    const nurLeitung = ["plan", "antraege", "offen", "hygkontrolle", "hygregeln", "stempelzeiten", "team"];
-    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "regeln", "regel-edit"];
+    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export"];
+    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen"];
+    const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
+    if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
     if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
-    if (zentrale() && ["dienst", "wuensche", "krank", "urlaub", "stechuhr"].includes(rechte)) rechte = "start";
+    if (nurQualitaet.includes(rechte) && !qualitaet()) rechte = "start";
+    if (berater() && ["quiz", "pinnwand"].includes(rechte)) rechte = "start";
+    if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "stechuhr"].includes(rechte)) rechte = "start";
     ansicht = rechte;
     const inhalt = (V[ansicht] || V.start)();
     $("#app").innerHTML = `${updateBand}${kopf()}<main>${inhalt}</main>${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
@@ -650,11 +725,54 @@ const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in
       if (pp && pp.art === "messwert") { pp.max = Number($("#r-max").value); pp.krit = Number($("#r-krit").value); }
       speichern(); meldung("Regel gespeichert. Gilt ab sofort in allen passenden Filialen."); gehe("regeln");
     },
+    "einsatz-neu": (el) => {
+      const fid = el.dataset.f, f = filiale(fid), d = $(`#e-${fid}-d`).value, o = $(`#e-${fid}-o`).value.trim(), v = $(`#e-${fid}-v`).value, b = $(`#e-${fid}-b`).value;
+      if (!d || !o || !v || !b || b <= v) return meldung("Bitte Datum, Ort und Zeiten prüfen");
+      f.einsaetze = (f.einsaetze || []).filter((e) => e.datum !== d); f.einsaetze.push({ datum: d, ort: o, von: v, bis: b });
+      speichern(); meldung("Einsatz angelegt. Er erscheint im Einsatzplan und in der Hygiene-Liste."); zeichnen();
+    },
+    "einsatz-weg": (el) => { const f = filiale(el.dataset.f); f.einsaetze = f.einsaetze.filter((e) => e.datum !== el.dataset.datum); speichern(); zeichnen(); },
+    sortiment: (el) => {
+      const f = filiale(el.dataset.f), g = el.dataset.g;
+      const akt = f.sortiment ? [...f.sortiment] : S.rezepte.warengruppen.map((x) => x.id);
+      f.sortiment = akt.includes(g) ? akt.filter((x) => x !== g) : [...akt, g];
+      speichern(); zeichnen();
+    },
+    "rezept-neu": () => { const r = { id: neueId("z"), gruppe: S.rezepte.warengruppen[0].id, name: "Neues Rezept", beschreibung: "", groessen: ["S", "M", "L"], zutaten: [], schritte: [] }; S.rezepte.rezepte.push(r); speichern(); gehe("rezept-edit", r.id); },
+    "rezept-speichern": (el) => {
+      const r = S.rezepte.rezepte.find((x) => x.id === el.dataset.id);
+      const groessen = $("#rz-gr").value.split(",").map((x) => x.trim()).filter(Boolean);
+      if (!groessen.length) return meldung("Bitte mindestens eine Größe angeben");
+      const fehler = [], zutaten = [];
+      $("#rz-zut").value.split("\n").map((z) => z.trim()).filter(Boolean).forEach((zeile, i) => {
+        const [n, m, e, a] = zeile.split("|").map((x) => (x || "").trim());
+        const mengen = (m || "").split("/").map((x) => Number(x.replace(",", ".")));
+        if (!n || mengen.some((x) => isNaN(x)) || (mengen.length !== 1 && mengen.length !== groessen.length)) { fehler.push(i + 1); return; }
+        const allergene = (a || "").split(",").map((x) => x.trim()).filter(Boolean);
+        const unbekannt = allergene.filter((x) => !D.ALLERGENE.includes(x));
+        if (unbekannt.length) { fehler.push(`${i + 1} (${unbekannt.join(", ")})`); return; }
+        zutaten.push({ name: n, menge: mengen.length === 1 ? mengen[0] : Object.fromEntries(groessen.map((g, k) => [g, mengen[k]])), einheit: e || "g", allergene });
+      });
+      if (fehler.length) return meldung("Zutat-Zeile prüfen: " + fehler.join(", "));
+      Object.assign(r, { name: $("#rz-name").value.trim() || r.name, gruppe: $("#rz-gruppe").value, groessen, beschreibung: $("#rz-beschr").value.trim(), standzeit: $("#rz-stand").value.trim() || undefined,
+        zutaten, schritte: $("#rz-schritte").value.split("\n").map((x) => x.trim()).filter(Boolean) });
+      speichern(); meldung("Rezept gespeichert. Alle Filialen sehen es sofort."); gehe("rezeptpflege");
+    },
+    "export-csv": (el) => {
+      const text = exportCsv(el.dataset.monat);
+      try {
+        const url = URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv;charset=utf-8" }));
+        const a = document.createElement("a"); a.href = url; a.download = `stunden-${FIL().kurz.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${el.dataset.monat}.csv`;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+        meldung("Datei wird gespeichert. Falls nicht: „Als Text anzeigen“.");
+      } catch (e) { AKT["export-text"](el); }
+    },
+    "export-text": (el) => { const t = $("#export-text"); t.hidden = false; t.value = exportCsv(el.dataset.monat); t.focus(); t.select(); },
     "update-pruefen": () => updatePruefen(true),
     "update-jetzt": () => { if (wartend) wartend.postMessage("jetzt-aktivieren"); },
   };
   function hygSpeichern(grund) {
-    const a = aufgabeFinden(arg); if (!a || a.durchfuehrung) return;
+    const a = aufgabeFinden(arg); if (!a || a.durchfuehrung || berater()) return;
     const r = a.regel, m = S.hygiene.massnahmen.find((x) => x.id === r.massnahme);
     const werte = {}; r.pruefpunkte.forEach((pp, i) => { werte[i] = entwurf.werte[i] == null ? null : entwurf.werte[i]; });
     const bew = grund ? "kritisch" : L.bewerte(r, werte);
