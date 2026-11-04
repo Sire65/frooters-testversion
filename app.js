@@ -1,0 +1,723 @@
+const APP_VERSION = "0.1.2"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+// frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
+(function () {
+  "use strict";
+  const L = window.FRL, D = window.FRD;
+  if (document.currentScript && document.currentScript.dataset.v !== APP_VERSION) {
+    // Mischstand alter Seite und neuem Programm (KICC-Regel 16): einmal frisch laden
+    try { if (sessionStorage.getItem("fr_mischstand") !== APP_VERSION) { sessionStorage.setItem("fr_mischstand", APP_VERSION); location.reload(); return; } } catch (e) { /* weiter */ }
+  }
+  const A = D.adapter("demo");
+  let S = A.laden();
+  if (!S || S.version !== 1) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  let sitzung = {};
+  try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
+  const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
+  const speichern = () => { if (!A.speichern(S)) meldung("Speichern im Browser nicht möglich"); };
+  const neueId = (p) => `${p}${S.naechsteId++}`;
+
+  // ---------- Hilfen ----------
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const $ = (sel) => document.querySelector(sel);
+  const heute = () => L.iso(new Date());
+  const jetztMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+  const jetztIso = () => { const d = new Date(); return `${L.iso(d)}T${L.minZuZeit(d.getHours() * 60 + d.getMinutes())}:${String(d.getSeconds()).padStart(2, "0")}`; };
+  const person = (id) => S.personen.find((p) => p.id === id);
+  const filiale = (id) => S.filialen.find((f) => f.id === id);
+  const name = (p) => p ? `${p.vorname} ${p.nachname}`.trim() : "–";
+  const ICH = () => person(sitzung.ich);
+  const FIL = () => filiale(sitzung.filiale) || filiale(ICH() && ICH().stammfiliale) || S.filialen[0];
+  const leitung = () => L.istLeitung(ICH(), FIL().id);
+  const zentrale = () => ICH() && ICH().rolle === "zentrale";
+  const meineFilialen = () => zentrale() ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
+  let meldTimer;
+  function meldung(t) { let m = $(".meldung"); if (!m) { m = document.createElement("div"); m.className = "meldung"; m.setAttribute("role", "status"); document.body.appendChild(m); } m.textContent = t; clearTimeout(meldTimer); meldTimer = setTimeout(() => m.remove(), 2600); }
+  const zeitTxt = (s) => s ? `${L.minZuZeit(s.start)}–${L.minZuZeit(s.ende)}` : "";
+  const schichtTxt = (fil, datum, sch) => `${L.schicht(sch).name} ${zeitTxt(L.schichtZeit(fil, datum, sch))}`;
+  const datumLang = (s) => { const d = L.ausIso(s); return `${L.TAG_NAME[L.wochentag(s)]}, ${d.getDate()}.${d.getMonth() + 1}.`; };
+  const offeneAntraege = (fid) => S.abwesenheiten.filter((a) => a.status === "beantragt" && (person(a.personId) || {}).stammfiliale === fid);
+  const offeneSchichten = (fid, von, tage) => {
+    const r = []; const f = filiale(fid);
+    for (let i = 0; i < tage; i++) {
+      const d = L.plusTage(von, i);
+      if (!S.veroeffentlicht[`${fid}|${L.montag(d)}`]) continue; // nur veröffentlichte Wochen, Entwürfe plant die Leitung noch
+      for (const sch of L.SCHICHTEN) { const a = L.abdeckung(S, fid, d, sch.id); if (a.soll > a.ist) r.push({ datum: d, schicht: sch.id, fehlen: a.soll - a.ist, f }); }
+    }
+    return r;
+  };
+  const leitungsMeldungen = (fid) => (S.meldungen || []).filter((m) => m.filiale === fid && !m.erledigt);
+
+  // ---------- Frootie ----------
+  const FROOTIE_TIPPS = {
+    start: "Hallo! Ich bin Frootie. Tipp auf eine Kachel, ich helfe dir überall mit dem ❓ weiter.",
+    dienst: "Hier siehst du deine Schichten, auch die in anderen Filialen, wenn du als Springer eingeteilt bist.",
+    wuensche: "Tipp für jeden Tag an, ob du möchtest, kannst oder nicht kannst. Die Shopleitung sieht das beim Planen.",
+    krank: "Gute Besserung! Melde dich hier krank, deine Shopleitung bekommt sofort Bescheid. Diagnosen gehören hier nicht hin.",
+    urlaub: "Stell deinen Urlaubsantrag hier. Du siehst sofort, ob er genehmigt ist.",
+    stechuhr: "Kommen, Pause, Gehen: einfach antippen. Am Stand geht es auch mit deinem Ausweis-QR.",
+    hygiene: "Das ist die Hygiene-Liste für heute. Gelb ist jetzt fällig, rot ist überfällig. Tipp drauf und hak ab.",
+    aufgabe: "Trag den Wert ein. Wenn etwas nicht stimmt, zeige ich dir sofort, was zu tun ist.",
+    rezepte: "Alle Rezepte nach Warengruppen. Im Rezept kannst du die Größe wechseln, die Mengen rechnen mit.",
+    quiz: "Kennst du unsere Rezepte? 10 Fragen, los geht's!",
+    pinnwand: "Kurze Infos für den Shop. Wichtige Zettel stehen oben.",
+    plan: "Tipp auf + um jemanden einzuteilen. Springer aus anderen Filialen siehst du mit grauem Rand.",
+    antraege: "Urlaubsanträge deines Teams. Genehmigte Tage werden im Plan automatisch frei.",
+    offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
+    hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
+    hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    ma: "Hier pflegst du die Mitarbeiter. Springer bekommen einen Haken bei jeder Filiale, in der sie aushelfen dürfen.",
+    regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
+    auswertung: "Jede Filiale einzeln und alle zusammen.",
+  };
+  function frootie(text) { return `<div class="frootie"><img src="frootie.svg" alt="Frootie"><div class="blase">${text}</div></div>`; }
+
+  // ---------- Ansichten ----------
+  const V = {};
+  let ansicht = "start", arg = null, fenster = null, quizStand = null, hygFilter = "alle", rezeptGruppe = "alle", rezeptGroesse = {};
+
+  function kopf() {
+    const p = ICH();
+    const fil = FIL();
+    const mehr = p && meineFilialen().length > 1;
+    return `<header class="kopf">
+      <button class="marke" data-go="start" aria-label="Startseite"><img src="frootie.svg" alt=""><span class="wort">frooters <b>Team</b></span></button>
+      <div class="rechts">${p ? `<button class="chip fil" ${mehr ? 'data-act="filiale-wahl"' : "disabled"} aria-label="Filiale wechseln">📍 ${esc(fil.kurz)}${mehr ? " ▾" : ""}</button>
+      <button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>` : ""}</div></header>
+      <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser</div>`;
+  }
+  function titel(t, zurueck) {
+    return `<div class="titel">${zurueck !== false ? `<button class="zurueck" data-go="${zurueck || "start"}" aria-label="Zurück">←</button>` : ""}<h1>${t}</h1>
+      <button class="chip" data-act="hilfe" aria-label="Frootie fragen" style="margin-left:auto">❓</button></div>`;
+  }
+  function kachel(sym, t, u, go, zahl) { return `<button class="kachel" data-go="${go}"><span class="sym" aria-hidden="true">${sym}</span><b>${t}</b><span>${u}</span>${zahl ? `<span class="zahl">${zahl}</span>` : ""}</button>`; }
+
+  V.login = () => {
+    const gruppen = [{ id: null, name: "Zentrale" }, ...S.filialen];
+    return `${titel("Wer bist du?", ICH() ? "start" : false)}
+      ${frootie("Das ist die Testversion. Wähle eine Person, um die App aus ihrer Sicht zu sehen. In der echten App meldest du dich mit deinem persönlichen Zugang an.")}
+      ${gruppen.map((g) => `<div class="abschnitt"><h2>${esc(g.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === g.id && p.aktiv !== false).map((p) =>
+        `<button class="zeile" data-act="ich" data-id="${p.id}"><span class="punkt ${p.id === sitzung.ich ? "gruen" : ""}"></span><span>${esc(name(p))}<small>${L.ROLLEN[p.rolle].name}${p.springer ? " · Springer" : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}
+      <div class="karte"><p class="klein muted">Beispieldaten zurücksetzen: Alle Änderungen in dieser Testversion werden gelöscht.</p><button class="btn drei" data-act="reset">Beispieldaten neu laden</button></div>`;
+  };
+
+  V.start = () => {
+    const p = ICH(), f = FIL(), d = heute();
+    const meine = L.schichtenAm(S, d, (s) => s.personId === p.id);
+    const st = L.stempelStatus(L.stempelAm(S, p.id, d));
+    const hl = L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() });
+    const hs = L.tagesSumme(hl);
+    const meineAufg = hl.filter((a) => (a.status === "faellig" || a.status === "ueberfaellig") && a.zustaendig.ids.includes(p.id)).length;
+    const pin = S.pinnwand.filter((n) => n.filiale === f.id || n.filiale === null).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit))[0];
+    const krank = L.abwesenheitAm(S, p.id, d);
+    let k = "";
+    if (!zentrale()) {
+      k += `<div class="abschnitt"><h2>Mein Bereich</h2><div class="kacheln">
+        ${kachel("🗓️", "Mein Dienstplan", "Meine Schichten", "dienst")}
+        ${kachel("📝", "Dienstwünsche", "Für die nächsten Wochen", "wuensche")}
+        ${kachel("⏱️", "Stechuhr", st === "da" ? "Eingestempelt" : st === "pause" ? "In Pause" : "Kommen · Gehen", "stechuhr")}
+        ${kachel("🤒", "Krank melden", "Shopleitung wird informiert", "krank")}
+        ${kachel("🏖️", "Urlaub", "Antrag stellen", "urlaub")}
+      </div></div>`;
+    }
+    k += `<div class="abschnitt"><h2>Shop ${esc(f.kurz)}</h2><div class="kacheln">
+      ${kachel("🧼", "Hygiene heute", `${hs.erledigt + hs.abweichung} von ${hs.gesamt} erledigt`, "hygiene", hs.faellig + hs.ueberfaellig)}
+      ${kachel("📖", "Rezepte", "Nach Warengruppen", "rezepte")}
+      ${kachel("🎯", "Rezept-Quiz", "Wie gut kennst du sie?", "quiz")}
+      ${kachel("📌", "Pinnwand", "Infos für den Shop", "pinnwand")}
+    </div></div>`;
+    if (leitung()) {
+      const offen = offeneSchichten(f.id, d, 7).length;
+      k += `<div class="abschnitt"><h2>Shopleitung ${esc(f.kurz)}</h2><div class="kacheln">
+        ${kachel("📅", "Einsatzplan", "Woche planen", "plan")}
+        ${kachel("✅", "Anträge", "Urlaub genehmigen", "antraege", offeneAntraege(f.id).length)}
+        ${kachel("🚨", "Krank & offen", "Schichten besetzen", "offen", offen + leitungsMeldungen(f.id).length)}
+        ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
+        ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
+        ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
+        ${kachel("👥", "Team", "Inklusive Springer", "team")}
+      </div></div>`;
+    }
+    if (zentrale()) {
+      k += `<div class="abschnitt"><h2>Zentrale</h2><div class="kacheln">
+        ${kachel("📊", "Auswertung", "Jede Filiale und gesamt", "auswertung")}
+        ${kachel("👤", "Mitarbeiter", "Stammdaten, Springer", "ma")}
+        ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
+        ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
+      </div></div>`;
+    }
+    k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
+    const heuteKarte = zentrale() ? "" : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
+      ${krank ? `<p class="hinweis">Du bist ${krank.art === "krank" ? "krank gemeldet" : "im Urlaub"} bis ${L.datumKurz(krank.bis)}.</p>` : ""}
+      ${meine.length ? meine.map((s) => `<p>🗓️ <b>${schichtTxt(filiale(s.filiale), d, s.schicht)}</b> in ${esc(filiale(s.filiale).kurz)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
+      ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
+      ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
+    </div>`;
+    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${heuteKarte}${k}`;
+  };
+
+  // ----- Mitarbeiter -----
+  V.dienst = () => {
+    const p = ICH(), mo = L.montag(heute());
+    const tage = [...L.woche(mo), ...L.woche(L.plusTage(mo, 7))];
+    const rows = tage.map((d) => {
+      const sch = L.schichtenAm(S, d, (s) => s.personId === p.id);
+      const abw = L.abwesenheitAm(S, p.id, d);
+      const pub = sch.every((s) => S.veroeffentlicht[`${s.filiale}|${L.montag(d)}`]);
+      return `<div class="zeile ${d === heute() ? "st-faellig" : ""}"><span class="punkt ${sch.length ? "gruen" : ""}"></span><span><b>${datumLang(d)}</b>
+        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${schichtTxt(filiale(s.filiale), d, s.schicht)} · ${esc(filiale(s.filiale).kurz)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
+        <span class="marke-s ${sch.length && !pub ? "gelb" : ""}">${sch.length ? (pub ? "fest" : "Entwurf") : ""}</span></div>`;
+    }).join("");
+    const std = L.stundenInWoche(S, p.id, mo);
+    return `${titel("Mein Dienstplan")}${frootie(FROOTIE_TIPPS.dienst)}
+      <div class="karte"><p>Diese Woche: <b>${std} Std.</b> geplant${p.wochenstunden ? ` von ${p.wochenstunden} Std. laut Vertrag` : ""}.</p></div>
+      <div class="liste">${rows}</div>`;
+  };
+
+  V.wuensche = () => {
+    const p = ICH(), start = L.plusTage(L.montag(heute()), 7);
+    const tage = [...L.woche(start), ...L.woche(L.plusTage(start, 7))];
+    const fil = filiale(p.stammfiliale);
+    return `${titel("Dienstwünsche")}${frootie(FROOTIE_TIPPS.wuensche)}
+      <div class="liste">${tage.map((d) => {
+        const w = L.wunschAm(S, p.id, d) || {};
+        const zu = fil && !L.oeffnung(fil, d);
+        return `<div class="karte"><div class="reihe zw"><b>${datumLang(d)}</b>${zu ? '<span class="marke-s">Shop geschlossen</span>' : ""}</div>
+          ${zu ? "" : `<div class="wahl">${[["moechte", "😀 möchte"], ["kann", "👍 kann"], ["nicht", "✋ kann nicht"]].map(([a, t]) =>
+            `<button class="${w.art === a ? "an" : ""} ${a === "nicht" ? "nein" : ""}" data-act="wunsch" data-datum="${d}" data-art="${a}">${t}</button>`).join("")}</div>
+          ${w.art && w.art !== "nicht" ? `<div class="wahl">${[["egal", "egal"], ["frueh", "Frühdienst"], ["spaet", "Spätdienst"]].map(([s, t]) =>
+            `<button class="${(w.schicht || "egal") === s ? "an" : ""}" data-act="wunsch-schicht" data-datum="${d}" data-schicht="${s}">${t}</button>`).join("")}</div>` : ""}`}
+        </div>`;
+      }).join("")}</div>`;
+  };
+
+  V.krank = () => {
+    const p = ICH();
+    const meine = S.abwesenheiten.filter((a) => a.personId === p.id && a.art === "krank").sort((a, b) => b.von.localeCompare(a.von));
+    return `${titel("Krank melden")}${frootie(FROOTIE_TIPPS.krank)}
+      <div class="karte"><div class="gitter2"><div class="feld"><label for="k-von">Krank ab</label><input type="date" id="k-von" value="${heute()}"></div>
+        <div class="feld"><label for="k-bis">Voraussichtlich bis</label><input type="date" id="k-bis" value="${heute()}"></div></div>
+        <p class="klein muted">Ab wann du eine Arbeitsunfähigkeitsbescheinigung brauchst, steht in deinem Arbeitsvertrag. Die eAU ruft der Arbeitgeber bei der Krankenkasse ab.</p>
+        <button class="btn gross" data-act="krank">🤒 Krankmeldung absenden</button></div>
+      <div class="abschnitt"><h2>Meine Krankmeldungen</h2><div class="liste">${meine.length ? meine.map((a) => `<div class="zeile"><span class="punkt rot"></span><span>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}<small>gemeldet</small></span><span></span></div>`).join("") : '<p class="leer">Keine Krankmeldungen.</p>'}</div></div>`;
+  };
+
+  V.urlaub = () => {
+    const p = ICH();
+    const meine = S.abwesenheiten.filter((a) => a.personId === p.id && a.art === "urlaub").sort((a, b) => b.von.localeCompare(a.von));
+    const farbe = { beantragt: "gelb", genehmigt: "gruen", abgelehnt: "rot" };
+    return `${titel("Urlaub")}${frootie(FROOTIE_TIPPS.urlaub)}
+      <div class="karte"><div class="gitter2"><div class="feld"><label for="u-von">Von</label><input type="date" id="u-von" value="${L.plusTage(heute(), 14)}"></div>
+        <div class="feld"><label for="u-bis">Bis</label><input type="date" id="u-bis" value="${L.plusTage(heute(), 18)}"></div></div>
+        <div class="feld"><label for="u-notiz">Bemerkung (freiwillig)</label><input type="text" id="u-notiz" maxlength="120"></div>
+        <button class="btn gross" data-act="urlaub">🏖️ Urlaub beantragen</button></div>
+      <div class="abschnitt"><h2>Meine Anträge</h2><div class="liste">${meine.length ? meine.map((a) => `<div class="zeile"><span class="punkt ${farbe[a.status]}"></span><span>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}<small>${esc(a.notiz || "")}</small></span><span class="marke-s ${farbe[a.status]}">${a.status}</span></div>`).join("") : '<p class="leer">Noch keine Anträge.</p>'}</div></div>`;
+  };
+
+  V.stechuhr = () => {
+    const p = ICH(), d = heute(), f = FIL();
+    const e = L.stempelAm(S, p.id, d), st = L.stempelStatus(e), sum = L.stempelSumme(e, jetztIso());
+    const hinweise = L.arbeitszeitHinweise(sum, S.parameter);
+    const art = { kommen: "Kommen", pause: "Pause", weiter: "Weiter", gehen: "Gehen" };
+    const knopf = st === "aus" ? `<button class="btn gross" data-act="stempel" data-art="kommen">▶️ Kommen in ${esc(f.kurz)}</button>`
+      : st === "pause" ? `<button class="btn gross zwei" data-act="stempel" data-art="weiter">▶️ Pause beenden</button>`
+        : `<div class="gitter2"><button class="btn gross zwei" data-act="stempel" data-art="pause">☕ Pause</button><button class="btn gross" data-act="stempel" data-art="gehen">⏹️ Gehen</button></div>`;
+    return `${titel("Stechuhr")}${frootie(FROOTIE_TIPPS.stechuhr)}
+      <div class="karte"><div class="reihe zw"><b>${st === "da" ? "🟢 Eingestempelt" : st === "pause" ? "🟡 In Pause" : "⚪ Nicht eingestempelt"}</b><span class="muted klein">${datumLang(d)}</span></div>${knopf}
+        <p class="muted">Arbeit heute: <b>${Math.floor(sum.arbeit / 60)} Std. ${sum.arbeit % 60} Min.</b> · Pause: ${sum.pause} Min.</p>
+        ${hinweise.map((h) => `<p class="hinweis">${esc(h)}</p>`).join("")}</div>
+      <div class="abschnitt"><h2>Heute gestempelt</h2><div class="liste">${e.length ? e.map((x) => `<div class="zeile"><span class="punkt gruen"></span><span>${art[x.art]}<small>${esc(filiale(x.filiale).kurz)}</small></span><span>${x.zeit.slice(11, 16)}</span></div>`).join("") : '<p class="leer">Noch nichts gestempelt.</p>'}</div></div>
+      <p class="klein muted">Fehlt ein Stempel? Sag deiner Shopleitung Bescheid. Korrekturen gibt es nur mit Begründung und Freigabe.</p>`;
+  };
+
+  // ----- Hygiene -----
+  const STATUS_TXT = { erledigt: "erledigt", abweichung: "Abweichung", nicht_moeglich: "nicht möglich", faellig: "jetzt fällig", ueberfaellig: "überfällig", verpasst: "verpasst", spaeter: "später" };
+  const STATUS_FARBE = { erledigt: "gruen", abweichung: "rot", nicht_moeglich: "rot", faellig: "gelb", ueberfaellig: "rot", verpasst: "rot", spaeter: "" };
+  function hygZeile(a) {
+    const bereich = S.hygiene.bereiche.find((b) => b.id === a.regel.bereich);
+    const wer = a.zustaendig.ids.map((id) => (person(id) || {}).vorname).filter(Boolean).join(", ");
+    return `<button class="zeile st-${a.status}" data-go="aufgabe" data-arg="${esc(a.key)}"><span class="punkt"></span>
+      <span><b>${a.nachkontrolle ? "🔁 Nachkontrolle: " : ""}${esc(a.regel.titel)}</b>${a.geraet ? ` · ${esc(a.geraet.name)}` : ""}
+      <small>${L.minZuZeit(a.ab)} Uhr · ${esc(bereich ? bereich.name : "")} · ${a.durchfuehrung ? `von ${esc((person(a.durchfuehrung.personId) || {}).vorname || "")} um ${a.durchfuehrung.zeit.slice(11, 16)}` : `zuständig: ${esc(wer || "–")}${a.zustaendig.ersatz ? " (niemand eingeteilt)" : ""}`}</small></span>
+      <span class="marke-s ${STATUS_FARBE[a.status]}">${STATUS_TXT[a.status]}</span></button>`;
+  }
+  V.hygiene = () => {
+    const f = FIL(), d = arg || heute();
+    const liste = L.tagesliste(S, f.id, d, { datum: heute(), min: jetztMin() });
+    const s = L.tagesSumme(liste);
+    const bereiche = S.hygiene.bereiche.filter((b) => liste.some((a) => a.regel.bereich === b.id));
+    const sicht = liste.filter((a) => hygFilter === "alle" || (hygFilter === "meine" ? a.zustaendig.ids.includes(sitzung.ich) : a.regel.bereich === hygFilter));
+    return `${titel("Hygiene " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.hygiene)}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="hygiene" data-arg="${L.plusTage(d, -1)}">‹</button><b>${datumLang(d)}</b><button class="chip" data-go="hygiene" data-arg="${L.plusTage(d, 1)}" ${d >= heute() ? "disabled" : ""}>›</button></div>
+        ${liste.length ? `<div class="balken" aria-hidden="true"><span style="width:${s.quote || 0}%"></span></div>
+        <div class="summe"><span class="marke-s gruen">${s.erledigt} erledigt</span><span class="marke-s gelb">${s.faellig} fällig</span><span class="marke-s rot">${s.ueberfaellig} überfällig</span>${s.abweichung ? `<span class="marke-s rot">${s.abweichung} Abweichung</span>` : ""}<span class="marke-s">${s.spaeter} später</span></div>` : '<p class="muted">Heute ist der Shop geschlossen.</p>'}</div>
+      <div class="wahl"><button class="${hygFilter === "alle" ? "an" : ""}" data-act="hygfilter" data-f="alle">Alle</button><button class="${hygFilter === "meine" ? "an" : ""}" data-act="hygfilter" data-f="meine">Für mich</button>
+        ${bereiche.map((b) => `<button class="${hygFilter === b.id ? "an" : ""}" data-act="hygfilter" data-f="${b.id}">${esc(b.name)}</button>`).join("")}</div>
+      <div class="liste">${sicht.length ? sicht.map(hygZeile).join("") : '<p class="leer">Keine Aufgaben in dieser Auswahl.</p>'}</div>`;
+  };
+  function aufgabeFinden(key) {
+    const d = key.split("|")[0], fid = key.split("|")[1];
+    return L.tagesliste(S, fid, d, { datum: heute(), min: jetztMin() }).find((a) => a.key === key);
+  }
+  let entwurf = null;
+  V.aufgabe = () => {
+    const a = aufgabeFinden(arg);
+    if (!a) return `${titel("Aufgabe", "hygiene")}<p class="leer">Aufgabe nicht gefunden.</p>`;
+    const r = a.regel, m = S.hygiene.massnahmen.find((x) => x.id === r.massnahme);
+    if (!entwurf || entwurf.key !== a.key) entwurf = { key: a.key, werte: {}, schritte: {} };
+    const fertig = a.durchfuehrung;
+    if (fertig) {
+      const d = fertig;
+      return `${titel(esc(r.titel), "hygiene")}
+        <div class="karte"><p><b>${a.geraet ? esc(a.geraet.name) + " · " : ""}${L.minZuZeit(a.ab)} Uhr</b></p>
+        <p class="hinweis ${d.bewertung === "ok" ? "gruen" : "rot"}">${d.ergebnis === "nicht_moeglich" ? "Nicht möglich: " + esc(d.grund) : d.bewertung === "ok" ? "✓ Erledigt" : d.bewertung === "warn" ? "⚠️ Erledigt mit Warnung" : "🔴 Erledigt mit Abweichung"} · ${esc(name(person(d.personId)))} um ${d.zeit.slice(11, 16)}${d.nachgetragen ? " (nachgetragen)" : ""}</p>
+        ${r.pruefpunkte.map((pp, i) => `<p>${esc(pp.text)}: <b>${d.werte[i] === true ? "✓" : esc(d.werte[i] == null ? "–" : d.werte[i])}${pp.einheit ? " " + pp.einheit : ""}</b></p>`).join("")}
+        ${d.schritte && d.schritte.length ? `<p class="muted klein">Maßnahme: ${d.schritte.map(esc).join(" · ")}</p>` : ""}
+        <p class="klein muted">Einträge lassen sich nicht ändern. Eine Korrektur wäre ein neuer Eintrag.</p></div>`;
+    }
+    const bew = L.bewerte(r, entwurf.werte);
+    const zeigeMassnahme = (bew === "warn" || bew === "kritisch") && m;
+    const alleSchritte = !zeigeMassnahme || m.schritte.every((_, i) => entwurf.schritte[i]);
+    const feld = (pp, i) => {
+      const v = entwurf.werte[i];
+      if (pp.art === "messwert") {
+        const st = L.pruefeWert(pp, v);
+        return `<div class="feld"><label for="pp${i}">${esc(pp.text)} (${pp.einheit}${pp.max != null ? `, höchstens ${pp.max}` : ""}${pp.min != null ? `, mindestens ${pp.min}` : ""})</label>
+          <input type="number" inputmode="decimal" step="0.1" id="pp${i}" data-pp="${i}" value="${v == null ? "" : esc(v)}">
+          ${st === "warn" ? '<span class="marke-s gelb">leicht außerhalb</span>' : st === "kritisch" ? '<span class="marke-s rot">deutlich außerhalb</span>' : st === "ok" ? '<span class="marke-s gruen">in Ordnung</span>' : ""}</div>`;
+      }
+      if (pp.art === "auswahl") return `<div class="feld"><span class="lbl">${esc(pp.text)}</span><div class="wahl">${pp.werte.map((w) => `<button class="${v === w ? "an" : ""} ${(pp.schlecht || []).includes(w) ? "nein" : ""}" data-act="ppwahl" data-i="${i}" data-w="${esc(w)}">${esc(w)}</button>`).join("")}</div></div>`;
+      return `<label class="haken"><input type="checkbox" data-pp="${i}" ${v === true ? "checked" : ""}><span>${esc(pp.text)}</span></label>`;
+    };
+    return `${titel(esc(r.titel), "hygiene")}${frootie(FROOTIE_TIPPS.aufgabe)}
+      <div class="karte"><p><b>${a.geraet ? esc(a.geraet.name) + " · " : ""}fällig ${L.minZuZeit(a.ab)} bis ${L.minZuZeit(a.bis)} Uhr</b> <span class="marke-s ${STATUS_FARBE[a.status]}">${STATUS_TXT[a.status]}</span></p>
+        ${r.anleitung ? `<p class="muted">${esc(r.anleitung)}</p>` : ""}
+        ${r.pruefpunkte.map(feld).join("")}</div>
+      ${zeigeMassnahme ? `<div class="karte" style="border-color:var(--red)"><h2>${bew === "kritisch" ? "🔴" : "⚠️"} Was jetzt zu tun ist: ${esc(m.titel)}</h2>
+        ${m.schritte.map((t, i) => `<label class="haken"><input type="checkbox" data-schritt="${i}" ${entwurf.schritte[i] ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}
+        ${m.nachkontrolle ? `<p class="hinweis">🔁 In ${m.nachkontrolle} Minuten wird automatisch eine Nachkontrolle angelegt.</p>` : ""}
+        ${bew === "kritisch" ? '<p class="hinweis rot">Die Shopleitung wird sofort informiert.</p>' : ""}</div>` : ""}
+      <button class="btn gross" data-act="abhaken" ${bew === "offen" || !alleSchritte ? "disabled" : ""}>${bew === "offen" ? "Bitte alles ausfüllen" : !alleSchritte ? "Bitte Maßnahme abhaken" : "✓ Abhaken"}</button>
+      <button class="btn drei" data-act="nicht-moeglich">Nicht möglich …</button>`;
+  };
+
+  // ----- Rezepte und Quiz -----
+  V.rezepte = () => {
+    const R = S.rezepte;
+    const liste = R.rezepte.filter((r) => rezeptGruppe === "alle" || r.gruppe === rezeptGruppe);
+    return `${titel("Rezepte")}${frootie(FROOTIE_TIPPS.rezepte)}
+      <div class="gruppen wahl"><button class="${rezeptGruppe === "alle" ? "an" : ""}" data-act="rgruppe" data-g="alle">Alle</button>${R.warengruppen.map((g) => `<button class="${rezeptGruppe === g.id ? "an" : ""}" data-act="rgruppe" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div>
+      <button class="btn zwei" data-go="quiz">🎯 Rezept-Quiz starten</button>
+      <div class="liste">${liste.map((r) => { const g = R.warengruppen.find((x) => x.id === r.gruppe); const al = L.allergeneVon(r);
+        return `<button class="zeile" data-go="rezept" data-arg="${r.id}"><span style="font-size:1.6rem">${g.sym}</span><span><b>${esc(r.name)}</b><small>${esc(r.beschreibung)}${al.length ? ` · Allergene: ${al.map(esc).join(", ")}` : ""}</small></span><span>›</span></button>`; }).join("")}</div>
+      <p class="klein muted">Beispielrezepte für die Testversion. Die echten Rezepte pflegt die Zentrale.</p>`;
+  };
+  V.rezept = () => {
+    const r = S.rezepte.rezepte.find((x) => x.id === arg);
+    if (!r) return `${titel("Rezept", "rezepte")}<p class="leer">Nicht gefunden.</p>`;
+    const g = rezeptGroesse[r.id] || (r.groessen.includes("M") ? "M" : r.groessen[0]);
+    const al = L.allergeneVon(r);
+    return `${titel(esc(r.name), "rezepte")}
+      <div class="karte"><p class="muted">${esc(r.beschreibung)}</p>
+        ${r.groessen.length > 1 ? `<div class="wahl">${r.groessen.map((x) => `<button class="${x === g ? "an" : ""}" data-act="rgroesse" data-r="${r.id}" data-g="${x}">Größe ${x}</button>`).join("")}</div>` : ""}
+        <table class="zutaten"><tbody>${r.zutaten.map((z) => `<tr><td>${esc(z.name)}${z.allergene.length ? ` <span class="marke-s rot">${z.allergene.map(esc).join(", ")}</span>` : ""}</td><td>${L.mengeFuer(z, g)} ${esc(z.einheit)}</td></tr>`).join("")}</tbody></table></div>
+      <div class="karte"><h2>Allergene</h2>${al.length ? `<div class="allergene">${al.map((a) => `<span class="marke-s rot">${esc(a)}</span>`).join("")}</div>` : '<p class="muted">Keines der 14 Hauptallergene.</p>'}
+        ${!al.includes("Gluten") ? '<span class="marke-s gruen">glutenfrei</span>' : ""}</div>
+      <div class="karte"><h2>Zubereitung</h2><ol class="schritte">${r.schritte.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${r.standzeit ? `<p class="hinweis">⏳ Standzeit: ${esc(r.standzeit)}</p>` : ""}
+        <p class="klein muted">🎬 Arbeitsvideo folgt.</p></div>`;
+  };
+  V.quiz = () => {
+    if (!quizStand) quizStand = { fragen: L.quiz(S.rezepte.rezepte, S.rezepte.warengruppen, 10, Date.now() % 100000), nr: 0, punkte: 0, gewaehlt: null };
+    const q = quizStand;
+    if (q.nr >= q.fragen.length) {
+      const lob = q.punkte >= 9 ? "Wow, Rezept-Profi! 🏆" : q.punkte >= 6 ? "Gut gemacht! 👍" : "Schau dir die Rezepte nochmal an, dann klappt es beim nächsten Mal. 💪";
+      return `${titel("Rezept-Quiz", "rezepte")}${frootie(`<b>${q.punkte} von ${q.fragen.length} richtig.</b> ${lob}`)}<button class="btn gross" data-act="quiz-neu">Nochmal spielen</button><button class="btn drei" data-go="rezepte">Zu den Rezepten</button>`;
+    }
+    const f = q.fragen[q.nr];
+    return `${titel("Rezept-Quiz", "rezepte")}${q.nr === 0 && q.gewaehlt == null ? frootie(FROOTIE_TIPPS.quiz) : ""}
+      <div class="karte"><div class="reihe zw"><span class="muted klein">Frage ${q.nr + 1} von ${q.fragen.length}</span><span class="marke-s gruen">${q.punkte} Punkte</span></div>
+        <div class="balken" aria-hidden="true"><span style="width:${(q.nr / q.fragen.length) * 100}%"></span></div>
+        <h2>${esc(f.frage)}</h2>
+        <div class="antworten">${f.antworten.map((x, i) => { let k = ""; if (q.gewaehlt != null) { if (x === f.richtig) k = "richtig"; else if (i === q.gewaehlt) k = "falsch"; }
+          return `<button class="${k}" data-act="quiz-antwort" data-i="${i}" ${q.gewaehlt != null ? "disabled" : ""}>${esc(x)}</button>`; }).join("")}</div>
+        ${q.gewaehlt != null ? `<p class="hinweis ${f.antworten[q.gewaehlt] === f.richtig ? "gruen" : "rot"}">${f.antworten[q.gewaehlt] === f.richtig ? "🍓 Richtig!" : `Leider falsch. Richtig ist: <b>${esc(f.richtig)}</b>`}</p>
+          <button class="btn" data-act="quiz-weiter">Weiter</button>` : ""}</div>`;
+  };
+
+  V.pinnwand = () => {
+    const f = FIL();
+    const z = S.pinnwand.filter((n) => n.filiale === f.id || n.filiale === null).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit));
+    return `${titel("Pinnwand " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.pinnwand)}
+      <div class="karte"><div class="feld"><label for="pw-text">Neuer Zettel</label><textarea id="pw-text" rows="2" maxlength="300"></textarea></div>
+        <div class="reihe">${leitung() ? '<label class="haken"><input type="checkbox" id="pw-wichtig"><span>wichtig</span></label>' : ""}<button class="btn" data-act="pinnwand">📌 Anheften</button></div></div>
+      <div class="liste">${z.map((n) => `<div class="karte" ${n.wichtig ? 'style="border-color:var(--red)"' : ""}><p>${n.wichtig ? "❗ " : ""}${esc(n.text)}</p>
+        <div class="reihe zw"><span class="klein muted">${esc(name(person(n.vonId)))} · ${n.filiale ? esc(f.kurz) : "alle Filialen"} · ${L.datumKurz(n.zeit.slice(0, 10))}</span>
+        ${leitung() || n.vonId === sitzung.ich ? `<button class="chip" data-act="pin-weg" data-id="${n.id}">entfernen</button>` : ""}</div></div>`).join("") || '<p class="leer">Noch keine Zettel.</p>'}</div>`;
+  };
+
+  // ----- Shopleitung -----
+  V.plan = () => {
+    const f = FIL(), mo = arg || L.montag(heute());
+    const pub = S.veroeffentlicht[`${f.id}|${mo}`];
+    const tage = L.woche(mo).map((d) => {
+      const o = L.oeffnung(f, d);
+      if (!o) return `<div class="tag zu"><b>${datumLang(d)}</b><span class="muted klein">geschlossen</span></div>`;
+      return `<div class="tag"><div class="reihe zw"><b>${datumLang(d)}</b><span class="muted klein">${L.minZuZeit(o.auf)}–${L.minZuZeit(o.zu)}</span></div>
+        ${L.SCHICHTEN.map((sch) => { const ab = L.abdeckung(S, f.id, d, sch.id);
+          const leute = L.schichtenAm(S, d, (s) => s.filiale === f.id && s.schicht === sch.id);
+          return `<div class="slot"><div class="kopfz"><span><span class="punkt ${ab.ampel}" style="display:inline-block;vertical-align:-2px"></span> ${sch.name}</span><span>${zeitTxt(L.schichtZeit(f, d, sch.id))} · ${ab.ist}/${ab.soll}</span></div>
+            <div class="namen">${leute.map((s) => { const p = person(s.personId); const fehlt = L.abwesenheitAm(S, s.personId, d);
+              return `<button class="name ${p.stammfiliale !== f.id ? "springer" : ""} ${fehlt ? "fehlt" : ""}" data-act="plan-weg" data-id="${s.id}" title="Antippen zum Entfernen">${esc(p.vorname)}${p.stammfiliale !== f.id ? " ↔" : ""}${fehlt ? (fehlt.art === "krank" ? " 🤒" : " 🏖️") : ""}</button>`; }).join("")}
+              <button class="name plus" data-act="plan-plus" data-datum="${d}" data-schicht="${sch.id}">+ einteilen</button></div></div>`; }).join("")}</div>`;
+    }).join("");
+    return `${titel("Einsatzplan " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.plan)}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="plan" data-arg="${L.plusTage(mo, -7)}">‹</button><b>Woche ab ${L.datumKurz(mo)}</b><button class="chip" data-go="plan" data-arg="${L.plusTage(mo, 7)}">›</button></div>
+        <div class="reihe"><span class="marke-s ${pub ? "gruen" : "gelb"}">${pub ? "veröffentlicht" : "Entwurf"}</span>
+        <button class="btn zwei" data-act="vorschlag" data-mo="${mo}">✨ Vorschlag erstellen</button>${pub ? "" : `<button class="btn" data-act="veroeffentlichen" data-mo="${mo}">📣 Veröffentlichen</button>`}</div>
+        <p class="klein muted">Der Vorschlag füllt nur leere Plätze: erst mit dem eigenen Team, dann mit Springern. Wünsche und Urlaub werden beachtet.</p></div>
+      <div class="plan">${tage}</div>`;
+  };
+  function kandidatenFenster(d, schId) {
+    const f = FIL();
+    const ks = L.kandidaten(S, f.id, d, schId);
+    fenster = `<div class="reihe zw"><h2>${L.schicht(schId).name}, ${datumLang(d)}</h2><button class="chip" data-act="zu">✕</button></div>
+      <p class="muted klein">${esc(f.kurz)} · ${zeitTxt(L.schichtZeit(f, d, schId))}. Grauer Rand = Springer aus einer anderen Filiale.</p>
+      <div class="liste">${ks.map((k) => `<button class="zeile ${k.person.stammfiliale !== f.id ? "springer" : ""}" data-act="einteilen" data-id="${k.person.id}" data-datum="${d}" data-schicht="${schId}" ${k.moeglich ? "" : "disabled"} style="${k.moeglich ? "" : "opacity:.5"}">
+        <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc(filiale(k.person.stammfiliale).kurz)}</span>` : ""}
+        <small>${L.ROLLEN[k.person.rolle].name} · ${k.stunden} Std. diese Woche${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? "+" : ""}</span></button>`).join("")}</div>`;
+  }
+  V.antraege = () => {
+    const f = FIL(), a = offeneAntraege(f.id);
+    const erledigt = S.abwesenheiten.filter((x) => x.art === "urlaub" && x.status !== "beantragt" && (person(x.personId) || {}).stammfiliale === f.id).slice(-5).reverse();
+    return `${titel("Anträge " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.antraege)}
+      <div class="liste">${a.length ? a.map((x) => { const betr = L.betroffeneSchichten(S, x.personId, x.von, x.bis).length;
+        return `<div class="karte"><p><b>${esc(name(person(x.personId)))}</b> möchte Urlaub vom ${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</p>${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
+        ${betr ? `<p class="hinweis">Im Plan stehen in dieser Zeit ${betr} Schicht${betr > 1 ? "en" : ""}. Sie werden beim Genehmigen frei.</p>` : ""}
+        <div class="reihe"><button class="btn" data-act="genehmigen" data-id="${x.id}">✓ Genehmigen</button><button class="btn drei" data-act="ablehnen" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Anträge. 🎉</p>'}</div>
+      ${erledigt.length ? `<div class="abschnitt"><h2>Zuletzt entschieden</h2><div class="liste">${erledigt.map((x) => `<div class="zeile"><span class="punkt ${x.status === "genehmigt" ? "gruen" : "rot"}"></span><span>${esc(name(person(x.personId)))}<small>${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</small></span><span class="marke-s">${x.status}</span></div>`).join("")}</div></div>` : ""}`;
+  };
+  V.offen = () => {
+    const f = FIL(), d = heute();
+    const krank = S.abwesenheiten.filter((a) => a.art === "krank" && a.bis >= d && L.darfInFiliale(person(a.personId), f.id));
+    const offen = offeneSchichten(f.id, d, 14);
+    const mel = leitungsMeldungen(f.id);
+    return `${titel("Krank & offen")}${frootie(FROOTIE_TIPPS.offen)}
+      ${mel.length ? `<div class="abschnitt"><h2>Neue Meldungen</h2><div class="liste">${mel.map((m) => `<div class="zeile st-ueberfaellig"><span class="punkt"></span><span>${esc(m.text)}<small>${m.zeit.slice(0, 10) === d ? "heute" : L.datumKurz(m.zeit.slice(0, 10))} ${m.zeit.slice(11, 16)}</small></span><button class="chip" data-act="meldung-ok" data-id="${m.id}">gesehen</button></div>`).join("")}</div></div>` : ""}
+      <div class="abschnitt"><h2>Krank gemeldet</h2><div class="liste">${krank.length ? krank.map((a) => `<div class="zeile"><span class="punkt rot"></span><span>${esc(name(person(a.personId)))}<small>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}</small></span><span></span></div>`).join("") : '<p class="leer">Niemand krank gemeldet.</p>'}</div></div>
+      <div class="abschnitt"><h2>Offene Schichten (14 Tage)</h2><div class="liste">${offen.length ? offen.map((o) => `<button class="zeile st-${o.datum === d ? "ueberfaellig" : "faellig"}" data-act="plan-plus" data-datum="${o.datum}" data-schicht="${o.schicht}"><span class="punkt"></span><span><b>${datumLang(o.datum)}</b> · ${schichtTxt(f, o.datum, o.schicht)}<small>Es fehl${o.fehlen > 1 ? "en" : "t"} ${o.fehlen} Person${o.fehlen > 1 ? "en" : ""}</small></span><span>+</span></button>`).join("") : '<p class="leer">Alles besetzt. 🎉</p>'}</div></div>`;
+  };
+  V.hygkontrolle = () => {
+    const f = FIL(), d = heute();
+    const tage = Array.from({ length: 7 }, (_, i) => L.plusTage(d, -i));
+    const heuteL = L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() });
+    const abw = heuteL.filter((a) => a.status === "abweichung" || a.status === "nicht_moeglich" || a.status === "ueberfaellig");
+    return `${titel("Hygiene-Kontrolle " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.hygkontrolle)}
+      <div class="abschnitt"><h2>Heute: braucht Aufmerksamkeit</h2><div class="liste">${abw.length ? abw.map(hygZeile).join("") : '<p class="leer">Alles im grünen Bereich.</p>'}</div></div>
+      <div class="abschnitt"><h2>Letzte 7 Tage</h2><div class="liste">${tage.map((t) => { const l = L.tagesliste(S, f.id, t, { datum: d, min: jetztMin() }); const s = L.tagesSumme(l);
+        return `<button class="zeile" data-go="hygiene" data-arg="${t}"><span class="punkt ${!l.length ? "" : s.ueberfaellig || s.abweichung ? "rot" : s.erledigt === s.gesamt ? "gruen" : "gelb"}"></span><span><b>${datumLang(t)}</b><small>${l.length ? `${s.erledigt} erledigt · ${s.abweichung} Abweichung · ${s.ueberfaellig} ${t === d ? "überfällig" : "verpasst"} · ${s.faellig + s.spaeter} offen` : "geschlossen"}</small></span><span>${s.quote == null ? "" : s.quote + " %"}</span></button>`; }).join("")}</div></div>`;
+  };
+  V.hygregeln = () => {
+    const f = FIL(), H = S.hygiene;
+    const geraete = H.geraete.filter((g) => g.filiale === f.id);
+    const typName = (id) => (H.geraetetypen.find((t) => t.id === id) || {}).name || "";
+    return `${titel("Regeln & Geräte " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.hygregeln)}
+      <div class="abschnitt"><h2>Geräte in diesem Shop</h2><div class="liste">${geraete.map((g) => `<div class="zeile"><span class="punkt ${g.status === "aktiv" ? "gruen" : g.status === "gestoert" ? "rot" : ""}"></span><span><b>${esc(g.name)}</b><small>${esc(typName(g.typ))} · ${g.status === "aktiv" ? "in Betrieb" : g.status === "gestoert" ? "gestört, Aufgaben pausiert" : "stillgelegt"}</small></span>
+        <select data-act="geraet-status" data-id="${g.id}" aria-label="Status ${esc(g.name)}">${[["aktiv", "in Betrieb"], ["gestoert", "gestört"], ["stillgelegt", "stillgelegt"]].map(([v, t]) => `<option value="${v}" ${g.status === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>`).join("")}</div>
+        <div class="karte"><div class="gitter2"><div class="feld"><label for="g-typ">Gerätetyp</label><select id="g-typ">${H.geraetetypen.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+          <div class="feld"><label for="g-name">Bezeichnung</label><input type="text" id="g-name" placeholder="z. B. Kühlvitrine 3" maxlength="60"></div></div><button class="btn zwei" data-act="geraet-neu">+ Gerät anlegen</button></div></div>
+      <div class="abschnitt"><h2>Regeln in diesem Shop</h2><div class="liste">${H.regeln.filter((r) => r.aktiv !== false).map((r) => {
+        const z = H.zuteilung[`${r.id}|${f.id}`] || {};
+        const gilt = L.regelGilt(S, r, f.id);
+        const anz = r.geraetetyp ? geraete.filter((g) => g.typ === r.geraetetyp && g.status !== "stillgelegt").length : null;
+        return `<div class="karte"><div class="reihe zw"><b>${esc(r.titel)}</b>${r.pflicht ? '<span class="marke-s">Pflicht</span>' : ""}</div>
+          <p class="klein muted">${intervallTxt(r.intervall)} · ${zustTxt(r.zustaendig)}${r.geraetetyp ? ` · gilt je ${esc(typName(r.geraetetyp))}: <b>${anz} im Shop</b>${anz === 0 ? " → keine Aufgabe" : ""}` : ""}</p>
+          <div class="wahl"><button class="${gilt ? "an" : ""}" data-act="zuteilung" data-r="${r.id}" data-s="aktiv">gilt hier</button>
+            <button class="${!gilt ? "an nein" : ""}" data-act="zuteilung" data-r="${r.id}" data-s="nicht" ${r.pflicht ? "disabled title=\"Pflichtregel: nur die Zentrale kann sie abschalten\"" : ""}>trifft nicht zu</button></div>
+          ${gilt && ["oeffnung", "schliessung", "wochentage", "monatlich"].includes(r.intervall.art) ? `<div class="feld"><label for="uz-${r.id}">Eigene Uhrzeit (leer = Standard)</label><input type="time" id="uz-${r.id}" data-act="uhrzeit" data-r="${r.id}" value="${esc(z.uhrzeit || "")}"></div>` : ""}</div>`;
+      }).join("")}</div></div>`;
+  };
+  function intervallTxt(iv) {
+    switch (iv.art) {
+      case "oeffnung": return `bei Öffnung${iv.versatz ? ` + ${iv.versatz} Min.` : ""}`;
+      case "schliessung": return "bei Ladenschluss";
+      case "uhrzeiten": return `täglich ${iv.zeiten.join(", ")} Uhr`;
+      case "alle_std": return `alle ${iv.std} Std.`;
+      case "wochentage": return `${iv.tage.map((t) => L.TAG_NAME[t].slice(0, 2)).join(", ")} ${iv.zeit} Uhr`;
+      case "monatlich": return `monatlich ab dem ${iv.tagAb}.`;
+      default: return "";
+    }
+  }
+  function zustTxt(z) { if (!z || z.art === "alle") return "alle im Dienst"; if (z.art === "schicht") return L.schicht(z.wert).name; return L.ROLLEN[z.wert] ? L.ROLLEN[z.wert].name : z.wert; }
+  V.stempelzeiten = () => {
+    const f = FIL(), d = heute();
+    const leute = [...new Set([...L.schichtenAm(S, d, (s) => s.filiale === f.id).map((s) => s.personId), ...S.stempel.filter((s) => s.filiale === f.id && s.zeit.startsWith(d)).map((s) => s.personId)])].map(person).filter(Boolean);
+    return `${titel("Stempelzeiten heute")}
+      <div class="liste">${leute.length ? leute.map((p) => { const e = L.stempelAm(S, p.id, d); const st = L.stempelStatus(e); const sum = L.stempelSumme(e, jetztIso()); const geplant = L.schichtenAm(S, d, (s) => s.personId === p.id && s.filiale === f.id);
+        return `<div class="zeile"><span class="punkt ${st === "da" ? "gruen" : st === "pause" ? "gelb" : ""}"></span><span><b>${esc(name(p))}</b><small>Plan: ${geplant.map((s) => schichtTxt(f, d, s.schicht)).join(", ") || "–"} · Ist: ${e.length ? e.map((x) => x.zeit.slice(11, 16)).join(" · ") : "noch nicht gestempelt"}</small></span><span class="klein">${Math.floor(sum.arbeit / 60)}:${String(sum.arbeit % 60).padStart(2, "0")} Std.</span></div>`; }).join("") : '<p class="leer">Heute ist niemand eingeteilt.</p>'}</div>`;
+  };
+  V.team = () => {
+    const f = FIL();
+    const leute = S.personen.filter((p) => L.darfInFiliale(p, f.id));
+    return `${titel("Team " + esc(f.kurz))}<div class="liste">${leute.map((p) => `<div class="zeile"><span class="punkt ${L.abwesenheitAm(S, p.id, heute()) ? "rot" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale !== f.id ? ` · Springer aus ${esc(filiale(p.stammfiliale).kurz)}` : p.springer ? ` · Springer auch in ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ")}` : ""} · ${p.wochenstunden} Std./Woche</small></span><span></span></div>`).join("")}</div>`;
+  };
+
+  // ----- Zentrale -----
+  V.auswertung = () => {
+    const d = heute(), mo = L.montag(d);
+    let sum = { soll: 0, ist: 0, hyg: 0, hygG: 0, krank: 0, std: 0 };
+    const zeilen = S.filialen.map((f) => {
+      const l = L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() }); const s = L.tagesSumme(l);
+      let soll = 0, ist = 0; for (const t of L.woche(mo)) for (const sch of L.SCHICHTEN) { const a = L.abdeckung(S, f.id, t, sch.id); soll += a.soll; ist += Math.min(a.ist, a.soll); }
+      const krank = S.abwesenheiten.filter((a) => a.art === "krank" && L.zwischen(d, a.von, a.bis) && (person(a.personId) || {}).stammfiliale === f.id).length;
+      const std = S.personen.filter((p) => p.stammfiliale === f.id).reduce((x, p) => x + L.stundenInWoche(S, p.id, mo), 0);
+      sum.soll += soll; sum.ist += ist; sum.hyg += s.erledigt + s.abweichung; sum.hygG += s.gesamt; sum.krank += krank; sum.std += std;
+      return { f, s, soll, ist, krank, std };
+    });
+    const zeile = (t, soll, ist, hyg, hygG, krank, std, fett) => `<tr${fett ? ' style="font-weight:700"' : ""}><td>${t}</td><td>${soll ? Math.round((ist / soll) * 100) : "–"} %</td><td>${hygG ? Math.round((hyg / hygG) * 100) + " %" : "–"}</td><td>${krank}</td><td>${std}</td></tr>`;
+    return `${titel("Auswertung")}${frootie(FROOTIE_TIPPS.auswertung)}
+      <div class="karte"><div style="overflow-x:auto"><table class="zutaten"><thead><tr><td><b>Filiale</b></td><td><b>Besetzt</b></td><td><b>Hygiene</b></td><td><b>Krank</b></td><td><b>Std.</b></td></tr></thead><tbody>
+        ${zeilen.map((z) => zeile(esc(z.f.kurz), z.soll, z.ist, z.s.erledigt + z.s.abweichung, z.s.gesamt, z.krank, z.std)).join("")}
+        ${zeile("Alle Filialen", sum.soll, sum.ist, sum.hyg, sum.hygG, sum.krank, sum.std, true)}</tbody></table></div></div>
+      <p class="klein muted">Besetzt = besetzte Plätze dieser Woche laut Einsatzplan. Hygiene = heute erledigte Aufgaben von allen Aufgaben des Tages (auch noch nicht fällige). Std. = geplante Stunden dieser Woche.</p>`;
+  };
+  V.ma = () => `${titel("Mitarbeiter")}${frootie(FROOTIE_TIPPS.ma)}
+    <button class="btn zwei" data-act="ma-neu">+ Mitarbeiter anlegen</button>
+    ${S.filialen.map((f) => `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === f.id).map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · ${p.wochenstunden} Std.${p.springer ? ` · Springer: ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}`;
+  V["ma-edit"] = () => {
+    const p = person(arg);
+    if (!p) return `${titel("Mitarbeiter", "ma")}<p class="leer">Nicht gefunden.</p>`;
+    return `${titel("Mitarbeiter bearbeiten", "ma")}
+      <div class="karte"><div class="gitter2"><div class="feld"><label for="m-vor">Vorname</label><input type="text" id="m-vor" value="${esc(p.vorname)}"></div><div class="feld"><label for="m-nach">Nachname</label><input type="text" id="m-nach" value="${esc(p.nachname)}"></div></div>
+        <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle</label><select id="m-rolle">${Object.entries(L.ROLLEN).filter(([k]) => k !== "zentrale").map(([k, r]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>
+          <div class="feld"><label for="m-stamm">Stammfiliale</label><select id="m-stamm">${S.filialen.map((f) => `<option value="${f.id}" ${p.stammfiliale === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div></div>
+        <div class="feld"><label for="m-std">Wochenstunden laut Vertrag</label><input type="number" id="m-std" min="0" max="48" value="${p.wochenstunden}"></div>
+        <label class="haken"><input type="checkbox" id="m-springer" ${p.springer ? "checked" : ""}><span><b>Springer</b>: darf in anderen Filialen aushelfen</span></label>
+        <div class="feld"><span class="lbl">Einsetzbar in (zusätzlich zur Stammfiliale)</span>${S.filialen.filter((f) => f.id !== p.stammfiliale).map((f) => `<label class="haken"><input type="checkbox" data-einsatz="${f.id}" ${p.einsatzfilialen.includes(f.id) ? "checked" : ""}><span>${esc(f.name)}</span></label>`).join("")}</div>
+        <label class="haken"><input type="checkbox" id="m-aktiv" ${p.aktiv !== false ? "checked" : ""}><span>aktiv (ausgetretene Mitarbeiter abwählen)</span></label>
+        <button class="btn gross" data-act="ma-speichern" data-id="${p.id}">Speichern</button></div>`;
+  };
+  V.filialen = () => `${titel("Filialen")}${S.filialen.map((f) => `<div class="karte"><h2>${esc(f.name)}</h2>
+    ${["mo", "di", "mi", "do", "fr", "sa", "so"].map((t) => { const z = f.oeffnung[t]; return `<div class="reihe"><span style="width:90px">${L.TAG_NAME[t]}</span>
+      <input type="time" style="width:auto" data-oz="${f.id}|${t}|0" value="${z ? z[0] : ""}" aria-label="${L.TAG_NAME[t]} auf"><span>–</span><input type="time" style="width:auto" data-oz="${f.id}|${t}|1" value="${z ? z[1] : ""}" aria-label="${L.TAG_NAME[t]} zu">${z ? "" : '<span class="muted klein">geschlossen</span>'}</div>`; }).join("")}
+    <div class="gitter2"><div class="feld"><label for="b-${f.id}-f">Besetzung Frühdienst</label><input type="number" min="0" max="9" id="b-${f.id}-f" data-bedarf="${f.id}|frueh" value="${f.bedarf.standard.frueh}"></div>
+      <div class="feld"><label for="b-${f.id}-s">Besetzung Spätdienst</label><input type="number" min="0" max="9" id="b-${f.id}-s" data-bedarf="${f.id}|spaet" value="${f.bedarf.standard.spaet}"></div></div>
+    <p class="klein muted">Leere Zeiten = geschlossen. Samstags gilt eine eigene Besetzung (${f.bedarf.sa ? f.bedarf.sa.frueh + "/" + f.bedarf.sa.spaet : "wie Standard"}).</p></div>`).join("")}`;
+  V.regeln = () => {
+    const H = S.hygiene;
+    return `${titel("Hygieneregeln (alle Filialen)")}${frootie(FROOTIE_TIPPS.regeln)}
+      <button class="btn zwei" data-act="regel-neu">+ Neue Regel</button>
+      <div class="liste">${H.regeln.map((r) => { const shops = S.filialen.filter((f) => L.regelGilt(S, r, f.id) && (!r.geraetetyp || L.geraeteFuer(S, r, f.id).length));
+        return `<button class="zeile" data-go="regel-edit" data-arg="${r.id}"><span class="punkt ${r.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(r.titel)}</b>
+        <small>${esc((H.bereiche.find((b) => b.id === r.bereich) || {}).name || "")}${r.geraetetyp ? " · je " + esc((H.geraetetypen.find((t) => t.id === r.geraetetyp) || {}).name) : ""} · ${intervallTxt(r.intervall)} · ${zustTxt(r.zustaendig)} · gilt in ${shops.length} von ${S.filialen.length} Filialen</small></span><span>›</span></button>`; }).join("")}</div>`;
+  };
+  V["regel-edit"] = () => {
+    const H = S.hygiene, r = H.regeln.find((x) => x.id === arg);
+    if (!r) return `${titel("Regel", "regeln")}<p class="leer">Nicht gefunden.</p>`;
+    const iv = r.intervall, pp = r.pruefpunkte[0] || {};
+    const sel = (id, opts, wert) => `<select id="${id}">${opts.map(([v, t]) => `<option value="${v}" ${String(wert) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+    return `${titel("Regel bearbeiten", "regeln")}
+      <div class="karte"><h2>1. Was</h2><div class="feld"><label for="r-titel">Titel</label><input type="text" id="r-titel" value="${esc(r.titel)}"></div>
+        <div class="gitter2"><div class="feld"><label for="r-bereich">Bereich</label>${sel("r-bereich", H.bereiche.map((b) => [b.id, b.name]), r.bereich)}</div>
+          <div class="feld"><label for="r-typ">Gilt für Gerätetyp</label>${sel("r-typ", [["", "kein Gerät (gilt für den Shop)"], ...H.geraetetypen.map((t) => [t.id, t.name])], r.geraetetyp || "")}</div></div>
+        <div class="feld"><label for="r-anl">Anleitung</label><textarea id="r-anl" rows="2">${esc(r.anleitung || "")}</textarea></div></div>
+      <div class="karte"><h2>2. Wie oft</h2><div class="gitter2"><div class="feld"><label for="r-iv">Intervall</label>${sel("r-iv", [["oeffnung", "bei Öffnung"], ["schliessung", "bei Ladenschluss"], ["uhrzeiten", "feste Uhrzeiten"], ["alle_std", "alle x Stunden"], ["wochentage", "an Wochentagen"], ["monatlich", "monatlich"]], iv.art)}</div>
+        <div class="feld"><label for="r-ivw">Uhrzeiten / Stunden / Zeit</label><input type="text" id="r-ivw" value="${esc(iv.art === "uhrzeiten" ? iv.zeiten.join(", ") : iv.art === "alle_std" ? iv.std : iv.zeit || "")}" placeholder="z. B. 10:15, 14:00"></div></div>
+        ${iv.art === "wochentage" ? `<div class="wahl">${["mo", "di", "mi", "do", "fr", "sa"].map((t) => `<label class="haken"><input type="checkbox" data-wt="${t}" ${iv.tage.includes(t) ? "checked" : ""}><span>${L.TAG_NAME[t].slice(0, 2)}</span></label>`).join("")}</div>` : ""}</div>
+      <div class="karte"><h2>3. Wer</h2>${sel("r-zust", [["alle|", "alle im Dienst"], ["schicht|frueh", "Frühdienst"], ["schicht|spaet", "Spätdienst"], ["rolle|shopleitung", "Shopleitung"], ["rolle|stv", "Stellv. Shopleitung"]], `${r.zustaendig.art}|${r.zustaendig.wert || ""}`)}</div>
+      <div class="karte"><h2>4. Prüfpunkte</h2>${r.pruefpunkte.map((x) => `<p>• ${esc(x.text)} <span class="muted klein">(${x.art === "messwert" ? `Messwert ${x.einheit}, Grenze ${x.max != null ? "max. " + x.max : ""}${x.min != null ? " min. " + x.min : ""}, kritisch ab ${x.krit != null ? x.krit : x.kritMin}` : x.art === "auswahl" ? "Auswahl: " + x.werte.join(" / ") : "Haken"})</span></p>`).join("")}
+        ${pp.art === "messwert" ? `<div class="gitter2"><div class="feld"><label for="r-max">Grenzwert (${pp.einheit})</label><input type="number" step="0.1" id="r-max" value="${pp.max}"></div><div class="feld"><label for="r-krit">Kritisch ab (${pp.einheit})</label><input type="number" step="0.1" id="r-krit" value="${pp.krit}"></div></div>` : ""}</div>
+      <div class="karte"><h2>5. Wenn etwas nicht stimmt</h2>${sel("r-mn", H.massnahmen.map((m) => [m.id, m.titel]), r.massnahme)}</div>
+      <div class="karte"><h2>6. Gültigkeit</h2><label class="haken"><input type="checkbox" id="r-pflicht" ${r.pflicht ? "checked" : ""}><span>Pflichtregel (Shop kann sie nicht abschalten)</span></label>
+        <label class="haken"><input type="checkbox" id="r-aktiv" ${r.aktiv !== false ? "checked" : ""}><span>aktiv</span></label>
+        <button class="btn gross" data-act="regel-speichern" data-id="${r.id}">Speichern</button></div>`;
+  };
+
+  V.hilfe = () => `${titel("Frag Frootie")}${frootie("Hier findest du zu jedem Bereich eine kurze Erklärung. Videoanleitungen zu allen Funktionen kommen mit der nächsten Version.")}
+    <div class="liste">${[["dienst", "🗓️ Mein Dienstplan"], ["wuensche", "📝 Dienstwünsche"], ["krank", "🤒 Krank melden"], ["urlaub", "🏖️ Urlaub"], ["stechuhr", "⏱️ Stechuhr"], ["hygiene", "🧼 Hygiene"], ["rezepte", "📖 Rezepte"], ["quiz", "🎯 Quiz"], ["plan", "📅 Einsatzplan (Leitung)"], ["hygregeln", "⚙️ Regeln & Geräte (Leitung)"], ["ma", "👤 Mitarbeiter und Springer (Zentrale)"]]
+      .map(([k, t]) => `<div class="karte"><b>${t}</b><p class="muted">${FROOTIE_TIPPS[k]}</p><p class="klein muted">🎬 Video folgt</p></div>`).join("")}</div>`;
+  V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
+
+  let updateBand = "", wartend = null;
+  // ---------- Zeichnen ----------
+  function zeichnen() {
+    if (!ICH()) ansicht = "login";
+    let rechte = ansicht;
+    const nurLeitung = ["plan", "antraege", "offen", "hygkontrolle", "hygregeln", "stempelzeiten", "team"];
+    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "regeln", "regel-edit"];
+    if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
+    if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
+    if (zentrale() && ["dienst", "wuensche", "krank", "urlaub", "stechuhr"].includes(rechte)) rechte = "start";
+    ansicht = rechte;
+    const inhalt = (V[ansicht] || V.start)();
+    $("#app").innerHTML = `${updateBand}${kopf()}<main>${inhalt}</main>${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
+  }
+  function gehe(v, a) { ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0); try { history.replaceState(null, "", "#" + v); } catch (e) { /* egal */ } }
+
+  // ---------- Aktionen ----------
+  const AKT = {
+    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); },
+    reset: () => { A.zuruecksetzen(); S = D.demoDaten(heute()); A.speichern(S); meldung("Beispieldaten neu geladen"); gehe("login"); },
+    "filiale-wahl": () => { fenster = `<h2>Filiale wählen</h2><div class="liste">${meineFilialen().map((f) => `<button class="zeile" data-act="filiale" data-id="${f.id}"><span class="punkt ${f.id === FIL().id ? "gruen" : ""}"></span><span>${esc(f.name)}${ICH().stammfiliale && f.id !== ICH().stammfiliale ? "<small>als Springer</small>" : ""}</span><span>›</span></button>`).join("")}</div>`; zeichnen(); },
+    filiale: (el) => { sitzung.filiale = el.dataset.id; merke(); fenster = null; zeichnen(); },
+    zu: () => { fenster = null; zeichnen(); },
+    "zu-hg": (el, ev) => { if (ev.target === el) { fenster = null; zeichnen(); } },
+    hilfe: () => { fenster = `${frootie(FROOTIE_TIPPS[ansicht] || FROOTIE_TIPPS.start)}<button class="btn" data-act="zu">Danke, Frootie!</button>`; zeichnen(); },
+    wunsch: (el) => {
+      const p = ICH(), d = el.dataset.datum; let w = L.wunschAm(S, p.id, d);
+      if (w && w.art === el.dataset.art) S.wuensche = S.wuensche.filter((x) => x !== w);
+      else if (w) w.art = el.dataset.art;
+      else S.wuensche.push({ id: neueId("w"), personId: p.id, datum: d, art: el.dataset.art, schicht: "egal" });
+      speichern(); zeichnen();
+    },
+    "wunsch-schicht": (el) => { const w = L.wunschAm(S, ICH().id, el.dataset.datum); if (w) { w.schicht = el.dataset.schicht; speichern(); zeichnen(); } },
+    krank: () => {
+      const von = $("#k-von").value, bis = $("#k-bis").value, p = ICH();
+      if (!von || !bis || bis < von) return meldung("Bitte Zeitraum prüfen");
+      S.abwesenheiten.push({ id: neueId("a"), personId: p.id, art: "krank", von, bis, status: "gemeldet" });
+      const betr = L.betroffeneSchichten(S, p.id, von, bis);
+      S.meldungen = S.meldungen || [];
+      for (const fid of new Set([p.stammfiliale, ...betr.map((s) => s.filiale)]))
+        S.meldungen.push({ id: neueId("m"), filiale: fid, text: `🤒 ${name(p)} ist krank (${L.datumKurz(von)}–${L.datumKurz(bis)}). ${betr.filter((s) => s.filiale === fid).length} Schicht(en) betroffen.`, zeit: jetztIso() });
+      speichern(); meldung("Gute Besserung! Deine Shopleitung ist informiert."); gehe("start");
+    },
+    urlaub: () => {
+      const von = $("#u-von").value, bis = $("#u-bis").value;
+      if (!von || !bis || bis < von) return meldung("Bitte Zeitraum prüfen");
+      S.abwesenheiten.push({ id: neueId("a"), personId: ICH().id, art: "urlaub", von, bis, status: "beantragt", notiz: $("#u-notiz").value.trim() });
+      speichern(); meldung("Antrag gestellt"); zeichnen();
+    },
+    stempel: (el) => { S.stempel.push({ id: neueId("t"), personId: ICH().id, filiale: FIL().id, art: el.dataset.art, zeit: jetztIso() }); speichern(); meldung({ kommen: "Guten Start!", pause: "Gute Pause!", weiter: "Weiter geht's", gehen: "Schönen Feierabend!" }[el.dataset.art]); zeichnen(); },
+    hygfilter: (el) => { hygFilter = el.dataset.f; zeichnen(); },
+    ppwahl: (el) => { entwurf.werte[el.dataset.i] = el.dataset.w; zeichnen(); },
+    abhaken: () => hygSpeichern(),
+    "nicht-moeglich": () => { fenster = `<h2>Warum nicht möglich?</h2><div class="liste">${["Gerät defekt", "Ware oder Material fehlt", "Keine Zeit, wird nachgeholt", "Sonstiges"].map((g) => `<button class="zeile" data-act="nm-grund" data-g="${g}"><span class="punkt rot"></span><span>${g}</span><span>›</span></button>`).join("")}</div><button class="btn drei" data-act="zu">Abbrechen</button>`; zeichnen(); },
+    "nm-grund": (el) => { fenster = null; hygSpeichern(el.dataset.g); },
+    rgruppe: (el) => { rezeptGruppe = el.dataset.g; zeichnen(); },
+    rgroesse: (el) => { rezeptGroesse[el.dataset.r] = el.dataset.g; zeichnen(); },
+    "quiz-antwort": (el) => { const q = quizStand; q.gewaehlt = Number(el.dataset.i); if (q.fragen[q.nr].antworten[q.gewaehlt] === q.fragen[q.nr].richtig) q.punkte++; zeichnen(); },
+    "quiz-weiter": () => { quizStand.nr++; quizStand.gewaehlt = null; zeichnen(); },
+    "quiz-neu": () => { quizStand = null; zeichnen(); },
+    pinnwand: () => { const t = $("#pw-text").value.trim(); if (!t) return; S.pinnwand.push({ id: neueId("n"), filiale: FIL().id, vonId: ICH().id, text: t, zeit: jetztIso(), wichtig: !!($("#pw-wichtig") || {}).checked }); speichern(); zeichnen(); },
+    "pin-weg": (el) => { S.pinnwand = S.pinnwand.filter((n) => n.id !== el.dataset.id); speichern(); zeichnen(); },
+    "plan-plus": (el) => { kandidatenFenster(el.dataset.datum, el.dataset.schicht); zeichnen(); },
+    einteilen: (el) => {
+      S.plan.push({ id: neueId("s"), filiale: FIL().id, datum: el.dataset.datum, schicht: el.dataset.schicht, personId: el.dataset.id, quelle: "hand" });
+      if (S.veroeffentlicht[`${FIL().id}|${L.montag(el.dataset.datum)}`]) S.meldungen = S.meldungen || [];
+      speichern(); fenster = null; meldung(`${person(el.dataset.id).vorname} eingeteilt`); zeichnen();
+    },
+    "plan-weg": (el) => { const s = S.plan.find((x) => x.id === el.dataset.id); S.plan = S.plan.filter((x) => x !== s); speichern(); meldung(`${person(s.personId).vorname} aus der Schicht genommen`); zeichnen(); },
+    vorschlag: (el) => {
+      const neu = [...L.planVorschlag(S, FIL().id, el.dataset.mo, () => neueId("s"), { nurStamm: true })];
+      S.plan.push(...neu); const neu2 = L.planVorschlag(S, FIL().id, el.dataset.mo, () => neueId("s")); S.plan.push(...neu2);
+      speichern(); meldung(neu.length + neu2.length ? `${neu.length + neu2.length} Schichten vorgeschlagen${neu2.length ? `, davon ${neu2.length} mit Springern` : ""}` : "Nichts mehr frei, was sich besetzen lässt"); zeichnen();
+    },
+    veroeffentlichen: (el) => { S.veroeffentlicht[`${FIL().id}|${el.dataset.mo}`] = true; speichern(); meldung("Plan veröffentlicht. Das Team sieht ihn jetzt."); zeichnen(); },
+    genehmigen: (el) => {
+      const a = S.abwesenheiten.find((x) => x.id === el.dataset.id); a.status = "genehmigt";
+      const betr = L.betroffeneSchichten(S, a.personId, a.von, a.bis); S.plan = S.plan.filter((s) => !betr.includes(s));
+      speichern(); meldung(`Genehmigt${betr.length ? `, ${betr.length} Schicht(en) sind jetzt offen` : ""}`); zeichnen();
+    },
+    ablehnen: (el) => { S.abwesenheiten.find((x) => x.id === el.dataset.id).status = "abgelehnt"; speichern(); zeichnen(); },
+    "meldung-ok": (el) => { S.meldungen.find((m) => m.id === el.dataset.id).erledigt = true; speichern(); zeichnen(); },
+    "geraet-neu": () => {
+      const typ = $("#g-typ").value, n = $("#g-name").value.trim() || (S.hygiene.geraetetypen.find((t) => t.id === typ) || {}).name;
+      S.hygiene.geraete.push({ id: neueId("g"), filiale: FIL().id, typ, name: n, status: "aktiv" }); speichern(); meldung("Gerät angelegt. Passende Aufgaben erscheinen in der Tagesliste."); zeichnen();
+    },
+    zuteilung: (el) => { S.hygiene.zuteilung[`${el.dataset.r}|${FIL().id}`] = { ...(S.hygiene.zuteilung[`${el.dataset.r}|${FIL().id}`] || {}), status: el.dataset.s, von: ICH().id, zeit: jetztIso() }; speichern(); zeichnen(); },
+    "ma-neu": () => { const p = { id: neueId("p"), vorname: "Neu", nachname: "", rolle: "aushilfe", stammfiliale: S.filialen[0].id, springer: false, einsatzfilialen: [], wochenstunden: 10, aktiv: true }; S.personen.push(p); speichern(); gehe("ma-edit", p.id); },
+    "ma-speichern": (el) => {
+      const p = person(el.dataset.id);
+      Object.assign(p, { vorname: $("#m-vor").value.trim() || p.vorname, nachname: $("#m-nach").value.trim(), rolle: $("#m-rolle").value, stammfiliale: $("#m-stamm").value,
+        wochenstunden: Number($("#m-std").value) || 0, springer: $("#m-springer").checked, aktiv: $("#m-aktiv").checked,
+        einsatzfilialen: [...document.querySelectorAll("[data-einsatz]")].filter((x) => x.checked).map((x) => x.dataset.einsatz).filter((x) => x !== $("#m-stamm").value) });
+      speichern(); meldung("Gespeichert"); gehe("ma");
+    },
+    "regel-neu": () => { const r = { id: neueId("r"), titel: "Neue Regel", bereich: S.hygiene.bereiche[0].id, geraetetyp: null, intervall: { art: "oeffnung", versatz: 0 }, zustaendig: { art: "alle" }, pruefpunkte: [{ art: "haken", text: "Erledigt" }], massnahme: S.hygiene.massnahmen[0].id, standard: "alle", pflicht: false, toleranz: 60, aktiv: false, anleitung: "" }; S.hygiene.regeln.push(r); speichern(); gehe("regel-edit", r.id); },
+    "regel-speichern": (el) => {
+      const r = S.hygiene.regeln.find((x) => x.id === el.dataset.id);
+      const art = $("#r-iv").value, w = $("#r-ivw").value.trim();
+      const iv = { art };
+      if (art === "uhrzeiten") iv.zeiten = w.split(/[,; ]+/).filter((x) => /^\d{1,2}:\d{2}$/.test(x));
+      else if (art === "alle_std") iv.std = Math.max(1, Number(w) || 2);
+      else if (art === "wochentage") { iv.tage = [...document.querySelectorAll("[data-wt]")].filter((x) => x.checked).map((x) => x.dataset.wt); iv.zeit = /^\d{1,2}:\d{2}$/.test(w) ? w : "11:00"; if (!iv.tage.length) iv.tage = ["mo"]; }
+      else if (art === "monatlich") { iv.tagAb = 1; iv.zeit = /^\d{1,2}:\d{2}$/.test(w) ? w : "11:00"; }
+      else iv.versatz = 0;
+      if (art === "uhrzeiten" && !iv.zeiten.length) return meldung("Bitte Uhrzeiten wie 10:15, 14:00 eingeben");
+      const [za, zw] = $("#r-zust").value.split("|");
+      Object.assign(r, { titel: $("#r-titel").value.trim() || r.titel, bereich: $("#r-bereich").value, geraetetyp: $("#r-typ").value || null, anleitung: $("#r-anl").value.trim(), intervall: iv,
+        zustaendig: za === "alle" ? { art: "alle" } : { art: za, wert: zw }, massnahme: $("#r-mn").value, pflicht: $("#r-pflicht").checked, aktiv: $("#r-aktiv").checked });
+      const pp = r.pruefpunkte[0];
+      if (pp && pp.art === "messwert") { pp.max = Number($("#r-max").value); pp.krit = Number($("#r-krit").value); }
+      speichern(); meldung("Regel gespeichert. Gilt ab sofort in allen passenden Filialen."); gehe("regeln");
+    },
+    "update-pruefen": () => updatePruefen(true),
+    "update-jetzt": () => { if (wartend) wartend.postMessage("jetzt-aktivieren"); },
+  };
+  function hygSpeichern(grund) {
+    const a = aufgabeFinden(arg); if (!a || a.durchfuehrung) return;
+    const r = a.regel, m = S.hygiene.massnahmen.find((x) => x.id === r.massnahme);
+    const werte = {}; r.pruefpunkte.forEach((pp, i) => { werte[i] = entwurf.werte[i] == null ? null : entwurf.werte[i]; });
+    const bew = grund ? "kritisch" : L.bewerte(r, werte);
+    const d = { id: neueId("h"), key: a.key, filiale: a.filiale, datum: a.datum, regelId: r.id, geraetId: a.geraet ? a.geraet.id : null, personId: ICH().id, zeit: jetztIso(), werte, bewertung: bew,
+      ergebnis: grund ? "nicht_moeglich" : "erledigt", grund: grund || null, nachgetragen: a.datum < heute() || a.status === "ueberfaellig",
+      schritte: !grund && bew !== "ok" && m ? m.schritte.filter((_, i) => entwurf.schritte[i]) : [] };
+    S.hygiene.durchfuehrungen.push(d);
+    let txt = "Abgehakt ✓";
+    if (!grund && bew !== "ok" && m && m.nachkontrolle && a.datum === heute()) {
+      S.hygiene.nachkontrollen.push({ key: `${a.key}|nk${S.naechsteId}`, filiale: a.filiale, datum: a.datum, regelId: r.id, geraetId: d.geraetId, ab: jetztMin() + m.nachkontrolle, quelle: a.key });
+      txt = `Gespeichert. Nachkontrolle in ${m.nachkontrolle} Min. angelegt.`;
+    }
+    if (bew === "kritisch" || grund) {
+      S.meldungen = S.meldungen || [];
+      S.meldungen.push({ id: neueId("m"), filiale: a.filiale, text: `🧼 ${grund ? "Nicht möglich" : "Abweichung"}: ${r.titel}${a.geraet ? " · " + a.geraet.name : ""}${grund ? " (" + grund + ")" : ""}`, zeit: jetztIso() });
+      if (!grund) txt += " Shopleitung informiert.";
+    }
+    entwurf = null; speichern(); meldung(txt); gehe("hygiene");
+  }
+
+  document.addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-go],[data-act]");
+    if (!el || el.disabled || el.tagName === "SELECT" || (el.tagName === "INPUT" && el.dataset.act)) return;
+    if (el.dataset.go) { gehe(el.dataset.go, el.dataset.arg); return; }
+    const f = AKT[el.dataset.act]; if (f) f(el, ev);
+  });
+  document.addEventListener("change", (ev) => {
+    const el = ev.target;
+    if (el.dataset.pp != null && el.type === "checkbox") { entwurf.werte[el.dataset.pp] = el.checked; zeichnen(); }
+    else if (el.dataset.pp != null) { entwurf.werte[el.dataset.pp] = el.value; zeichnen(); const n = $(`#pp${el.dataset.pp}`); if (n) n.focus(); }
+    else if (el.dataset.schritt != null) { entwurf.schritte[el.dataset.schritt] = el.checked; zeichnen(); }
+    else if (el.dataset.act === "geraet-status") { S.hygiene.geraete.find((g) => g.id === el.dataset.id).status = el.value; speichern(); zeichnen(); }
+    else if (el.dataset.act === "uhrzeit") { const k = `${el.dataset.r}|${FIL().id}`; S.hygiene.zuteilung[k] = { ...(S.hygiene.zuteilung[k] || { status: "aktiv" }), uhrzeit: el.value || null }; speichern(); meldung("Uhrzeit gespeichert"); }
+    else if (el.dataset.oz) { const [fid, t, i] = el.dataset.oz.split("|"); const f = filiale(fid); const z = f.oeffnung[t] ? [...f.oeffnung[t]] : ["10:00", "19:00"]; z[i] = el.value; f.oeffnung[t] = z[0] && z[1] ? z : null; speichern(); zeichnen(); }
+    else if (el.dataset.bedarf) { const [fid, sch] = el.dataset.bedarf.split("|"); filiale(fid).bedarf.standard[sch] = Number(el.value) || 0; speichern(); }
+  });
+
+  // Erst anzeigen, dann den Update-Dienst versuchen: in eingebetteten Ansichten (z. B. geteilter Link) ist er gesperrt
+  // und darf die App nie am Starten hindern.
+  const start = (location.hash || "").slice(1);
+  if (start && V[start]) ansicht = start;
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (V[h] && h !== ansicht) { ansicht = h; arg = null; fenster = null; zeichnen(); } });
+  zeichnen();
+
+  // ---------- Update wie in der Club-App: komplett oder gar nicht ----------
+  function swDa() { try { return "serviceWorker" in navigator && !!navigator.serviceWorker && location.protocol !== "file:"; } catch (e) { return false; } }
+  function updatePruefen(laut) {
+    if (!swDa()) { if (laut) meldung("Updates gibt es nur in der installierten App"); return; }
+    try {
+      navigator.serviceWorker.getRegistration().then((reg) => { if (!reg) { if (laut) meldung("Kein Update-Dienst aktiv"); return; } return reg.update().then(() => { if (laut && !reg.installing && !reg.waiting) meldung("Du hast die neueste Version"); }); }).catch(() => laut && meldung("Update-Prüfung nicht möglich"));
+    } catch (e) { if (laut) meldung("Update-Prüfung nicht möglich"); }
+  }
+  if (swDa()) {
+    try {
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        const zeigen = (w) => { wartend = w; updateBand = `<div class="update">Neue Version bereit <button data-act="update-jetzt">Jetzt aktualisieren</button></div>`; zeichnen(); };
+        if (reg.waiting && navigator.serviceWorker.controller) zeigen(reg.waiting);
+        reg.addEventListener("updatefound", () => { const n = reg.installing; n && n.addEventListener("statechange", () => { if (n.state === "installed" && navigator.serviceWorker.controller) zeigen(n); }); });
+      }).catch(() => { /* ohne Service Worker läuft die App trotzdem */ });
+      let neu = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if (neu) return; neu = true; location.reload(); });
+    } catch (e) { /* gesperrt, die App läuft ohne Update-Dienst */ }
+  }
+  setInterval(() => { if (["hygiene", "start", "stechuhr", "hygkontrolle"].includes(ansicht) && !fenster && !document.activeElement.matches("input,textarea,select")) zeichnen(); }, 60000);
+  window.FR_APP = { zustand: () => S, version: APP_VERSION };
+})();
