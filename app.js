@@ -1,4 +1,4 @@
-const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 8) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 9) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -32,6 +32,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
   const zentrale = () => rolle() === "zentrale";
   const qualitaet = () => rolle() === "qualitaet" || zentrale();
   const berater = () => rolle() === "berater";
+  const rezeptRecht = () => qualitaet() || rolle() === "shopleitung";
   const uebergreifend = () => L.UEBERGREIFEND.includes(rolle());
   const meineFilialen = () => uebergreifend() ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
   const sortiment = (f) => S.rezepte.warengruppen.filter((g) => !f.sortiment || f.sortiment.includes(g.id));
@@ -83,6 +84,8 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    zutaten: "Hier stehen alle Zutaten mit ihren Allergenen. Trag sie vom Datenblatt des Lieferanten ein. Die Rezepte rechnen ihre Allergene daraus aus.",
+    freigaben: "Hier gibst du Änderungen anderer frei. Eigene Änderungen muss immer eine zweite Person freigeben.",
     ma: "Hier pflegst du die Mitarbeiter: Beschäftigungsart, Stundenumfang (mit „darf überschreiten“), Einsatzprofil, Bereitschaft, Springer und Qualifikationen. Am PC siehst du alles als Tabelle.",
     regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
     auswertung: "Jede Filiale einzeln und alle zusammen.",
@@ -117,7 +120,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -175,6 +178,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
         ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · Grafik & Druck`, "buero")}
+        ${rolle() === "shopleitung" ? kachel("📝", "Rezepte pflegen", "Zutaten, Allergene, Freigaben", "rezeptpflege", meineFreigaben().length) : ""}
         ${zentrale() ? "" : kachel("👤", "Mitarbeiter", "Stunden, Einsatz, Qualifikationen", "ma", L.qualiAblauf({ personen: maSichtbar() }, d, 30).length)}
         ${kachel("👥", "Team", "Inklusive Springer", "team")}
       </div></div>`;
@@ -185,7 +189,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("👤", "Mitarbeiter", "Beschäftigung, Einsatz, Springer", "ma", L.qualiAblauf({ personen: maSichtbar() }, d, 30).length)}
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
-        ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+        ${kachel("📝", "Rezepte pflegen", "Zutaten, Allergene, Freigaben", "rezeptpflege", meineFreigaben().length)}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · alles für die Zentrale`, "buero")}
         ${kachel("🛠️", "Admin", "Betreiber & Datenbanken", "admin", (S.betreiber || []).filter((b) => !b.freigegeben).length)}
       </div></div>`;
@@ -193,7 +197,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
     if (rolle() === "qualitaet") {
       k += `<div class="abschnitt"><h2>Qualität & Pflege</h2><div class="kacheln">
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
-        ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+        ${kachel("📝", "Rezepte pflegen", "Zutaten, Allergene, Freigaben", "rezeptpflege", meineFreigaben().length)}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner`, "buero")}
       </div></div>`;
     }
@@ -425,7 +429,7 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
   V.rezepte = () => {
     const R = S.rezepte, gruppen = sortiment(FIL());
     if (rezeptGruppe !== "alle" && !gruppen.some((g) => g.id === rezeptGruppe)) rezeptGruppe = "alle";
-    const liste = R.rezepte.filter((r) => gruppen.some((g) => g.id === r.gruppe) && (rezeptGruppe === "alle" || r.gruppe === rezeptGruppe));
+    const liste = L.rezepteFreigegeben(S).filter((r) => gruppen.some((g) => g.id === r.gruppe) && (rezeptGruppe === "alle" || r.gruppe === rezeptGruppe));
     return `${titel("Rezepte " + esc(FIL().kurz))}${frootie(FROOTIE_TIPPS.rezepte)}
       <div class="gruppen wahl"><button class="${rezeptGruppe === "alle" ? "an" : ""}" data-act="rgruppe" data-g="alle">Alle</button>${gruppen.map((g) => `<button class="${rezeptGruppe === g.id ? "an" : ""}" data-act="rgruppe" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div>
       <button class="btn zwei" data-go="quiz">🎯 Rezept-Quiz starten</button>
@@ -434,8 +438,9 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
       <p class="klein muted">Beispielrezepte für die Testversion. Die echten Rezepte pflegt die Zentrale.</p>`;
   };
   V.rezept = () => {
-    const r = S.rezepte.rezepte.find((x) => x.id === arg);
+    const r = L.rezepteFreigegeben(S).find((x) => x.id === arg);
     if (!r) return `${titel("Rezept", "rezepte")}<p class="leer">Nicht gefunden.</p>`;
+    const sp = L.spurenVon(r);
     const g = rezeptGroesse[r.id] || (r.groessen.includes("M") ? "M" : r.groessen[0]);
     const al = L.allergeneVon(r);
     return `${titel(esc(r.name), "rezepte")}
@@ -443,13 +448,15 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${r.groessen.length > 1 ? `<div class="wahl">${r.groessen.map((x) => `<button class="${x === g ? "an" : ""}" data-act="rgroesse" data-r="${r.id}" data-g="${x}">Größe ${x}</button>`).join("")}</div>` : ""}
         <table class="zutaten"><tbody>${r.zutaten.map((z) => `<tr><td>${esc(z.name)}${z.allergene.length ? ` <span class="marke-s rot">${z.allergene.map(esc).join(", ")}</span>` : ""}</td><td>${L.mengeFuer(z, g)} ${esc(z.einheit)}</td></tr>`).join("")}</tbody></table></div>
       <div class="karte"><h2>Allergene</h2>${al.length ? `<div class="allergene">${al.map((a) => `<span class="marke-s rot">${esc(a)}</span>`).join("")}</div>` : '<p class="muted">Keines der 14 Hauptallergene.</p>'}
-        ${!al.includes("Gluten") ? '<span class="marke-s gruen">glutenfrei</span>' : ""}</div>
+        ${sp.length ? `<p class="klein">Kann Spuren enthalten von: <b>${sp.map(esc).join(", ")}</b></p>` : ""}
+        ${!al.includes("Gluten") && !sp.includes("Gluten") ? '<span class="marke-s gruen">ohne glutenhaltige Zutaten</span>' : ""}
+        <p class="klein muted">Fassung ${r.fassung || 1}${r.freigabe ? ` · ${freigabeTxt(r)}` : ""}</p></div>
       <div class="karte"><h2>Zubereitung</h2><ol class="schritte">${r.schritte.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
         ${r.standzeit ? `<p class="hinweis">⏳ Standzeit: ${esc(r.standzeit)}</p>` : ""}
         <p class="klein muted">🎬 Arbeitsvideo folgt.</p></div>`;
   };
   V.quiz = () => {
-    if (!quizStand) { const gr = sortiment(FIL()); quizStand = { fragen: L.quiz(S.rezepte.rezepte.filter((r) => gr.some((g) => g.id === r.gruppe)), gr, 10, Date.now() % 100000), nr: 0, punkte: 0, gewaehlt: null }; }
+    if (!quizStand) { const gr = sortiment(FIL()); quizStand = { fragen: L.quiz(L.rezepteFreigegeben(S).filter((r) => gr.some((g) => g.id === r.gruppe)), gr, 10, Date.now() % 100000), nr: 0, punkte: 0, gewaehlt: null }; }
     const q = quizStand;
     if (q.nr >= q.fragen.length) {
       const lob = q.punkte >= 9 ? "Wow, Rezept-Profi! 🏆" : q.punkte >= 6 ? "Gut gemacht! 👍" : "Schau dir die Rezepte nochmal an, dann klappt es beim nächsten Mal. 💪";
@@ -1062,25 +1069,91 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
     return V.buero();
   };
 
-  V.rezeptpflege = () => `${titel("Rezepte pflegen")}${frootie(FROOTIE_TIPPS.rezeptpflege)}
-    <button class="btn zwei" data-act="rezept-neu">+ Neues Rezept</button>
+  // ----- Rezepte pflegen: Rezepte, Zutaten & Allergene, Freigaben (4 Augen) -----
+  const AL_KURZ = { Gluten: "Glu", Krebstiere: "Kre", Ei: "Ei", Fisch: "Fis", "Erdnüsse": "Erd", Soja: "Soj", Milch: "Mil", "Schalenfrüchte": "Sch", Sellerie: "Sel", Senf: "Sen", Sesam: "Ses", Schwefeldioxid: "SO₂", Lupinen: "Lup", Weichtiere: "Wei" };
+  const meineFreigaben = () => L.offeneFreigaben(S).filter((x) => L.freigabePruefen(S, x.typ, x.e.id, ICH().id).moeglich);
+  const pflegeTabs = (an) => { const n = L.offeneFreigaben(S).length; return `<div class="wahl tabs">${[["rezeptpflege", "📝 Rezepte"], ["zutaten", "🧾 Zutaten & Allergene"], ["freigaben", `✅ Freigaben${n ? ` (${n})` : ""}`]].map(([v, t]) => `<button class="${an === v ? "an" : ""}" data-go="${v}">${t}</button>`).join("")}</div>`; };
+  const statusMarke = (e) => e.neu ? '<span class="marke-s gelb">neu · noch nicht freigegeben</span>' : e.entwurf ? `<span class="marke-s gelb">Fassung ${e.fassung || 1} · Änderung wartet</span>` : `<span class="marke-s gruen">Fassung ${e.fassung || 1}</span>`;
+  const wer = (id) => esc((person(id) || {}).vorname || "?");
+  const zeitKurz = (iso) => iso ? `${L.datumKurz(iso.slice(0, 10))}${iso.length > 10 ? " " + iso.slice(11, 16) : ""}` : "";
+  const freigabeTxt = (e) => e.freigabe ? `freigegeben ${L.datumKurz(e.freigabe.zweiteAm.slice(0, 10))} von ${wer(e.freigabe.von)} und ${wer(e.freigabe.zweiteVon)}` : "";
+  V.rezeptpflege = () => `${titel("Rezepte pflegen")}${breit() ? "" : frootie(FROOTIE_TIPPS.rezeptpflege)}${pflegeTabs("rezeptpflege")}
+    <div class="reihe"><button class="btn zwei" data-act="rezept-neu">+ Neues Rezept</button><span class="klein muted">Änderungen gelten erst, wenn eine zweite Person sie freigibt.</span></div>
     ${S.rezepte.warengruppen.map((g) => { const rs = S.rezepte.rezepte.filter((r) => r.gruppe === g.id); const fil = S.filialen.filter((f) => !f.sortiment || f.sortiment.includes(g.id)).map((f) => f.kurz);
-      return `<div class="abschnitt"><h2>${g.sym} ${esc(g.name)}</h2><p class="klein muted">verkauft in: ${fil.map(esc).join(", ") || "keiner Filiale"}</p><div class="liste">${rs.map((r) => `<button class="zeile" data-go="rezept-edit" data-arg="${r.id}"><span class="punkt gruen"></span><span><b>${esc(r.name)}</b><small>${r.zutaten.length} Zutaten · Allergene: ${L.allergeneVon(r).map(esc).join(", ") || "keine"}</small></span><span>›</span></button>`).join("") || '<p class="leer">Noch keine Rezepte.</p>'}</div></div>`; }).join("")}`;
+      return `<div class="abschnitt"><h2>${g.sym} ${esc(g.name)}</h2><p class="klein muted">verkauft in: ${fil.map(esc).join(", ") || "keiner Filiale"}</p><div class="liste">${rs.map((r) => { const al = L.allergeneVon(r), sp = L.spurenVon(r);
+        return `<button class="zeile" data-go="rezept-edit" data-arg="${r.id}"><span class="punkt ${r.neu || r.entwurf ? "gelb" : "gruen"}"></span><span><b>${esc(r.name)}</b> ${statusMarke(r)}<small>${r.zutaten.length} Zutaten · Allergene: ${al.map(esc).join(", ") || "keine"}${sp.length ? ` · Spuren: ${sp.map(esc).join(", ")}` : ""}</small></span><span>›</span></button>`; }).join("") || '<p class="leer">Noch keine Rezepte.</p>'}</div></div>`; }).join("")}`;
+  V.zutaten = () => {
+    const al = S.rezepte.allergene, zs = S.rezepte.zutaten.slice().sort((a, b) => a.name.localeCompare(b.name));
+    return `${titel("Zutaten & Allergene")}${breit() ? "" : frootie(FROOTIE_TIPPS.zutaten)}${pflegeTabs("zutaten")}
+      <div class="hinweis">Die Allergene werden <b>an der Zutat</b> gepflegt. Jedes Rezept rechnet sie aus seinen Zutaten aus. Ändert sich eine Zutat, stimmen nach der Freigabe alle Rezepte, der Allergen-Aushang und das Quiz.</div>
+      <div class="reihe"><button class="btn zwei" data-act="zutat-neu">+ Neue Zutat</button><span class="klein muted">● enthalten · ○ Spuren · ${zs.length} Zutaten</span></div>
+      <div class="karte tab-karte"><table class="pc-tab al-tab"><thead><tr><th>Zutat</th>${al.map((a) => `<th class="al" title="${esc(a)}"><span>${esc(AL_KURZ[a] || a)}</span></th>`).join("")}<th>geprüft</th></tr></thead><tbody>
+        ${zs.map((z) => { const x = z.allergene || {}; return `<tr data-go="zutat-edit" data-arg="${z.id}" tabindex="0" class="${z.neu || z.entwurf ? "offen" : ""}"><td><b>${esc(z.name)}</b>${z.lieferant ? `<small>${esc(z.lieferant)}</small>` : ""}${z.neu ? '<small class="warn">neu · Allergene eintragen</small>' : z.entwurf ? '<small class="warn">Änderung wartet auf Freigabe</small>' : ""}</td>
+          ${al.map((a) => `<td class="al">${x[a] === "ja" ? '<span class="al-ja" title="enthält">●</span>' : x[a] === "spuren" ? '<span class="al-sp" title="Spuren">○</span>' : ""}</td>`).join("")}
+          <td class="klein">${z.geprueft ? `${wer(z.geprueft.von)} · ${L.datumKurz(z.geprueft.am)}` : '<span class="marke-s gelb">offen</span>'}</td></tr>`; }).join("")}</tbody></table></div>
+      <p class="klein muted">Spalten: ${al.map((a) => `${esc(AL_KURZ[a])} = ${esc(a)}`).join(" · ")}</p>`;
+  };
+  function fassungenHtml(e, typ) {
+    const f = (e.fassungen || []).slice().reverse();
+    return `<div class="karte"><h2>Fassungen</h2><p class="klein muted">Jede Freigabe ergibt eine neue Fassung. Die alten bleiben lesbar, z. B. für Kontrollen („Was galt am …?“).</p>
+      <div class="liste">${e.neu ? "" : `<div class="zeile"><span class="punkt gruen"></span><span><b>Fassung ${e.fassung || 1} (gültig)</b><small>${freigabeTxt(e)}</small></span><span></span></div>`}
+      ${f.map((x) => `<button class="zeile" data-act="fassung-zeigen" data-typ="${typ}" data-id="${e.id}" data-f="${x.fassung}"><span class="punkt"></span><span><b>Fassung ${x.fassung}</b><small>${x.freigabe ? `freigegeben ${L.datumKurz(x.freigabe.zweiteAm.slice(0, 10))}` : "Ausgangsstand"}</small></span><span>ansehen ›</span></button>`).join("")}</div></div>`;
+  }
+  function entwurfBand(e, typ) {
+    if (!e.entwurf) return "";
+    const pr = L.freigabePruefen(S, typ, e.id, ICH().id);
+    return `<div class="hinweis"><b>${e.neu ? "Neu" : "Geänderte Fassung"}, wartet auf Freigabe</b> · von ${wer(e.entwurf.von)}, ${zeitKurz(e.entwurf.am)}<br>${L.aenderungen(S, typ, e.id).map(esc).join(" · ")}
+      <div class="reihe" style="margin-top:6px">${pr.moeglich ? `<button class="btn zwei" data-act="freigeben" data-typ="${typ}" data-id="${e.id}">✅ Freigeben</button>` : `<span class="klein muted">${esc(pr.grund)}</span>`}
+      <button class="btn drei" data-act="entwurf-weg" data-typ="${typ}" data-id="${e.id}">${e.neu ? "Verwerfen" : "Änderung verwerfen"}</button></div></div>`;
+  }
+  V["zutat-edit"] = () => {
+    const z = S.rezepte.zutaten.find((x) => x.id === arg);
+    if (!z) return `${titel("Zutat", "zutaten")}<p class="leer">Nicht gefunden.</p>`;
+    const d = z.entwurf ? z.entwurf.daten : z, x = d.allergene || {};
+    const rz = S.rezepte.rezepte.filter((r) => r.zutaten.some((l) => l.zutatId === z.id) || (r.entwurf && r.entwurf.daten.zutaten.some((l) => l.zutatId === z.id)));
+    return `${titel(esc(z.name), "zutaten")}${entwurfBand(z, "zutat")}
+      <div class="karte"><div class="gitter2"><div class="feld"><label for="zt-name">Name</label><input type="text" id="zt-name" maxlength="60" value="${esc(d.name)}"></div>
+        <div class="feld"><label for="zt-lief">Lieferant</label><input type="text" id="zt-lief" maxlength="60" value="${esc(d.lieferant || "")}"></div></div>
+        <div class="gitter2"><div class="feld"><label for="zt-nr">Artikelnummer</label><input type="text" id="zt-nr" maxlength="30" value="${esc(d.artNr || "")}"></div>
+        <div class="feld"><label for="zt-zus">Zusatzstoffe (freiwillig)</label><input type="text" id="zt-zus" maxlength="120" placeholder="z. B. mit Farbstoff" value="${esc(d.zusatzstoffe || "")}"></div></div></div>
+      <div class="karte"><h2>Allergene (14 Hauptallergene)</h2><p class="klein muted">Vom Datenblatt des Lieferanten übernehmen. Im Zweifel nachfragen und nicht raten.</p>
+        <div class="al-gitter">${S.rezepte.allergene.map((a) => `<div class="al-zeile"><span>${esc(a)}</span><div class="al-wahl" role="radiogroup" aria-label="${esc(a)}">${[["nein", "nein"], ["spuren", "Spuren"], ["ja", "enthält"]].map(([v, t]) => `<label class="tagwahl ${v}"><input type="radio" name="al-${esc(a)}" data-al="${esc(a)}" value="${v}" ${(x[a] || "nein") === v ? "checked" : ""}><span>${t}</span></label>`).join("")}</div></div>`).join("")}</div></div>
+      <div class="karte"><h2>Verwendet in</h2>${rz.length ? `<div class="liste">${rz.map((r) => `<button class="zeile" data-go="rezept-edit" data-arg="${r.id}"><span class="punkt"></span><span><b>${esc(r.name)}</b></span><span>›</span></button>`).join("")}</div>` : '<p class="muted">Noch in keinem Rezept.</p>'}</div>
+      <button class="btn gross" data-act="zutat-speichern" data-id="${z.id}">Zur Freigabe speichern</button>
+      ${fassungenHtml(z, "zutat")}`;
+  };
+  V.freigaben = () => {
+    const offen = L.offeneFreigaben(S);
+    return `${titel("Freigaben")}${breit() ? "" : frootie(FROOTIE_TIPPS.freigaben)}${pflegeTabs("freigaben")}
+      <p class="klein muted">4-Augen-Prinzip: Eine Änderung an Rezept oder Allergenen gilt erst, wenn eine zweite Person sie freigibt (Qualität & Pflege, Inhaber oder Shopleitung). Bis dahin sieht das Team die alte Fassung.</p>
+      ${offen.length ? offen.map(({ typ, e }) => { const pr = L.freigabePruefen(S, typ, e.id, ICH().id);
+        return `<div class="karte"><div class="reihe zw"><h2>${typ === "zutat" ? "🧾" : "📝"} ${esc(e.entwurf.daten.name || e.name)}</h2>${statusMarke(e)}</div>
+          <p class="klein muted">${typ === "zutat" ? "Zutat" : "Rezept"} · geändert von ${wer(e.entwurf.von)}, ${zeitKurz(e.entwurf.am)}</p>
+          <ul class="aend">${L.aenderungen(S, typ, e.id).map((a) => `<li>${esc(a)}</li>`).join("")}</ul>
+          <div class="reihe">${pr.moeglich ? `<button class="btn zwei" data-act="freigeben" data-typ="${typ}" data-id="${e.id}">✅ Freigeben</button>` : `<span class="klein muted">${esc(pr.grund)}</span>`}
+            <button class="btn drei" data-go="${typ === "zutat" ? "zutat-edit" : "rezept-edit"}" data-arg="${e.id}">Ansehen</button>
+            <button class="btn drei" data-act="entwurf-weg" data-typ="${typ}" data-id="${e.id}">Verwerfen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Änderungen. 🎉</p>'}`;
+  };
   V["rezept-edit"] = () => {
     const r = S.rezepte.rezepte.find((x) => x.id === arg);
     if (!r) return `${titel("Rezept", "rezeptpflege")}<p class="leer">Nicht gefunden.</p>`;
-    const zl = r.zutaten.map((z) => `${z.name} | ${typeof z.menge === "object" ? r.groessen.map((g) => z.menge[g]).join("/") : z.menge} | ${z.einheit} | ${z.allergene.join(", ")}`).join("\n");
-    return `${titel("Rezept bearbeiten", "rezeptpflege")}
-      <div class="karte"><div class="feld"><label for="rz-name">Name</label><input type="text" id="rz-name" value="${esc(r.name)}" maxlength="80"></div>
-        <div class="gitter2"><div class="feld"><label for="rz-gruppe">Warengruppe</label><select id="rz-gruppe">${S.rezepte.warengruppen.map((g) => `<option value="${g.id}" ${g.id === r.gruppe ? "selected" : ""}>${g.sym} ${esc(g.name)}</option>`).join("")}</select></div>
-          <div class="feld"><label for="rz-gr">Größen (mit Komma)</label><input type="text" id="rz-gr" value="${esc(r.groessen.join(", "))}"></div></div>
-        <div class="feld"><label for="rz-beschr">Beschreibung</label><input type="text" id="rz-beschr" value="${esc(r.beschreibung)}" maxlength="160"></div>
-        <div class="feld"><label for="rz-stand">Standzeit (freiwillig)</label><input type="text" id="rz-stand" value="${esc(r.standzeit || "")}" placeholder="z. B. 4 Std. in der Vitrine"></div></div>
-      <div class="karte"><h2>Zutaten</h2><p class="klein muted">Eine Zutat pro Zeile: <b>Name | Mengen je Größe mit / | Einheit | Allergene</b>. Beispiel: <i>Granola | 20/30/40 | g | Gluten, Schalenfrüchte</i></p>
+    const d = r.entwurf ? r.entwurf.daten : r;
+    const zl = d.zutaten.map((z) => `${z.name} | ${typeof z.menge === "object" ? d.groessen.map((g) => z.menge[g]).join("/") : z.menge} | ${z.einheit}`).join("\n");
+    const al = L.allergeneVon(d), sp = L.spurenVon(d), offen = L.ungepruefteZutaten(S, d);
+    return `${titel(r.neu ? "Neues Rezept" : "Rezept bearbeiten", "rezeptpflege")}${entwurfBand(r, "rezept")}
+      <div class="karte"><div class="feld"><label for="rz-name">Name</label><input type="text" id="rz-name" value="${esc(d.name)}" maxlength="80"></div>
+        <div class="gitter2"><div class="feld"><label for="rz-gruppe">Warengruppe</label><select id="rz-gruppe">${S.rezepte.warengruppen.map((g) => `<option value="${g.id}" ${g.id === d.gruppe ? "selected" : ""}>${g.sym} ${esc(g.name)}</option>`).join("")}</select></div>
+          <div class="feld"><label for="rz-gr">Größen (mit Komma)</label><input type="text" id="rz-gr" value="${esc(d.groessen.join(", "))}"></div></div>
+        <div class="feld"><label for="rz-beschr">Beschreibung</label><input type="text" id="rz-beschr" value="${esc(d.beschreibung)}" maxlength="160"></div>
+        <div class="feld"><label for="rz-stand">Standzeit (freiwillig)</label><input type="text" id="rz-stand" value="${esc(d.standzeit || "")}" placeholder="z. B. 4 Std. in der Vitrine"></div></div>
+      <div class="karte"><h2>Zutaten</h2><p class="klein muted">Eine Zutat pro Zeile: <b>Zutat | Mengen je Größe mit / | Einheit</b>. Beispiel: <i>Granola | 20/30/40 | g</i>. Die Allergene kommen aus der Zutat. Unbekannte Zutaten werden neu angelegt; ihre Allergene müssen vor der Freigabe eingetragen werden.</p>
         <textarea id="rz-zut" rows="7">${esc(zl)}</textarea>
-        <p class="klein muted">Erlaubte Allergene: ${D.ALLERGENE.map(esc).join(", ")}</p></div>
-      <div class="karte"><h2>Zubereitung</h2><p class="klein muted">Ein Schritt pro Zeile.</p><textarea id="rz-schritte" rows="5">${esc(r.schritte.join("\n"))}</textarea></div>
-      <button class="btn gross" data-act="rezept-speichern" data-id="${r.id}">Speichern</button>`;
+        <details><summary class="klein">Alle Zutaten (${S.rezepte.zutaten.length})</summary><p class="klein muted">${S.rezepte.zutaten.map((z) => esc(z.name)).sort().join(" · ")}</p></details>
+        <div class="reihe"><b>Allergene${r.entwurf ? " im Entwurf" : ""}:</b> ${al.map((a) => `<span class="marke-s rot">${esc(a)}</span>`).join(" ") || '<span class="muted">keine</span>'}${sp.map((a) => ` <span class="marke-s">Spuren: ${esc(a)}</span>`).join("")}</div>
+        ${offen.length ? `<p class="hinweis">⚠️ Allergene noch nicht geprüft: ${offen.map((n) => { const z = L.zutatFinden(S, n); return `<button class="chip" data-go="zutat-edit" data-arg="${z.id}">${esc(n)}</button>`; }).join(" ")}</p>` : ""}</div>
+      <div class="karte"><h2>Zubereitung</h2><p class="klein muted">Ein Schritt pro Zeile.</p><textarea id="rz-schritte" rows="5">${esc(d.schritte.join("\n"))}</textarea></div>
+      <button class="btn gross" data-act="rezept-speichern" data-id="${r.id}">Zur Freigabe speichern</button>
+      ${fassungenHtml(r, "rezept")}`;
   };
   V.export = () => {
     const f = FIL(), monat = arg || heute().slice(0, 7);
@@ -1148,13 +1221,14 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
     let rechte = ansicht;
     const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "filialen", "admin", "admin-edit", "admin-pinnwand"];
-    const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
+    const nurQualitaet = ["regeln", "regel-edit"];
     if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
     if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
     if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
     if (["ma", "ma-edit", "ma-import"].includes(rechte) && !(zentrale() || leitung())) rechte = "start";
     if (nurQualitaet.includes(rechte) && !qualitaet()) rechte = "start";
+    if (["rezeptpflege", "rezept-edit", "zutaten", "zutat-edit", "freigaben"].includes(rechte) && !rezeptRecht()) rechte = "start";
     if (berater() && ["quiz", "pinnwand"].includes(rechte)) rechte = "start";
     if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(rechte)) rechte = "start";
     ansicht = rechte;
@@ -1479,25 +1553,60 @@ const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in
       f.sortiment = akt.includes(g) ? akt.filter((x) => x !== g) : [...akt, g];
       speichern(); zeichnen();
     },
-    "rezept-neu": () => { const r = { id: neueId("z"), gruppe: S.rezepte.warengruppen[0].id, name: "Neues Rezept", beschreibung: "", groessen: ["S", "M", "L"], zutaten: [], schritte: [] }; S.rezepte.rezepte.push(r); speichern(); gehe("rezept-edit", r.id); },
+    "rezept-neu": () => { const r = { id: neueId("z"), gruppe: S.rezepte.warengruppen[0].id, name: "Neues Rezept", beschreibung: "", groessen: ["S", "M", "L"], zutaten: [], schritte: [], neu: true }; S.rezepte.rezepte.push(r); speichern(); gehe("rezept-edit", r.id); },
     "rezept-speichern": (el) => {
       const r = S.rezepte.rezepte.find((x) => x.id === el.dataset.id);
       const groessen = $("#rz-gr").value.split(",").map((x) => x.trim()).filter(Boolean);
       if (!groessen.length) return meldung("Bitte mindestens eine Größe angeben");
-      const fehler = [], zutaten = [];
-      $("#rz-zut").value.split("\n").map((z) => z.trim()).filter(Boolean).forEach((zeile, i) => {
-        const [n, m, e, a] = zeile.split("|").map((x) => (x || "").trim());
-        const mengen = (m || "").split("/").map((x) => Number(x.replace(",", ".")));
-        if (!n || mengen.some((x) => isNaN(x)) || (mengen.length !== 1 && mengen.length !== groessen.length)) { fehler.push(i + 1); return; }
-        const allergene = (a || "").split(",").map((x) => x.trim()).filter(Boolean);
-        const unbekannt = allergene.filter((x) => !D.ALLERGENE.includes(x));
-        if (unbekannt.length) { fehler.push(`${i + 1} (${unbekannt.join(", ")})`); return; }
-        zutaten.push({ name: n, menge: mengen.length === 1 ? mengen[0] : Object.fromEntries(groessen.map((g, k) => [g, mengen[k]])), einheit: e || "g", allergene });
-      });
-      if (fehler.length) return meldung("Zutat-Zeile prüfen: " + fehler.join(", "));
-      Object.assign(r, { name: $("#rz-name").value.trim() || r.name, gruppe: $("#rz-gruppe").value, groessen, beschreibung: $("#rz-beschr").value.trim(), standzeit: $("#rz-stand").value.trim() || undefined,
-        zutaten, schritte: $("#rz-schritte").value.split("\n").map((x) => x.trim()).filter(Boolean) });
-      speichern(); meldung("Rezept gespeichert. Alle Filialen sehen es sofort."); gehe("rezeptpflege");
+      const text = $("#rz-zut").value;
+      let z = L.zutatenZeilen(S, text, groessen);
+      if (z.fehler.length) return meldung(z.fehler.join(" · "));
+      const neue = [...new Set(z.unbekannt)];
+      for (const n of neue) S.rezepte.zutaten.push({ id: neueId("zt"), name: n, lieferant: "", artNr: "", zusatzstoffe: "", allergene: {}, neu: true, entwurf: { daten: { name: n, lieferant: "", artNr: "", zusatzstoffe: "", allergene: {} }, von: ICH().id, am: jetztIso() } });
+      if (neue.length) z = L.zutatenZeilen(S, text, groessen);
+      const daten = { name: $("#rz-name").value.trim() || r.name, gruppe: $("#rz-gruppe").value, groessen, beschreibung: $("#rz-beschr").value.trim(), standzeit: $("#rz-stand").value.trim() || undefined,
+        zutaten: z.zutaten, schritte: $("#rz-schritte").value.split("\n").map((x) => x.trim()).filter(Boolean) };
+      L.entwurfSpeichern(S, "rezept", r.id, daten, ICH().id, jetztIso());
+      if (r.neu) r.name = daten.name;
+      speichern();
+      meldung(neue.length ? `Gespeichert. Neue Zutaten: ${neue.join(", ")}. Bitte ihre Allergene eintragen.` : "Gespeichert. Gilt nach der Freigabe durch eine zweite Person.");
+      zeichnen();
+    },
+    "zutat-neu": () => { const z = { id: neueId("zt"), name: "Neue Zutat", lieferant: "", artNr: "", zusatzstoffe: "", allergene: {}, neu: true }; z.entwurf = { daten: { name: z.name, lieferant: "", artNr: "", zusatzstoffe: "", allergene: {} }, von: ICH().id, am: jetztIso() }; S.rezepte.zutaten.push(z); speichern(); gehe("zutat-edit", z.id); },
+    "zutat-speichern": (el) => {
+      const z = S.rezepte.zutaten.find((x) => x.id === el.dataset.id);
+      const n = $("#zt-name").value.trim();
+      if (!n) return meldung("Bitte einen Namen eingeben");
+      const doppelt = L.zutatFinden(S, n);
+      if (doppelt && doppelt !== z) return meldung(`„${n}“ gibt es schon als Zutat.`);
+      const allergene = {};
+      for (const x of document.querySelectorAll("[data-al]:checked")) if (x.value !== "nein") allergene[x.dataset.al] = x.value;
+      L.entwurfSpeichern(S, "zutat", z.id, { name: n, lieferant: $("#zt-lief").value.trim(), artNr: $("#zt-nr").value.trim(), zusatzstoffe: $("#zt-zus").value.trim(), allergene }, ICH().id, jetztIso());
+      if (z.neu) z.name = n;
+      speichern(); meldung("Gespeichert. Gilt nach der Freigabe durch eine zweite Person."); zeichnen();
+    },
+    freigeben: (el) => {
+      const r = L.freigeben(S, el.dataset.typ, el.dataset.id, ICH().id, jetztIso());
+      if (!r.moeglich) return meldung(r.grund);
+      speichern(); meldung(`Freigegeben · Fassung ${r.fassung}${el.dataset.typ === "zutat" ? ". Alle Rezepte mit dieser Zutat sind aktualisiert." : ". Das Team sieht sie jetzt."}`); zeichnen();
+    },
+    "entwurf-weg": (el) => {
+      const e = (el.dataset.typ === "zutat" ? S.rezepte.zutaten : S.rezepte.rezepte).find((x) => x.id === el.dataset.id);
+      const warNeu = e && e.neu;
+      if (warNeu && el.dataset.typ === "zutat" && S.rezepte.rezepte.some((r) => r.entwurf && r.entwurf.daten.zutaten.some((l) => l.zutatId === e.id))) return meldung("Die Zutat steht in einem Rezept-Entwurf. Zuerst dort entfernen.");
+      L.entwurfVerwerfen(S, el.dataset.typ, el.dataset.id); speichern(); meldung("Verworfen");
+      if (warNeu && ansicht !== "freigaben") gehe(el.dataset.typ === "zutat" ? "zutaten" : "rezeptpflege"); else zeichnen();
+    },
+    "fassung-zeigen": (el) => {
+      const e = (el.dataset.typ === "zutat" ? S.rezepte.zutaten : S.rezepte.rezepte).find((x) => x.id === el.dataset.id);
+      const f = (e.fassungen || []).find((x) => String(x.fassung) === el.dataset.f); if (!f) return;
+      const d = f.daten;
+      fenster = `<div class="reihe zw"><h2>${esc(d.name || e.name)} · Fassung ${f.fassung}</h2><button class="chip" data-act="zu">✕</button></div>
+        <p class="klein muted">${f.freigabe ? `freigegeben ${L.datumKurz(f.freigabe.zweiteAm.slice(0, 10))} von ${wer(f.freigabe.von)} und ${wer(f.freigabe.zweiteVon)}` : "Ausgangsstand"} · nur lesen</p>
+        ${el.dataset.typ === "zutat" ? (() => { const a = L.zutatAllergene(d); return `<p>Enthält: <b>${a.ja.map(esc).join(", ") || "keine Hauptallergene"}</b></p>${a.spuren.length ? `<p>Spuren: ${a.spuren.map(esc).join(", ")}</p>` : ""}<p class="klein muted">Lieferant: ${esc(d.lieferant || "–")}</p>`; })()
+          : `<table class="zutaten"><tbody>${d.zutaten.map((z) => `<tr><td>${esc(z.name)}${(z.allergene || []).length ? ` <span class="marke-s rot">${z.allergene.map(esc).join(", ")}</span>` : ""}</td><td>${typeof z.menge === "object" ? d.groessen.map((g) => z.menge[g]).join("/") : z.menge} ${esc(z.einheit)}</td></tr>`).join("")}</tbody></table>
+            <p>Allergene: <b>${L.allergeneVon(d).map(esc).join(", ") || "keine"}</b></p><ol class="schritte">${(d.schritte || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`}`;
+      zeichnen();
     },
     "export-csv": (el) => {
       const text = exportCsv(el.dataset.monat);

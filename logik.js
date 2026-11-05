@@ -811,6 +811,119 @@
     for (const z of rezept.zutaten) (z.allergene || []).forEach((a) => s.add(a));
     return [...s].sort();
   }
+  function spurenVon(rezept) {
+    const s = new Set(), ja = new Set(allergeneVon(rezept));
+    for (const z of rezept.zutaten) (z.spuren || []).forEach((a) => { if (!ja.has(a)) s.add(a); });
+    return [...s].sort();
+  }
+  // ---------- Zutaten, Allergene, Freigabe nach dem 4-Augen-Prinzip ----------
+  // Allergene stehen an der Zutat (enthält / Spuren / nein). Rezepte rechnen sie aus ihren Zutaten aus.
+  const FREIGABE_ROLLEN_REZEPT = ["qualitaet", "zentrale", "shopleitung"];
+  const nameNorm = (x) => String(x || "").trim().toLowerCase().replace(/\s+/g, " ");
+  function zutatFinden(state, name) { const n = nameNorm(name); return ((state.rezepte || {}).zutaten || []).find((z) => nameNorm(z.name) === n); }
+  function zutatAllergene(z) {
+    const a = (z && z.allergene) || {};
+    return { ja: Object.keys(a).filter((k) => a[k] === "ja").sort(), spuren: Object.keys(a).filter((k) => a[k] === "spuren").sort() };
+  }
+  // Schreibt in jede Rezeptzeile (freigegeben und Entwurf) die Allergene der freigegebenen Zutat.
+  function allergeneAktualisieren(state) {
+    const stamm = (state.rezepte || {}).zutaten || [];
+    const zeile = (l) => { const z = stamm.find((x) => x.id === l.zutatId); if (!z) return; const a = zutatAllergene(z); l.name = z.name; l.allergene = a.ja; l.spuren = a.spuren; };
+    for (const r of (state.rezepte || {}).rezepte || []) { r.zutaten.forEach(zeile); if (r.entwurf) r.entwurf.daten.zutaten.forEach(zeile); }
+    return state;
+  }
+  // Zutatenzeilen eines Rezepts: „Zutat | Mengen je Größe mit / | Einheit“. Unbekannte Zutaten werden gemeldet.
+  function zutatenZeilen(state, text, groessen) {
+    const fehler = [], zutaten = [], unbekannt = [];
+    String(text || "").split("\n").map((z) => z.trim()).filter(Boolean).forEach((zeile, i) => {
+      const [n, m, e] = zeile.split("|").map((x) => (x || "").trim());
+      const mengen = (m || "").split("/").map((x) => Number(x.replace(",", ".")));
+      if (!n || !m || mengen.some((x) => isNaN(x) || x < 0) || (mengen.length !== 1 && mengen.length !== groessen.length)) { fehler.push(`Zeile ${i + 1}: Menge prüfen`); return; }
+      const z = zutatFinden(state, n);
+      if (!z) { unbekannt.push(n); return; }
+      zutaten.push({ zutatId: z.id, name: z.name, menge: mengen.length === 1 ? mengen[0] : Object.fromEntries(groessen.map((g, k) => [g, mengen[k]])), einheit: e || "g", allergene: zutatAllergene(z).ja, spuren: zutatAllergene(z).spuren });
+    });
+    return { zutaten, fehler, unbekannt };
+  }
+  function eintragVon(state, typ, id) { const R = state.rezepte || {}; return (typ === "zutat" ? R.zutaten : R.rezepte || []).find((x) => x.id === id); }
+  // Änderung als Entwurf ablegen. Gültig wird sie erst nach der Freigabe durch eine zweite Person.
+  function entwurfSpeichern(state, typ, id, daten, vonId, zeit) {
+    const e = eintragVon(state, typ, id);
+    if (!e) return null;
+    e.entwurf = { daten: JSON.parse(JSON.stringify(daten)), von: vonId, am: zeit };
+    if (typ === "rezept") allergeneAktualisieren(state);
+    return e.entwurf;
+  }
+  function ungepruefteZutaten(state, rezeptDaten) {
+    return rezeptDaten.zutaten.map((l) => eintragVon(state, "zutat", l.zutatId)).filter((z) => z && (!z.geprueft || z.neu)).map((z) => z.name);
+  }
+  function freigabePruefen(state, typ, id, personId) {
+    const e = eintragVon(state, typ, id), p = (state.personen || []).find((x) => x.id === personId);
+    if (!e || !e.entwurf) return { moeglich: false, grund: "Keine offene Änderung." };
+    if (!p || !FREIGABE_ROLLEN_REZEPT.includes(p.rolle)) return { moeglich: false, grund: "Freigeben dürfen Qualität & Pflege, Inhaber und Shopleitung." };
+    if (e.entwurf.von === personId) return { moeglich: false, grund: "Eigene Änderungen gibt eine zweite Person frei (4-Augen-Prinzip)." };
+    if (typ === "rezept") {
+      const offen = ungepruefteZutaten(state, e.entwurf.daten);
+      if (offen.length) return { moeglich: false, grund: `Zuerst die Allergene prüfen und freigeben: ${offen.join(", ")}.` };
+      if (!e.entwurf.daten.zutaten.length) return { moeglich: false, grund: "Das Rezept hat keine Zutaten." };
+    }
+    return { moeglich: true, grund: "" };
+  }
+  function freigeben(state, typ, id, personId, zeit) {
+    const pr = freigabePruefen(state, typ, id, personId);
+    if (!pr.moeglich) return pr;
+    const e = eintragVon(state, typ, id), en = e.entwurf;
+    const felder = Object.keys(en.daten);
+    const alt = {}; for (const k of felder) alt[k] = e[k];
+    e.fassungen = e.fassungen || [];
+    if (!e.neu) e.fassungen.push({ fassung: e.fassung || 1, daten: JSON.parse(JSON.stringify(alt)), freigabe: e.freigabe || null });
+    Object.assign(e, JSON.parse(JSON.stringify(en.daten)));
+    e.fassung = e.neu ? 1 : (e.fassung || 1) + 1;
+    e.freigabe = { von: en.von, am: en.am, zweiteVon: personId, zweiteAm: zeit };
+    if (typ === "zutat") e.geprueft = { von: personId, am: zeit.slice(0, 10) };
+    delete e.neu; delete e.entwurf;
+    allergeneAktualisieren(state);
+    return { moeglich: true, grund: "", fassung: e.fassung };
+  }
+  function entwurfVerwerfen(state, typ, id) {
+    const e = eintragVon(state, typ, id); if (!e || !e.entwurf) return false;
+    if (e.neu) { const R = state.rezepte; if (typ === "zutat") R.zutaten = R.zutaten.filter((x) => x !== e); else R.rezepte = R.rezepte.filter((x) => x !== e); }
+    else delete e.entwurf;
+    return true;
+  }
+  function offeneFreigaben(state) {
+    const R = state.rezepte || {};
+    return [...(R.zutaten || []).filter((z) => z.entwurf).map((z) => ({ typ: "zutat", e: z })), ...(R.rezepte || []).filter((r) => r.entwurf).map((r) => ({ typ: "rezept", e: r }))]
+      .sort((a, b) => a.e.entwurf.am.localeCompare(b.e.entwurf.am));
+  }
+  // Was ändert der Entwurf? Kurze Liste für die Freigabe.
+  function aenderungen(state, typ, id) {
+    const e = eintragVon(state, typ, id); if (!e || !e.entwurf) return [];
+    const d = e.entwurf.daten, r = [];
+    if (e.neu) return [typ === "zutat" ? "neue Zutat" : "neues Rezept"];
+    if (typ === "zutat") {
+      const a = zutatAllergene(e), b = zutatAllergene(d);
+      const plus = b.ja.filter((x) => !a.ja.includes(x)), minus = a.ja.filter((x) => !b.ja.includes(x));
+      const sp = b.spuren.filter((x) => !a.spuren.includes(x)), spm = a.spuren.filter((x) => !b.spuren.includes(x));
+      if (plus.length) r.push("enthält neu: " + plus.join(", ")); if (minus.length) r.push("enthält nicht mehr: " + minus.join(", "));
+      if (sp.length) r.push("Spuren neu: " + sp.join(", ")); if (spm.length) r.push("keine Spuren mehr: " + spm.join(", "));
+      for (const k of ["name", "lieferant", "artNr", "zusatzstoffe"]) if ((d[k] || "") !== (e[k] || "")) r.push(`${k === "artNr" ? "Artikelnummer" : k[0].toUpperCase() + k.slice(1)}: „${e[k] || ""}“ → „${d[k] || ""}“`);
+      if (plus.length || minus.length) { const betroffen = ((state.rezepte || {}).rezepte || []).filter((x) => x.zutaten.some((l) => l.zutatId === e.id)).map((x) => x.name); if (betroffen.length) r.push("betrifft: " + betroffen.join(", ")); }
+    } else {
+      if (d.name !== e.name) r.push(`Name: „${e.name}“ → „${d.name}“`);
+      const alt = new Map(e.zutaten.map((l) => [l.zutatId, l])), neu = new Map(d.zutaten.map((l) => [l.zutatId, l]));
+      for (const [k, l] of neu) if (!alt.has(k)) r.push("+ " + l.name); else if (JSON.stringify(alt.get(k).menge) !== JSON.stringify(l.menge) || alt.get(k).einheit !== l.einheit) r.push("Menge geändert: " + l.name);
+      for (const [k, l] of alt) if (!neu.has(k)) r.push("− " + l.name);
+      const aa = allergeneVon(e), ab = allergeneVon(d);
+      if (JSON.stringify(aa) !== JSON.stringify(ab)) r.push(`Allergene: ${aa.join(", ") || "keine"} → ${ab.join(", ") || "keine"}`);
+      if (JSON.stringify(d.schritte) !== JSON.stringify(e.schritte)) r.push("Zubereitung geändert");
+      for (const k of ["beschreibung", "standzeit", "gruppe"]) if ((d[k] || "") !== (e[k] || "")) r.push(k[0].toUpperCase() + k.slice(1) + " geändert");
+      if (JSON.stringify(d.groessen) !== JSON.stringify(e.groessen)) r.push("Größen: " + d.groessen.join(", "));
+    }
+    return r.length ? r : ["keine inhaltliche Änderung"];
+  }
+  // Rezepte, die im Shop sichtbar sind (nie freigegebene neue Rezepte nicht)
+  function rezepteFreigegeben(state) { return ((state.rezepte || {}).rezepte || []).filter((r) => !r.neu); }
   function mengeFuer(zutat, groesse) {
     const m = zutat.menge;
     return typeof m === "object" ? m[groesse] : m;
@@ -870,6 +983,7 @@
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
-    allergeneVon, mengeFuer, quiz, zufall, mischen,
+    allergeneVon, spurenVon, mengeFuer, quiz, zufall, mischen,
+    FREIGABE_ROLLEN_REZEPT, zutatFinden, zutatAllergene, allergeneAktualisieren, zutatenZeilen, entwurfSpeichern, ungepruefteZutaten, freigabePruefen, freigeben, entwurfVerwerfen, offeneFreigaben, aenderungen, rezepteFreigegeben,
   };
 });

@@ -316,6 +316,22 @@ table.pc-tab tr.gewaehlt td { background: var(--green-soft); } table.pc-tab tr.i
 .pc-rahmen main { max-width: 1500px; margin: 0; width: 100%; padding: 20px 28px 48px; }
 .ma-pc { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(360px, 1fr); gap: 18px; align-items: start; }
 .ma-detail { position: sticky; top: 76px; max-height: calc(100vh - 90px); overflow-y: auto; display: grid; gap: 10px; padding-right: 4px; }
+
+/* ---------- 0.9.0: Zutaten, Allergene, Freigaben ---------- */
+.tabs button { font-weight: 700; }
+table.al-tab th.al { text-align: center; padding: 6px 2px; font-size: .68rem; letter-spacing: 0; }
+table.al-tab td.al { text-align: center; padding: 7px 2px; width: 34px; }
+.al-ja { color: var(--red); font-size: 1.05rem; } .al-sp { color: var(--red); font-size: 1rem; }
+table.al-tab tr.offen td { background: var(--amber-soft); }
+table.pc-tab small.warn { color: var(--amber); font-weight: 700; }
+.al-gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 4px 20px; }
+.al-zeile { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.al-wahl { display: flex; gap: 4px; }
+.al-wahl .tagwahl span { min-width: 0; padding: 4px 10px; font-size: .85rem; }
+.al-wahl .tagwahl.ja input:checked + span { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+.al-wahl .tagwahl.spuren input:checked + span { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+.al-wahl .tagwahl.nein input:checked + span { background: var(--tint); border-color: var(--muted); color: var(--ink); }
+ul.aend { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

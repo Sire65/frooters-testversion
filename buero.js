@@ -47,7 +47,7 @@
   function postenVorschlag(state, filiale) {
     const gruppen = (state.rezepte.warengruppen || []).filter((g) => !filiale.sortiment || filiale.sortiment.includes(g.id));
     const zeilen = [];
-    for (const g of gruppen) for (const r of state.rezepte.rezepte.filter((x) => x.gruppe === g.id)) zeilen.push(`${r.name} | ${r.groessen.length > 1 ? r.groessen.join(" / ") : ""} | `);
+    for (const g of gruppen) for (const r of L.rezepteFreigegeben(state).filter((x) => x.gruppe === g.id)) zeilen.push(`${r.name} | ${r.groessen.length > 1 ? r.groessen.join(" / ") : ""} | `);
     return zeilen.join("\n");
   }
   function oeffnungText(filiale) {
@@ -89,12 +89,12 @@
       inhalt = `<div class="dp-text">${zeilenText(d.text)}</div>${d.preis ? `<div class="dp-preis" style="background:${f.haupt}">${preisTxt(d.preis)}</div>` : ""}`;
     } else if (d.vorlage === "allergene") {
       const al = state.rezepte.allergene;
-      const rz = state.rezepte.rezepte.filter((r) => !filiale.sortiment || filiale.sortiment.includes(r.gruppe));
-      const genutzt = al.filter((a) => rz.some((r) => L.allergeneVon(r).includes(a)));
+      const rz = L.rezepteFreigegeben(state).filter((r) => !filiale.sortiment || filiale.sortiment.includes(r.gruppe));
+      const genutzt = al.filter((a) => rz.some((r) => L.allergeneVon(r).includes(a) || L.spurenVon(r).includes(a)));
       const ska = Math.max(0.45, Math.min(1, 9 / Math.max(1, rz.length)));
       inhalt = `<table class="dp-allergene" style="font-size:${((d.format === "quer" ? 2 : 2.6) * ska).toFixed(2)}cqw"><thead><tr><th>Produkt</th>${genutzt.map((a) => `<th><span>${esc(a)}</span></th>`).join("")}</tr></thead><tbody>
-        ${rz.map((r) => { const x = L.allergeneVon(r); return `<tr><td>${esc(r.name)}</td>${genutzt.map((a) => `<td>${x.includes(a) ? "●" : ""}</td>`).join("")}</tr>`; }).join("")}</tbody></table>
-        <p class="dp-klein">● enthalten. Nicht aufgeführte Allergene der 14 Hauptallergene sind in keinem Produkt enthalten.</p>`;
+        ${rz.map((r) => { const x = L.allergeneVon(r), y = L.spurenVon(r); return `<tr><td>${esc(r.name)}</td>${genutzt.map((a) => `<td>${x.includes(a) ? "●" : y.includes(a) ? "○" : ""}</td>`).join("")}</tr>`; }).join("")}</tbody></table>
+        <p class="dp-klein">● enthalten · ○ kann Spuren enthalten. Nicht aufgeführte Allergene der 14 Hauptallergene sind in keinem Produkt enthalten.</p>`;
     } else {
       inhalt = `<div class="dp-text ${d.vorlage === "oeffnung" ? "dp-zeiten" : ""}">${zeilenText(d.text)}</div>`;
     }

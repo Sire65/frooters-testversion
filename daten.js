@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v8";
+  const SCHLUESSEL = "frooters_demo_v9";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -162,8 +162,25 @@
       Rz("kaffee", "Cappuccino", "Espresso mit Milchschaum.", [Z("Espresso", { S: 1, M: 1, L: 2 }, "Shot"), Z("Milch", { S: 120, M: 180, L: 240 }, "ml", ["Milch"])], ["Espresso beziehen", "Milch aufschäumen (60–65 °C)", "Schaum auf den Espresso geben"]),
     ];
 
+    // Zutatenstamm: Allergene stehen an der Zutat (Beispiele, vom Lieferanten-Datenblatt zu prüfen)
+    const zutaten = [];
+    const petra = personen.find((p) => p.vorname === "Petra").id, inhaber = personen.find((p) => p.vorname === "Inhaber").id;
+    const geprueftAm = L.plusTage(heuteIso, -10);
+    for (const r of rezepte) for (const l of r.zutaten) {
+      let z = zutaten.find((x) => x.name === l.name);
+      if (!z) { z = { id: id("zt"), name: l.name, lieferant: "", artNr: "", zusatzstoffe: "", allergene: {}, geprueft: { von: petra, am: geprueftAm }, fassung: 1, freigabe: { von: petra, am: geprueftAm + "T09:00", zweiteVon: inhaber, zweiteAm: geprueftAm + "T12:00" } }; zutaten.push(z); }
+      for (const a of l.allergene) z.allergene[a] = "ja";
+      l.zutatId = z.id; l.spuren = [];
+    }
+    const granola = zutaten.find((z) => z.name === "Granola");
+    if (granola) { granola.allergene["Erdnüsse"] = "spuren"; granola.allergene["Sesam"] = "spuren"; granola.lieferant = "Beispiel-Lieferant"; }
+    for (const r of rezepte) Object.assign(r, { fassung: 1, freigabe: { von: petra, am: geprueftAm + "T09:00", zweiteVon: inhaber, zweiteAm: geprueftAm + "T12:00" }, fassungen: [] });
+    // Offene Änderung zum Ausprobieren der 4-Augen-Freigabe: Petra hat bei der Maracuja-Sauce „Spuren: Milch“ eingetragen
+    const sauce = zutaten.find((z) => z.name === "Maracuja-Sauce");
+    if (sauce) sauce.entwurf = { daten: { name: sauce.name, lieferant: "Beispiel-Lieferant", artNr: "", zusatzstoffe: "", allergene: { Milch: "spuren" } }, von: petra, am: L.plusTage(heuteIso, -1) + "T15:20" };
+
     const state = {
-      version: 8, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 9, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
@@ -173,7 +190,7 @@
       ],
       veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600, pinnwand: { maxZettel: 4, zeichen: 200, erinnernTage: 3, pauseTage: 7 } },
       hygiene: { bereiche, geraetetypen, geraete, regeln, massnahmen, zuteilung: {}, durchfuehrungen: [], nachkontrollen: [], abweichungen: [] },
-      rezepte: { warengruppen, rezepte, allergene: ALLERGENE },
+      rezepte: { warengruppen, rezepte, zutaten, allergene: ALLERGENE },
     };
     // Wünsche für die nächste Woche, ein Urlaubsantrag, eine Krankmeldung
     const mo = L.montag(heuteIso), naechste = L.plusTage(mo, 7);
