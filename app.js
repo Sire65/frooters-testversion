@@ -1,4 +1,4 @@
-const APP_VERSION = "0.4.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -98,7 +98,7 @@ const APP_VERSION = "0.4.0"; // gleich halten mit sw.js, version.json und ?v= in
     const fil = FIL();
     const mehr = p && meineFilialen().length > 1;
     return `<header class="kopf">
-      <button class="marke" data-go="start" aria-label="Startseite"><img src="frootie.svg" alt=""><span class="wort">frooters <b>Team</b></span></button>
+      <button class="marke" data-go="start" aria-label="Startseite"><span class="logo-plate"><img class="logo" src="logo.svg" alt="frooters"></span><span class="team">Team</span></button>
       <div class="rechts">${p ? `<button class="chip fil" ${mehr ? 'data-act="filiale-wahl"' : "disabled"} aria-label="Filiale wechseln">📍 ${esc(fil.kurz)}${mehr ? " ▾" : ""}</button>
       <button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>` : ""}</div></header>
       <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser · Pilot: Ochtrup</div>`;
@@ -112,7 +112,8 @@ const APP_VERSION = "0.4.0"; // gleich halten mit sw.js, version.json und ?v= in
   V.login = () => {
     const gruppen = [{ id: null, name: "Zentrale & Beratung" }, ...S.filialen];
     return `${titel("Wer bist du?", ICH() ? "start" : false)}
-      ${frootie("Das ist die Testversion. Wähle eine Person, um die App aus ihrer Sicht zu sehen. In der echten App meldest du dich mit deinem persönlichen Zugang an.")}
+      <div class="willkommen"><img src="frootie.svg" alt="Frootie, die Erdbeere mit der grünen Kappe"><div><span class="logo-plate"><img class="logo gross" src="logo.svg" alt="frooters"></span><p><b>Willkommen in der Team-App!</b> Ich bin Frootie und helfe dir überall weiter.</p></div></div>
+      <p class="hinweis">Testversion: Wähle eine Person, um die App aus ihrer Sicht zu sehen. In der echten App meldest du dich mit deinem persönlichen Zugang an.</p>
       ${gruppen.map((g) => `<div class="abschnitt"><h2>${esc(g.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === g.id && p.aktiv !== false).map((p) =>
         `<button class="zeile" data-act="ich" data-id="${p.id}"><span class="punkt ${p.id === sitzung.ich ? "gruen" : ""}"></span><span>${esc(name(p))}<small>${L.ROLLEN[p.rolle].name}${p.springer ? " · Springer" : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}
       <div class="karte"><p class="klein muted">Beispieldaten zurücksetzen: Alle Änderungen in dieser Testversion werden gelöscht.</p><button class="btn drei" data-act="reset">Beispieldaten neu laden</button></div>`;

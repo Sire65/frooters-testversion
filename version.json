@@ -1,8 +1,8 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "datum": "2026-11-04",
   "stufe": "DEV",
   "neu": [
-    "Admin-Einstellungen: Betreiber und Franchisenehmer mit eigener Datenbank (Supabase und Neon in Frankfurt), Filialen zuordnen, Schritte bis zur Freigabe; geheime Schlüssel werden abgewiesen"
+    "Original-Logo von frooters oben in der App, Frootie mit grüner Kappe größer"
   ]
 }
