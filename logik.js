@@ -299,6 +299,66 @@
     return [kopf.join(";"), ...zeilen.map((z) => z.map(f).join(";"))].join("\r\n");
   }
 
+  // ---------- Admin: Betreiber und Datenbanken ----------
+  // Prüft öffentliche Verbindungsdaten. Geheime Schlüssel und Passwörter werden erkannt und abgewiesen (KICC-Regel 15).
+  const SCHRITTE = [
+    { id: "antrag", text: "Antrag erfasst (Betreiber, Ansprechpartner, Filialen)", hand: true },
+    { id: "avv", text: "AV-Vertrag unterschrieben", hand: true },
+    { id: "supabase", text: "Supabase-Projekt in Frankfurt angelegt", hand: false },
+    { id: "neon", text: "Neon-Projekt in Frankfurt angelegt", hand: false },
+    { id: "einrichtung", text: "Einrichtung ausgeführt (Tabellen, Server, Geheimnisse im eigenen Vault)", hand: true },
+    { id: "verbindung", text: "Verbindung geprüft (automatisch)", auto: true },
+    { id: "sicherung", text: "Erste Datensicherung geprüft (automatisch)", auto: true },
+  ];
+  function geheimErkannt(t) {
+    const x = String(t || "").trim();
+    if (!x) return null;
+    if (/^sb_secret_/i.test(x)) return "Das ist der geheime Supabase-Schlüssel. Er gehört nur in den Vault des Betreibers, nie in die App.";
+    if (/postgres(ql)?:\/\/[^\s:@]+:[^\s@]+@/i.test(x)) return "Das ist eine Datenbank-Adresse mit Passwort. Sie gehört nur in den Vault des Betreibers.";
+    if (/^napi_/i.test(x)) return "Das ist ein Neon-API-Schlüssel. Er darf hier nicht gespeichert werden.";
+    const teile = x.split(".");
+    if (teile.length === 3 && /^eyJ/.test(teile[0])) {
+      try {
+        const b = teile[1].replace(/-/g, "+").replace(/_/g, "/");
+        const json = JSON.parse(typeof atob === "function" ? atob(b + "===".slice((b.length + 3) % 4)) : Buffer.from(b, "base64").toString("utf8"));
+        if (json.role === "service_role") return "Das ist der geheime service_role-Schlüssel. Er darf nie in die App.";
+      } catch (e) { return "Dieser Schlüssel lässt sich nicht lesen."; }
+    }
+    return null;
+  }
+  function pruefeVerbindung(b) {
+    const fehler = [], hinweise = [];
+    const sb = b.supabase || {}, ne = b.neon || {};
+    for (const [feld, wert] of [["Supabase-Adresse", sb.url], ["Publishable Key", sb.key], ["Neon Projekt-ID", ne.projekt]]) {
+      const g = geheimErkannt(wert); if (g) fehler.push(`${feld}: ${g}`);
+    }
+    let ref = null;
+    if (sb.url) {
+      const m = /^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(sb.url.trim());
+      if (!m) fehler.push("Supabase-Adresse: erwartet https://<20 Zeichen>.supabase.co");
+      else ref = m[1];
+    }
+    if (sb.key && !geheimErkannt(sb.key)) {
+      if (!/^sb_publishable_[A-Za-z0-9_-]{10,}$/.test(sb.key.trim()) && !/^eyJ/.test(sb.key.trim())) hinweise.push("Publishable Key: unbekanntes Format, bitte prüfen (erwartet sb_publishable_…)");
+    }
+    if (sb.region && sb.region !== "eu-central-1") fehler.push("Supabase-Region muss Frankfurt (eu-central-1) sein.");
+    if (ne.region && ne.region !== "aws-eu-central-1") fehler.push("Neon-Region muss Frankfurt (aws-eu-central-1) sein.");
+    if (ne.projekt && !geheimErkannt(ne.projekt) && !/^[a-z0-9]+(-[a-z0-9]+)+$/.test(ne.projekt.trim())) fehler.push("Neon Projekt-ID: erwartet z. B. ruhiger-see-12345678");
+    const supabaseFertig = !!(ref && sb.key && sb.region === "eu-central-1" && !fehler.some((f) => /^Supabase|Publishable/.test(f)));
+    const neonFertig = !!(ne.projekt && ne.region === "aws-eu-central-1" && !fehler.some((f) => /^Neon/.test(f)));
+    return { ok: !fehler.length, fehler, hinweise, ref, supabaseFertig, neonFertig };
+  }
+  // Stand eines Betreibers: welche Schritte sind erledigt, darf er freigegeben werden?
+  function betreiberStand(b) {
+    const v = pruefeVerbindung(b);
+    const erledigt = {
+      antrag: !!(b.schritte && b.schritte.antrag), avv: !!b.avvDatum, supabase: v.supabaseFertig, neon: v.neonFertig,
+      einrichtung: !!(b.schritte && b.schritte.einrichtung), verbindung: !!(b.pruefung && b.pruefung.verbindung === "ok"), sicherung: !!(b.pruefung && b.pruefung.sicherung === "ok"),
+    };
+    const anzahl = SCHRITTE.filter((x) => erledigt[x.id]).length;
+    return { erledigt, anzahl, gesamt: SCHRITTE.length, freigabeMoeglich: anzahl === SCHRITTE.length && v.ok, verbindung: v };
+  }
+
   // ---------- Hygiene ----------
   // Gilt eine Regel in der Filiale? Zuteilung der Shopleitung/Zentrale geht vor dem Standard der Regel.
   function regelGilt(state, regel, filialeId) {
@@ -477,6 +537,7 @@
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
     planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
+    SCHRITTE, geheimErkannt, pruefeVerbindung, betreiberStand,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,

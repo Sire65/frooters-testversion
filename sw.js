@@ -1,6 +1,6 @@
 // frooters Team-App – Service Worker: Dateien dieser Version zusammen speichern (alles oder nichts, kein Mischstand).
 // VERSION muss mit version.json, APP_VERSION in app.js und allen ?v= in index.html übereinstimmen.
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 const CACHE = "frooters-team-" + VERSION;
 const DATEIEN = ["./", "index.html", "styles.css?v=" + VERSION, "logik.js?v=" + VERSION, "daten.js?v=" + VERSION, "app.js?v=" + VERSION,
   "manifest.webmanifest", "frootie.svg", "icon-192.png", "icon-512.png"];

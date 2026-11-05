@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v3";
+  const SCHLUESSEL = "frooters_demo_v4";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -18,11 +18,11 @@
     const frooters = ["froyo", "obst", "smoothie", "saft", "stiel", "warm", "quark", "snack"];
     const mo0 = L.montag(heuteIso);
     const filialen = [
-      { id: "och", name: "Ochtrup · Designer Outlet", kurz: "Ochtrup", marke: "frooters", pilot: true, oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
-      { id: "obh", name: "Oberhausen · Centro", kurz: "Oberhausen", marke: "frooters", oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
-      { id: "sin", name: "Sinsheim · Therme", kurz: "Sinsheim", marke: "frooters", oeffnung: Object.assign(offen(["11:00", "21:00"]), { so: ["11:00", "21:00"] }), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 }, so: { frueh: 3, spaet: 3 } }, sortiment: frooters },
-      { id: "osn", name: "Osnabrück · Bowls & Smoothie · Café", kurz: "Osnabrück", marke: "Bowls & Smoothie", oeffnung: offen(["10:00", "19:00"]), bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["bowl", "smoothie", "saft", "kaffee", "obst"] },
-      { id: "rr", name: "Road Runner · mobiler Stand", kurz: "Road Runner", marke: "frooters", art: "mobil", oeffnung: {}, bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["froyo", "smoothie", "obst"],
+      { id: "och", name: "Ochtrup · Designer Outlet", kurz: "Ochtrup", betreiber: "gm", marke: "frooters", pilot: true, oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "obh", name: "Oberhausen · Centro", kurz: "Oberhausen", betreiber: "gm", marke: "frooters", oeffnung: offen(["10:00", "20:00"]), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "sin", name: "Sinsheim · Therme", kurz: "Sinsheim", betreiber: "gm", marke: "frooters", oeffnung: Object.assign(offen(["11:00", "21:00"]), { so: ["11:00", "21:00"] }), bedarf: { standard: { frueh: 2, spaet: 2 }, sa: { frueh: 3, spaet: 3 }, so: { frueh: 3, spaet: 3 } }, sortiment: frooters },
+      { id: "osn", name: "Osnabrück · Bowls & Smoothie · Café", kurz: "Osnabrück", betreiber: "gm", marke: "Bowls & Smoothie", oeffnung: offen(["10:00", "19:00"]), bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["bowl", "smoothie", "saft", "kaffee", "obst"] },
+      { id: "rr", name: "Road Runner · mobiler Stand", kurz: "Road Runner", betreiber: "gm", marke: "frooters", art: "mobil", oeffnung: {}, bedarf: { standard: { frueh: 2, spaet: 2 } }, sortiment: ["froyo", "smoothie", "obst"],
         einsaetze: [
           { datum: L.plusTage(mo0, 5), ort: "Wochenmarkt (Beispiel)", von: "09:00", bis: "15:00" },
           { datum: L.plusTage(mo0, 11), ort: "Stadtfest (Beispiel)", von: "12:00", bis: "22:00" },
@@ -129,7 +129,12 @@
     ];
 
     const state = {
-      version: 3, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 4, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
+      betreiber: [
+        { id: "gm", name: "Genussmanufaktur (eigene Filialen)", art: "eigen", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: { antrag: true }, pruefung: {}, freigegeben: false },
+        { id: "fr1", name: "Beispiel-Franchise GmbH", art: "franchise", kontakt: "Beispiel", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: {}, pruefung: {}, freigegeben: false },
+      ],
       veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600 },
       hygiene: { bereiche, geraetetypen, geraete, regeln, massnahmen, zuteilung: {}, durchfuehrungen: [], nachkontrollen: [], abweichungen: [] },
       rezepte: { warengruppen, rezepte, allergene: ALLERGENE },

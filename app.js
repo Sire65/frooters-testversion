@@ -1,4 +1,4 @@
-const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.4.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 3) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 4) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -81,6 +81,7 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
     regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
     auswertung: "Jede Filiale einzeln und alle zusammen.",
     tausch: "Du kannst nicht? Biete deine Schicht oder ein paar Stunden an. Ein Kollege übernimmt oder tauscht, deine Shopleitung bestätigt. Erst dann ändert sich der Plan.",
+    admin: "Hier legst du fest, welcher Betreiber welche Filialen hat und mit welcher eigenen Datenbank (Supabase und Neon in Frankfurt) er arbeitet. Trag nur öffentliche Daten ein. Geheime Schlüssel und Passwörter weist die App zurück.",
     export: "Die Stempelzeiten eines Monats als Liste für den Steuerberater. Offene Tage ohne Gehen sind markiert, die musst du vorher klären.",
     rezeptpflege: "Hier pflegst du die Rezepte für alle Filialen. Allergene trägst du bei der Zutat ein, die App rechnet sie für das Rezept zusammen.",
     filialen: "Öffnungszeiten, Besetzung und Sortiment je Filiale. Beim mobilen Stand legst du die Einsatztage mit Ort an.",
@@ -164,6 +165,7 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
         ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+        ${kachel("🛠️", "Admin", "Betreiber & Datenbanken", "admin", (S.betreiber || []).filter((b) => !b.freigegeben).length)}
       </div></div>`;
     }
     if (rolle() === "qualitaet") {
@@ -566,6 +568,50 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
       <div class="feld"><label for="b-${f.id}-s">Besetzung Spätdienst</label><input type="number" min="0" max="9" id="b-${f.id}-s" data-bedarf="${f.id}|spaet" value="${f.bedarf.standard.spaet}"></div></div>
     <div class="feld"><span class="lbl">Sortiment (Warengruppen, die diese Filiale verkauft)</span><div class="wahl">${S.rezepte.warengruppen.map((g) => `<button class="${!f.sortiment || f.sortiment.includes(g.id) ? "an" : ""}" data-act="sortiment" data-f="${f.id}" data-g="${g.id}">${g.sym} ${esc(g.name)}</button>`).join("")}</div></div>
     ${f.art === "mobil" ? "" : `<p class="klein muted">Leere Zeiten = geschlossen.${f.bedarf.sa ? ` Samstags gilt eine eigene Besetzung (${f.bedarf.sa.frueh}/${f.bedarf.sa.spaet}).` : ""}</p>`}</div>`).join("")}`;
+  const STAND_TXT = (b, st) => b.freigegeben ? ["freigegeben", "gruen"] : st.anzahl === 0 ? ["neu", ""] : ["in Einrichtung", "gelb"];
+  V.admin = () => {
+    const B = S.betreiber || [];
+    return `${titel("Admin: Betreiber & Datenbanken")}${frootie(FROOTIE_TIPPS.admin)}
+      <p class="hinweis">Jeder Franchisenehmer arbeitet mit seiner <b>eigenen Datenbank</b>. Hier stehen nur die öffentlichen Verbindungsdaten. Geheime Schlüssel trägt der Betreiber selbst in sein Supabase-Projekt ein.</p>
+      <button class="btn zwei" data-act="betreiber-neu">+ Franchisenehmer anlegen</button>
+      <div class="liste">${B.map((b) => { const st = L.betreiberStand(b), [t, f] = STAND_TXT(b, st), fil = S.filialen.filter((x) => x.betreiber === b.id);
+        return `<button class="zeile" data-go="admin-edit" data-arg="${b.id}"><span class="punkt ${f}"></span><span><b>${esc(b.name)}</b> <span class="marke-s">${b.art === "eigen" ? "eigene Filialen" : "Franchise"}</span>
+          <small>${fil.length ? fil.map((x) => esc(x.kurz)).join(", ") : "noch keine Filialen"} · ${st.anzahl} von ${st.gesamt} Schritten · ${st.verbindung.ref ? "Projekt " + esc(st.verbindung.ref) : "keine Datenbank eingetragen"}</small></span><span class="marke-s ${f}">${t}</span></button>`; }).join("")}</div>`;
+  };
+  V["admin-edit"] = () => {
+    const b = (S.betreiber || []).find((x) => x.id === arg);
+    if (!b) return `${titel("Betreiber", "admin")}<p class="leer">Nicht gefunden.</p>`;
+    const st = L.betreiberStand(b), v = st.verbindung;
+    const sel = (id, opts, wert) => `<select id="${id}">${opts.map(([w, t]) => `<option value="${w}" ${w === wert ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+    return `${titel("Betreiber einrichten", "admin")}
+      <div class="karte"><h2>1. Betreiber</h2>
+        <div class="feld"><label for="be-name">Name</label><input type="text" id="be-name" value="${esc(b.name)}" maxlength="80"></div>
+        <div class="gitter2"><div class="feld"><label for="be-art">Art</label>${sel("be-art", [["franchise", "Franchisenehmer"], ["eigen", "eigene Filialen"]], b.art)}</div>
+          <div class="feld"><label for="be-avv">AV-Vertrag unterschrieben am</label><input type="date" id="be-avv" value="${esc(b.avvDatum || "")}"></div></div>
+        <div class="gitter2"><div class="feld"><label for="be-kontakt">Ansprechpartner</label><input type="text" id="be-kontakt" value="${esc(b.kontakt || "")}" maxlength="80"></div>
+          <div class="feld"><label for="be-mail">E-Mail</label><input type="text" id="be-mail" inputmode="email" value="${esc(b.email || "")}" maxlength="120"></div></div>
+        <div class="feld"><span class="lbl">Filialen dieses Betreibers (jede Filiale gehört genau einem Betreiber)</span>${S.filialen.map((f) => `<label class="haken"><input type="checkbox" data-befil="${f.id}" ${f.betreiber === b.id ? "checked" : ""}><span>${esc(f.name)}${f.betreiber && f.betreiber !== b.id ? ` <span class="muted klein">(jetzt bei ${esc(((S.betreiber || []).find((x) => x.id === f.betreiber) || {}).name || "")})</span>` : ""}</span></label>`).join("")}</div></div>
+      <div class="karte"><h2>2. Eigene Datenbank: Supabase</h2>
+        <div class="feld"><label for="be-url">Projekt-Adresse</label><input type="text" id="be-url" value="${esc(b.supabase.url || "")}" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co" autocomplete="off"></div>
+        <div class="feld"><label for="be-key">Publishable Key (öffentlich)</label><input type="text" id="be-key" value="${esc(b.supabase.key || "")}" placeholder="sb_publishable_…" autocomplete="off"></div>
+        <div class="feld"><label for="be-sreg">Region</label>${sel("be-sreg", [["eu-central-1", "Frankfurt (eu-central-1)"], ["andere", "andere Region"]], b.supabase.region)}</div>
+        <p class="klein muted">Den geheimen Schlüssel (sb_secret_… oder service_role) und das Datenbank-Passwort hier <b>nicht</b> eintragen. Die trägt der Betreiber nur in seinem eigenen Supabase-Projekt ein.</p></div>
+      <div class="karte"><h2>3. Spiegel und Datensicherung: Neon</h2>
+        <div class="gitter2"><div class="feld"><label for="be-neon">Projekt-ID</label><input type="text" id="be-neon" value="${esc(b.neon.projekt || "")}" placeholder="z. B. ruhiger-see-12345678" autocomplete="off"></div>
+          <div class="feld"><label for="be-nreg">Region</label>${sel("be-nreg", [["aws-eu-central-1", "Frankfurt (aws-eu-central-1)"], ["andere", "andere Region"]], b.neon.region)}</div></div></div>
+      ${v.fehler.length || v.hinweise.length ? `<div class="karte" style="border-color:var(--red)">${v.fehler.map((t) => `<p class="hinweis rot">${esc(t)}</p>`).join("")}${v.hinweise.map((t) => `<p class="hinweis">${esc(t)}</p>`).join("")}</div>` : ""}
+      <div class="karte"><h2>4. Schritte bis zur Freigabe</h2>
+        ${L.SCHRITTE.map((x) => { const ok = st.erledigt[x.id];
+          if (x.hand && x.id !== "avv") return `<label class="haken"><input type="checkbox" data-schrittb="${x.id}" ${ok ? "checked" : ""}><span>${esc(x.text)}</span></label>`;
+          return `<div class="zeile"><span class="punkt ${ok ? "gruen" : ""}"></span><span>${esc(x.text)}<small>${ok ? "erledigt" : x.auto ? "⚪ noch nicht geprüft · wird automatisch geprüft, sobald der Server des Betreibers läuft" : x.id === "avv" ? "Datum oben eintragen" : "Felder oben ausfüllen"}</small></span><span></span></div>`; }).join("")}
+        <div class="balken" aria-hidden="true"><span style="width:${Math.round((st.anzahl / st.gesamt) * 100)}%"></span></div>
+        <p class="klein muted">${st.anzahl} von ${st.gesamt} Schritten erledigt.</p></div>
+      <button class="btn gross" data-act="betreiber-speichern" data-id="${b.id}">Speichern</button>
+      <button class="btn zwei" data-act="betreiber-pruefen" data-id="${b.id}">🔌 Verbindung prüfen</button>
+      ${b.freigegeben ? `<button class="btn drei" data-act="betreiber-sperren" data-id="${b.id}">Freigabe zurücknehmen</button>` : `<button class="btn" data-act="betreiber-freigeben" data-id="${b.id}" ${st.freigabeMoeglich ? "" : "disabled"}>✓ Freigeben</button>
+        ${st.freigabeMoeglich ? "" : '<p class="klein muted">Freigeben geht erst, wenn alle 7 Schritte erledigt sind.</p>'}`}`;
+  };
+
   V.rezeptpflege = () => `${titel("Rezepte pflegen")}${frootie(FROOTIE_TIPPS.rezeptpflege)}
     <button class="btn zwei" data-act="rezept-neu">+ Neues Rezept</button>
     ${S.rezepte.warengruppen.map((g) => { const rs = S.rezepte.rezepte.filter((r) => r.gruppe === g.id); const fil = S.filialen.filter((f) => !f.sortiment || f.sortiment.includes(g.id)).map((f) => f.kurz);
@@ -650,7 +696,7 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
     const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export"];
-    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen"];
+    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit"];
     const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
     if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
@@ -817,6 +863,23 @@ const APP_VERSION = "0.3.0"; // gleich halten mit sw.js, version.json und ?v= in
       speichern(); meldung("Bestätigt. Der Plan ist geändert."); zeichnen();
     },
     "tausch-nein": (el) => { const a = tausche().find((x) => x.id === el.dataset.id); Object.assign(a, { status: "offen", nehmerId: null, gegenId: null }); speichern(); meldung("Abgelehnt. Das Angebot ist wieder offen."); zeichnen(); },
+    "betreiber-neu": () => { const b = { id: neueId("b"), name: "Neuer Franchisenehmer", art: "franchise", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: {}, pruefung: {}, freigegeben: false }; (S.betreiber = S.betreiber || []).push(b); speichern(); gehe("admin-edit", b.id); },
+    "betreiber-speichern": (el) => {
+      const b = S.betreiber.find((x) => x.id === el.dataset.id);
+      const neu = { supabase: { url: $("#be-url").value.trim(), key: $("#be-key").value.trim(), region: $("#be-sreg").value }, neon: { projekt: $("#be-neon").value.trim(), region: $("#be-nreg").value } };
+      // Geheimnisse nie speichern, auch nicht kurz
+      for (const [feld, wert] of [["be-url", neu.supabase.url], ["be-key", neu.supabase.key], ["be-neon", neu.neon.projekt]]) if (L.geheimErkannt(wert)) { $("#" + feld).value = ""; return meldung("Nicht gespeichert: " + L.geheimErkannt(wert)); }
+      Object.assign(b, { name: $("#be-name").value.trim() || b.name, art: $("#be-art").value, avvDatum: $("#be-avv").value, kontakt: $("#be-kontakt").value.trim(), email: $("#be-mail").value.trim(), ...neu });
+      b.schritte = b.schritte || {};
+      document.querySelectorAll("[data-schrittb]").forEach((x) => { b.schritte[x.dataset.schrittb] = x.checked; });
+      document.querySelectorAll("[data-befil]").forEach((x) => { const f = filiale(x.dataset.befil); if (x.checked) f.betreiber = b.id; else if (f.betreiber === b.id) f.betreiber = null; });
+      b.pruefung = {}; // geänderte Verbindungsdaten müssen neu geprüft werden
+      if (b.freigegeben && !L.betreiberStand(b).freigabeMoeglich) b.freigegeben = false;
+      speichern(); const v = L.pruefeVerbindung(b); meldung(v.ok ? "Gespeichert" : "Gespeichert, bitte die roten Hinweise prüfen"); zeichnen();
+    },
+    "betreiber-pruefen": () => meldung("Die Prüfung braucht den Server des Betreibers. In dieser Testversion ist noch keiner angeschlossen."),
+    "betreiber-freigeben": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); if (!L.betreiberStand(b).freigabeMoeglich) return; b.freigegeben = true; speichern(); zeichnen(); },
+    "betreiber-sperren": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); b.freigegeben = false; speichern(); meldung("Freigabe zurückgenommen. Einladungslinks dieses Betreibers gelten nicht mehr."); zeichnen(); },
     "einsatz-neu": (el) => {
       const fid = el.dataset.f, f = filiale(fid), d = $(`#e-${fid}-d`).value, o = $(`#e-${fid}-o`).value.trim(), v = $(`#e-${fid}-v`).value, b = $(`#e-${fid}-b`).value;
       if (!d || !o || !v || !b || b <= v) return meldung("Bitte Datum, Ort und Zeiten prüfen");
