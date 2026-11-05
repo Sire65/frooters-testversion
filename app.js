@@ -1,4 +1,4 @@
-const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 5) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 6) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -65,6 +65,8 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     dienst: "Hier siehst du deine Schichten, auch die in anderen Filialen, wenn du als Springer eingeteilt bist.",
     wuensche: "Tipp für jeden Tag an, ob du möchtest, kannst oder nicht kannst. Die Shopleitung sieht das beim Planen.",
     krank: "Gute Besserung! Melde dich hier krank, deine Shopleitung bekommt sofort Bescheid. Diagnosen gehören hier nicht hin.",
+    abwesenheit: "Hier meldest du dich krank oder beantragst Urlaub, Bildungsurlaub und mehr. Oben siehst du dein Urlaubskonto: Anspruch, genommen, geplant und Rest.",
+    urlaubsuebersicht: "Wähle oben die Filialen: deine, alle oder nur bestimmte. Im Kalender siehst du, wer wann fehlt. Unter „Urlaubskonten“ steht der Rest jeder Person.",
     urlaub: "Stell deinen Urlaubsantrag hier. Du siehst sofort, ob er genehmigt ist.",
     stechuhr: "Kommen, Pause, Gehen: einfach antippen. Am Stand geht es auch mit deinem Ausweis-QR.",
     hygiene: "Das ist die Hygiene-Liste für heute. Gelb ist jetzt fällig, rot ist überfällig. Tipp drauf und hak ab.",
@@ -137,8 +139,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🗓️", "Mein Dienstplan", "Meine Schichten", "dienst")}
         ${kachel("📝", "Dienstwünsche", "Für die nächsten Wochen", "wuensche")}
         ${kachel("⏱️", "Stechuhr", st === "da" ? "Eingestempelt" : st === "pause" ? "In Pause" : "Kommen · Gehen", "stechuhr")}
-        ${kachel("🤒", "Krank melden", "Shopleitung wird informiert", "krank")}
-        ${kachel("🏖️", "Urlaub", "Antrag stellen", "urlaub")}
+        ${kachel("🏖️", "Abwesenheit", (() => { const k = L.urlaubskonto(S, p, d.slice(0, 4), d); return `Urlaub, krank, Bildungsurlaub · Rest ${k.rest} Tage`; })(), "abwesenheit")}
         ${kachel("🔁", "Tauschbörse", "Schichten und Stunden tauschen", "tausch", angeboteFuer(p).filter((a) => L.tauschPruefen(S, a, p.id).moeglich).length)}
       </div></div>`;
     }
@@ -154,6 +155,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       k += `<div class="abschnitt"><h2>Shopleitung ${esc(f.kurz)}</h2><div class="kacheln">
         ${kachel("📅", "Einsatzplan", "Woche planen", "plan")}
         ${kachel("📊", "Besetzung", "Übersicht und Lücken", "besetzung", L.woche(L.montag(d)).filter((t) => t >= d).flatMap((t) => L.besetzungsLuecken(S, f.id, t)).length)}
+        ${kachel("🗓️", "Urlaubsübersicht", "Filialen, Konten, Kalender", "urlaubsuebersicht")}
         ${kachel("✅", "Anträge", "Urlaub und Tausch", "antraege", offeneAntraege(f.id).length + tauschAnfragen(f.id).length)}
         ${kachel("🚨", "Krank & offen", "Schichten besetzen", "offen", offen + leitungsMeldungen(f.id).length)}
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
@@ -181,7 +183,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     }
     k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
     const heuteKarte = uebergreifend() ? (berater() ? frootie(FROOTIE_TIPPS.berater) : "") : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
-      ${krank ? `<p class="hinweis">Du bist ${krank.art === "krank" ? "krank gemeldet" : "im Urlaub"} bis ${L.datumKurz(krank.bis)}.</p>` : ""}
+      ${krank ? `<p class="hinweis">${L.abwArt(krank.art).sym} Du bist bis ${L.datumKurz(krank.bis)} abwesend: ${esc(L.abwArt(krank.art).name)}.</p>` : ""}
       ${meine.length ? meine.map((s) => `<p>🗓️ <b>${planTxt(s)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
       ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
@@ -199,7 +201,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       const abw = L.abwesenheitAm(S, p.id, d);
       const pub = sch.every((s) => S.veroeffentlicht[`${s.filiale}|${L.montag(d)}`]);
       return `<div class="zeile ${d === heute() ? "st-faellig" : ""}"><span class="punkt ${sch.length ? "gruen" : ""}"></span><span><b>${datumLang(d)}</b>
-        <small>${abw ? (abw.art === "krank" ? "🤒 krank" : "🏖️ Urlaub") : sch.length ? sch.map((s) => `${planTxt(s)}${tausche().some((a) => a.schichtId === s.id && (a.status === "offen" || a.status === "angefragt")) ? " · 🔁 angeboten" : ""} · ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
+        <small>${abw ? `${L.abwArt(abw.art).sym} ${esc(L.abwArt(abw.art).name)}` : sch.length ? sch.map((s) => `${planTxt(s)}${tausche().some((a) => a.schichtId === s.id && (a.status === "offen" || a.status === "angefragt")) ? " · 🔁 angeboten" : ""} · ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}${s.filiale !== p.stammfiliale ? " (Springer)" : ""}`).join("<br>") : "frei"}</small></span>
         <span class="marke-s ${sch.length && !pub ? "gelb" : ""}">${sch.length ? (pub ? "fest" : "Entwurf") : ""}</span></div>`;
     }).join("");
     const std = L.stundenInWoche(S, p.id, mo);
@@ -225,27 +227,73 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       }).join("")}</div>`;
   };
 
-  V.krank = () => {
-    const p = ICH();
-    const meine = S.abwesenheiten.filter((a) => a.personId === p.id && a.art === "krank").sort((a, b) => b.von.localeCompare(a.von));
-    return `${titel("Krank melden")}${frootie(FROOTIE_TIPPS.krank)}
-      <div class="karte"><div class="gitter2"><div class="feld"><label for="k-von">Krank ab</label><input type="date" id="k-von" value="${heute()}"></div>
-        <div class="feld"><label for="k-bis">Voraussichtlich bis</label><input type="date" id="k-bis" value="${heute()}"></div></div>
-        <p class="klein muted">Ab wann du eine Arbeitsunfähigkeitsbescheinigung brauchst, steht in deinem Arbeitsvertrag. Die eAU ruft der Arbeitgeber bei der Krankenkasse ab.</p>
-        <button class="btn gross" data-act="krank">🤒 Krankmeldung absenden</button></div>
-      <div class="abschnitt"><h2>Meine Krankmeldungen</h2><div class="liste">${meine.length ? meine.map((a) => `<div class="zeile"><span class="punkt rot"></span><span>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}<small>gemeldet</small></span><span></span></div>`).join("") : '<p class="leer">Keine Krankmeldungen.</p>'}</div></div>`;
+  // ---------- Abwesenheit: Urlaub, Krankmeldung, Bildungsurlaub usw. mit Urlaubskonto ----------
+  let abwArtWahl = "urlaub";
+  const ABW_FARBE = { beantragt: "gelb", genehmigt: "gruen", gemeldet: "rot", abgelehnt: "rot", zurueckgezogen: "" };
+  const ABW_STATUS = { beantragt: "beantragt", genehmigt: "genehmigt", gemeldet: "gemeldet", abgelehnt: "abgelehnt", zurueckgezogen: "zurückgezogen" };
+  function kontoKarte(p, jahr) {
+    const k = L.urlaubskonto(S, p, jahr, heute()), b = L.urlaubskonto(S, p, jahr, heute(), "bildung");
+    return `<div class="karte"><div class="reihe zw"><h2>Mein Urlaubskonto ${jahr}</h2><span class="marke-s ${k.rest < 0 ? "rot" : "gruen"}">Rest ${k.rest} Tage</span></div>
+      <div class="konto">
+        <div><small>Anspruch</small><b>${k.anspruch}</b></div>${k.uebertrag ? `<div><small>Übertrag</small><b>+${k.uebertrag}</b></div>` : ""}
+        <div><small>genommen</small><b>${k.genommen}</b></div><div><small>geplant</small><b>${k.geplant}</b></div>
+        <div class="${k.rest < 0 ? "rot" : ""}"><small>Rest</small><b>${k.rest}</b></div>${k.beantragt ? `<div class="gelb"><small>beantragt</small><b>${k.beantragt}</b></div>` : ""}</div>
+      <div class="balken" aria-hidden="true"><span style="width:${Math.min(100, Math.round(((k.genommen + k.geplant) / Math.max(1, k.anspruch + k.uebertrag)) * 100))}%"></span></div>
+      <p class="klein muted">Bildungsurlaub: ${b.genommen + b.geplant} von ${b.anspruch} Tagen${b.beantragt ? ` · ${b.beantragt} beantragt` : ""}. Gezählt werden Arbeitstage (${(S.parameter.urlaubTage || "mo-fr") === "mo-sa" ? "Mo–Sa" : "Mo–Fr"}).</p></div>`;
+  }
+  V.abwesenheit = () => {
+    const p = ICH(), d = heute(), jahr = d.slice(0, 4), art = L.abwArt(abwArtWahl);
+    const meine = S.abwesenheiten.filter((a) => a.personId === p.id).sort((a, b) => b.von.localeCompare(a.von)).slice(0, 12);
+    const vonStd = art.genehmigung ? L.plusTage(d, 14) : d, bisStd = art.genehmigung ? L.plusTage(d, 18) : d;
+    return `${titel("Abwesenheit")}${frootie(FROOTIE_TIPPS.abwesenheit)}
+      ${kontoKarte(p, jahr)}
+      <div class="karte"><h2>Neue Abwesenheit</h2>
+        <div class="wahl">${Object.entries(L.ABW_ARTEN).map(([k, a]) => `<button class="${k === abwArtWahl ? "an" : ""}" data-act="abw-art" data-a="${k}">${a.sym} ${esc(a.name)}</button>`).join("")}</div>
+        <div class="gitter2"><div class="feld"><label for="ab-von">${abwArtWahl === "krank" || abwArtWahl === "kind_krank" ? "Ab" : "Von"}</label><input type="date" id="ab-von" value="${vonStd}"></div>
+          <div class="feld"><label for="ab-bis">${abwArtWahl === "krank" || abwArtWahl === "kind_krank" ? "Voraussichtlich bis" : "Bis"}</label><input type="date" id="ab-bis" value="${bisStd}"></div></div>
+        <p class="klein muted" id="ab-tage"></p>
+        <div class="feld"><label for="ab-notiz">Bemerkung (freiwillig)</label><input type="text" id="ab-notiz" maxlength="120" placeholder="${art.genehmigung ? "z. B. Familienfeier" : "keine Diagnose eintragen"}"></div>
+        ${art.genehmigung ? "" : '<p class="klein muted">Deine Shopleitung bekommt sofort Bescheid. Ab wann du eine Bescheinigung brauchst, steht in deinem Arbeitsvertrag. Die eAU ruft der Arbeitgeber bei der Krankenkasse ab.</p>'}
+        <button class="btn gross" data-act="abw-senden">${art.sym} ${art.genehmigung ? `${esc(art.name)} beantragen` : `${esc(art.name)} absenden`}</button></div>
+      <div class="abschnitt"><h2>Meine Abwesenheiten</h2><div class="liste">${meine.length ? meine.map((a) => { const t = L.abwArt(a.art), tage = t.konto ? L.urlaubsTage(a.von, a.bis, S.parameter.urlaubTage) : null;
+        return `<div class="zeile"><span class="punkt ${ABW_FARBE[a.status] || ""}"></span><span>${t.sym} <b>${esc(t.name)}</b> · ${L.datumKurz(a.von)}${a.bis !== a.von ? " bis " + L.datumKurz(a.bis) : ""}<small>${tage != null ? tage + " Arbeitstage · " : ""}${esc(a.notiz || "")}</small></span>
+          ${a.status === "beantragt" ? `<button class="chip" data-act="abw-zurueck" data-id="${a.id}">zurückziehen</button>` : `<span class="marke-s ${ABW_FARBE[a.status] || ""}">${ABW_STATUS[a.status] || a.status}</span>`}</div>`; }).join("") : '<p class="leer">Noch keine Abwesenheiten.</p>'}</div></div>`;
   };
+  V.krank = () => { abwArtWahl = "krank"; return V.abwesenheit(); };
+  V.urlaub = () => { abwArtWahl = "urlaub"; return V.abwesenheit(); };
 
-  V.urlaub = () => {
-    const p = ICH();
-    const meine = S.abwesenheiten.filter((a) => a.personId === p.id && a.art === "urlaub").sort((a, b) => b.von.localeCompare(a.von));
-    const farbe = { beantragt: "gelb", genehmigt: "gruen", abgelehnt: "rot" };
-    return `${titel("Urlaub")}${frootie(FROOTIE_TIPPS.urlaub)}
-      <div class="karte"><div class="gitter2"><div class="feld"><label for="u-von">Von</label><input type="date" id="u-von" value="${L.plusTage(heute(), 14)}"></div>
-        <div class="feld"><label for="u-bis">Bis</label><input type="date" id="u-bis" value="${L.plusTage(heute(), 18)}"></div></div>
-        <div class="feld"><label for="u-notiz">Bemerkung (freiwillig)</label><input type="text" id="u-notiz" maxlength="120"></div>
-        <button class="btn gross" data-act="urlaub">🏖️ Urlaub beantragen</button></div>
-      <div class="abschnitt"><h2>Meine Anträge</h2><div class="liste">${meine.length ? meine.map((a) => `<div class="zeile"><span class="punkt ${farbe[a.status]}"></span><span>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)}<small>${esc(a.notiz || "")}</small></span><span class="marke-s ${farbe[a.status]}">${a.status}</span></div>`).join("") : '<p class="leer">Noch keine Anträge.</p>'}</div></div>`;
+  // Urlaubsübersicht für die Leitung: Filialen wählbar (eigene, alle, bestimmte), Art und Monat
+  let uebFilialen = null, uebArt = "alle", uebAnsicht = "kalender";
+  V.urlaubsuebersicht = () => {
+    const ich = ICH(), d = heute(), monat = arg && /^\d{4}-\d{2}$/.test(arg) ? arg : d.slice(0, 7), jahr = monat.slice(0, 4);
+    const erlaubt = zentrale() ? S.filialen : S.filialen.filter((f) => f.betreiber === FIL().betreiber || !f.betreiber);
+    if (!uebFilialen) uebFilialen = [FIL().id];
+    uebFilialen = uebFilialen.filter((id) => erlaubt.some((f) => f.id === id));
+    if (!uebFilialen.length) uebFilialen = [FIL().id];
+    const leute = S.personen.filter((p) => p.aktiv !== false && !L.UEBERGREIFEND.includes(p.rolle) && uebFilialen.includes(p.stammfiliale)).sort((a, b) => (a.stammfiliale || "").localeCompare(b.stammfiliale || "") || a.vorname.localeCompare(b.vorname));
+    const [y, m] = monat.split("-").map(Number), letzter = new Date(y, m, 0).getDate();
+    const tage = Array.from({ length: letzter }, (_, i) => `${monat}-${String(i + 1).padStart(2, "0")}`);
+    const vor = (() => { const x = new Date(y, m - 2, 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`; })(), nach = (() => { const x = new Date(y, m, 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`; })();
+    // Datenschutz: Krankmeldungen aus fremden Filialen nur als „abwesend“, außer für den Inhaber
+    const sichtArt = (a, p) => (!L.abwArt(a.art).genehmigung && !zentrale() && p.stammfiliale !== FIL().id) ? { name: "abwesend", sym: "•" } : L.abwArt(a.art);
+    const passt = (a) => uebArt === "alle" || a.art === uebArt || (uebArt === "krank" && a.art === "kind_krank");
+    const abw = S.abwesenheiten.filter((a) => a.status !== "zurueckgezogen" && a.status !== "abgelehnt" && passt(a) && a.bis >= tage[0] && a.von <= tage[tage.length - 1] && leute.some((p) => p.id === a.personId));
+    const zelle = (p, t) => { const a = abw.find((x) => x.personId === p.id && L.zwischen(t, x.von, x.bis)); const so = L.wochentag(t) === "so";
+      if (!a) return `<td class="${so ? "u-so" : ""}"></td>`; const art = sichtArt(a, p);
+      return `<td class="u-${a.status === "beantragt" ? "antrag" : art.name === "abwesend" ? "abw" : a.art}" title="${esc(p.vorname)}: ${esc(art.name)} ${a.status === "beantragt" ? "(beantragt)" : ""}">${art.sym}</td>`; };
+    const filText = uebFilialen.length === erlaubt.length ? "alle Filialen" : uebFilialen.map((id) => filiale(id).kurz).join(", ");
+    return `${titel("Urlaubsübersicht")}${frootie(FROOTIE_TIPPS.urlaubsuebersicht)}
+      <div class="karte"><div class="feld"><span class="lbl">Filialen</span><div class="wahl"><button class="${uebFilialen.length === erlaubt.length ? "an" : ""}" data-act="ueb-alle">Alle</button>${erlaubt.map((f) => `<button class="${uebFilialen.includes(f.id) ? "an" : ""}" data-act="ueb-fil" data-id="${f.id}">${esc(f.kurz)}</button>`).join("")}</div></div>
+        <div class="feld"><span class="lbl">Art</span><div class="wahl">${[["alle", "Alle"], ["urlaub", "🏖️ Urlaub"], ["krank", "🤒 Krank"], ["bildungsurlaub", "🎓 Bildungsurlaub"], ["sonderurlaub", "💐 Sonderurlaub"], ["freizeitausgleich", "⏳ Freizeitausgleich"]].map(([k, t]) => `<button class="${uebArt === k ? "an" : ""}" data-act="ueb-art" data-a="${k}">${t}</button>`).join("")}</div></div>
+        <div class="wahl"><button class="${uebAnsicht === "kalender" ? "an" : ""}" data-act="ueb-ansicht" data-a="kalender">📅 Kalender</button><button class="${uebAnsicht === "konten" ? "an" : ""}" data-act="ueb-ansicht" data-a="konten">🧮 Urlaubskonten</button><button class="${uebAnsicht === "liste" ? "an" : ""}" data-act="ueb-ansicht" data-a="liste">📋 Liste</button></div></div>
+      ${uebAnsicht === "kalender" ? `<div class="karte"><div class="reihe zw"><button class="chip" data-go="urlaubsuebersicht" data-arg="${vor}">‹</button><b>${["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][m - 1]} ${y} · ${esc(filText)}</b><button class="chip" data-go="urlaubsuebersicht" data-arg="${nach}">›</button></div>
+        <div class="matrix-scroll"><table class="ukal"><thead><tr><th></th>${tage.map((t) => `<th class="${L.wochentag(t) === "so" ? "u-so" : ""}">${Number(t.slice(8))}<small>${L.TAG_NAME[L.wochentag(t)].slice(0, 2)}</small></th>`).join("")}</tr></thead>
+          <tbody>${leute.map((p) => `<tr><th>${esc(p.vorname)} ${esc(p.nachname.slice(0, 1))}.<small>${esc(filiale(p.stammfiliale).kurz)}</small></th>${tage.map((t) => zelle(p, t)).join("")}</tr>`).join("")}
+          <tr class="u-summe"><th>abwesend</th>${tage.map((t) => { const n = leute.filter((p) => abw.some((a) => a.personId === p.id && L.zwischen(t, a.von, a.bis) && a.status !== "beantragt")).length; return `<td class="${n >= 3 ? "u-viel" : ""}">${n || ""}</td>`; }).join("")}</tr></tbody></table></div>
+        <div class="legende"><span class="u-urlaub">🏖️ Urlaub</span><span class="u-krank">🤒 krank</span><span class="u-bildungsurlaub">🎓 Bildung</span><span class="u-antrag">beantragt</span><span class="u-abw">• abwesend</span></div></div>`
+      : uebAnsicht === "konten" ? `<div class="karte"><h2>Urlaubskonten ${jahr} · ${esc(filText)}</h2><div class="matrix-scroll"><table class="zutaten"><thead><tr><td><b>Name</b></td><td><b>Anspruch</b></td><td><b>genommen</b></td><td><b>geplant</b></td><td><b>beantragt</b></td><td><b>Rest</b></td></tr></thead><tbody>
+          ${leute.map((p) => { const k = L.urlaubskonto(S, p, jahr, d); return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc(filiale(p.stammfiliale).kurz)}</span></td><td>${k.anspruch}${k.uebertrag ? ` +${k.uebertrag}` : ""}</td><td>${k.genommen}</td><td>${k.geplant}</td><td>${k.beantragt || ""}</td><td><b class="${k.rest < 0 ? "rot-txt" : ""}">${k.rest}</b></td></tr>`; }).join("")}</tbody></table></div></div>`
+      : `<div class="liste">${abw.sort((a, b) => a.von.localeCompare(b.von)).map((a) => { const p = person(a.personId), art = sichtArt(a, p); return `<div class="zeile"><span class="punkt ${ABW_FARBE[a.status] || ""}"></span><span><b>${esc(name(p))}</b> · ${art.sym} ${esc(art.name)}<small>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)} · ${esc(filiale(p.stammfiliale).kurz)}</small></span><span class="marke-s ${ABW_FARBE[a.status] || ""}">${ABW_STATUS[a.status] || a.status}</span></div>`; }).join("") || '<p class="leer">Keine Abwesenheiten in diesem Monat.</p>'}</div>`}`;
   };
 
   V.tausch = () => {
@@ -493,7 +541,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       <p class="muted klein">${esc(f.kurz)} · ${zeitTxt(L.schichtZeit(f, d, schId))}. Grauer Rand = Springer aus einer anderen Filiale.</p>
       <div class="liste">${ks.map((k) => `<button class="zeile ${k.person.stammfiliale !== f.id ? "springer" : ""}" data-act="einteilen" data-id="${k.person.id}" data-datum="${d}" data-schicht="${schId}" ${k.moeglich ? "" : "disabled"} style="${k.moeglich ? "" : "opacity:.5"}">
         <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc(filiale(k.person.stammfiliale).kurz)}</span>` : ""}
-        <small>${L.ROLLEN[k.person.rolle].name} · ${k.stunden} Std. diese Woche${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? "+" : ""}</span></button>`).join("")}</div>`;
+        <small>${L.ROLLEN[k.person.rolle].name} · ${k.stand.ist} von ${k.stand.soll || "–"} Std. ${k.stand.einheit === "monat" ? "im Monat" : "in der Woche"}${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? (k.stand.ueber ? "⚠️" : "+") : ""}</span></button>`).join("")}</div>`;
   }
 
   // ---------- Besetzung: grafische Übersicht, Lückenliste, Tagesansicht, Matrix ----------
@@ -560,7 +608,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   };
   V.antraege = () => {
     const f = FIL(), a = offeneAntraege(f.id);
-    const erledigt = S.abwesenheiten.filter((x) => x.art === "urlaub" && x.status !== "beantragt" && (person(x.personId) || {}).stammfiliale === f.id).slice(-5).reverse();
+    const erledigt = S.abwesenheiten.filter((x) => L.abwArt(x.art).genehmigung && (x.status === "genehmigt" || x.status === "abgelehnt") && x.entschieden && (person(x.personId) || {}).stammfiliale === f.id).sort((x, y) => y.entschieden.localeCompare(x.entschieden)).slice(0, 5);
     const ta = tauschAnfragen(f.id);
     return `${titel("Anträge " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.antraege)}
       ${ta.length ? `<div class="abschnitt"><h2>Schichttausch</h2><div class="liste">${ta.map((x) => { const sch = S.plan.find((y) => y.id === x.schichtId); const z = angebotZeit(x); const chk = L.tauschPruefen(S, x, x.nehmerId, x.gegenId); const g = x.gegenId && S.plan.find((y) => y.id === x.gegenId);
@@ -570,16 +618,20 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
           ${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
           ${chk.gruende.map((t) => `<p class="hinweis rot">${esc(t)}</p>`).join("")}${chk.hinweise.map((t) => `<p class="hinweis">${esc(t)}</p>`).join("")}
           <div class="reihe"><button class="btn" data-act="tausch-ok" data-id="${x.id}" ${chk.moeglich ? "" : "disabled"}>✓ Bestätigen</button><button class="btn drei" data-act="tausch-nein" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("")}</div></div>` : ""}
-      <div class="abschnitt"><h2>Urlaub</h2>
-      <div class="liste">${a.length ? a.map((x) => { const betr = L.betroffeneSchichten(S, x.personId, x.von, x.bis).length;
-        return `<div class="karte"><p><b>${esc(name(person(x.personId)))}</b> möchte Urlaub vom ${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</p>${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
+      <div class="abschnitt"><h2>Urlaub und andere Abwesenheiten</h2>
+      <div class="liste">${a.length ? a.map((x) => { const betr = L.betroffeneSchichten(S, x.personId, x.von, x.bis).length, art = L.abwArt(x.art), p = person(x.personId);
+        const tage = art.konto ? L.urlaubsTage(x.von, x.bis, S.parameter.urlaubTage) : null, k = art.konto ? L.urlaubskonto(S, p, x.von.slice(0, 4), heute(), art.konto) : null;
+        const gleich = S.abwesenheiten.filter((y) => y !== x && y.status === "genehmigt" && y.bis >= x.von && y.von <= x.bis && (person(y.personId) || {}).stammfiliale === p.stammfiliale).map((y) => person(y.personId).vorname);
+        return `<div class="karte"><p>${art.sym} <b>${esc(name(p))}</b>: ${esc(art.name)} vom ${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}${tage != null ? ` · <b>${tage} Tage</b>` : ""}</p>${x.notiz ? `<p class="muted">${esc(x.notiz)}</p>` : ""}
+        ${k ? `<p class="${k.rest - tage < 0 ? "hinweis rot" : "klein muted"}">Konto: Rest ${k.rest} Tage, nach Genehmigung ${k.rest - tage} Tage${k.rest - tage < 0 ? " (überzogen)" : ""}</p>` : ""}
+        ${gleich.length ? `<p class="hinweis">In der Zeit auch abwesend: ${gleich.map(esc).join(", ")}</p>` : ""}
         ${betr ? `<p class="hinweis">Im Plan stehen in dieser Zeit ${betr} Schicht${betr > 1 ? "en" : ""}. Sie werden beim Genehmigen frei.</p>` : ""}
-        <div class="reihe"><button class="btn" data-act="genehmigen" data-id="${x.id}">✓ Genehmigen</button><button class="btn drei" data-act="ablehnen" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Urlaubsanträge. 🎉</p>'}</div></div>
+        <div class="reihe"><button class="btn" data-act="genehmigen" data-id="${x.id}">✓ Genehmigen</button><button class="btn drei" data-act="ablehnen" data-id="${x.id}">Ablehnen</button></div></div>`; }).join("") : '<p class="leer">Keine offenen Anträge. 🎉</p>'}</div></div>
       ${erledigt.length ? `<div class="abschnitt"><h2>Zuletzt entschieden</h2><div class="liste">${erledigt.map((x) => `<div class="zeile"><span class="punkt ${x.status === "genehmigt" ? "gruen" : "rot"}"></span><span>${esc(name(person(x.personId)))}<small>${L.datumKurz(x.von)} bis ${L.datumKurz(x.bis)}</small></span><span class="marke-s">${x.status}</span></div>`).join("")}</div></div>` : ""}`;
   };
   V.offen = () => {
     const f = FIL(), d = heute();
-    const krank = S.abwesenheiten.filter((a) => a.art === "krank" && a.bis >= d && L.darfInFiliale(person(a.personId), f.id));
+    const krank = S.abwesenheiten.filter((a) => !L.abwArt(a.art).genehmigung && a.status !== "zurueckgezogen" && a.bis >= d && L.darfInFiliale(person(a.personId), f.id));
     const offen = offeneSchichten(f.id, d, 14);
     const mel = leitungsMeldungen(f.id);
     return `${titel("Krank & offen")}${frootie(FROOTIE_TIPPS.offen)}
@@ -639,7 +691,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   V.team = () => {
     const f = FIL();
     const leute = S.personen.filter((p) => L.darfInFiliale(p, f.id));
-    return `${titel("Team " + esc(f.kurz))}<div class="liste">${leute.map((p) => `<div class="zeile"><span class="punkt ${L.abwesenheitAm(S, p.id, heute()) ? "rot" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale !== f.id ? ` · Springer aus ${esc(filiale(p.stammfiliale).kurz)}` : p.springer ? ` · Springer auch in ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ")}` : ""} · ${p.wochenstunden} Std./Woche</small></span><span></span></div>`).join("")}</div>`;
+    return `${titel("Team " + esc(f.kurz))}<div class="liste">${leute.map((p) => `<div class="zeile"><span class="punkt ${L.abwesenheitAm(S, p.id, heute()) ? "rot" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale !== f.id ? ` · Springer aus ${esc(filiale(p.stammfiliale).kurz)}` : p.springer ? ` · Springer auch in ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ")}` : ""} · ${p.wochenstunden} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"}</small></span><span></span></div>`).join("")}</div>`;
   };
 
   // ----- Zentrale -----
@@ -664,7 +716,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   V.ma = () => `${titel("Mitarbeiter")}${frootie(FROOTIE_TIPPS.ma)}
     <button class="btn zwei" data-act="ma-neu">+ Mitarbeiter anlegen</button>
     <div class="abschnitt"><h2>Zentrale & Beratung</h2><div class="liste">${S.personen.filter((p) => !p.stammfiliale).map((p) => `<div class="zeile"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · sieht alle Filialen</small></span><span></span></div>`).join("")}</div></div>
-    ${S.filialen.map((f) => `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === f.id).map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · ${p.wochenstunden} Std.${p.springer ? ` · Springer: ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}`;
+    ${S.filialen.map((f) => `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === f.id).map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · ${p.wochenstunden} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"} · Urlaub ${p.urlaubsanspruch != null ? p.urlaubsanspruch : 30} Tage${p.springer ? ` · Springer: ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}`;
   V["ma-edit"] = () => {
     const p = person(arg);
     if (!p) return `${titel("Mitarbeiter", "ma")}<p class="leer">Nicht gefunden.</p>`;
@@ -672,7 +724,11 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       <div class="karte"><div class="gitter2"><div class="feld"><label for="m-vor">Vorname</label><input type="text" id="m-vor" value="${esc(p.vorname)}"></div><div class="feld"><label for="m-nach">Nachname</label><input type="text" id="m-nach" value="${esc(p.nachname)}"></div></div>
         <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle</label><select id="m-rolle">${Object.entries(L.ROLLEN).filter(([k]) => !L.UEBERGREIFEND.includes(k)).map(([k, r]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>
           <div class="feld"><label for="m-stamm">Stammfiliale</label><select id="m-stamm">${S.filialen.map((f) => `<option value="${f.id}" ${p.stammfiliale === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div></div>
-        <div class="feld"><label for="m-std">Wochenstunden laut Vertrag</label><input type="number" id="m-std" min="0" max="48" value="${p.wochenstunden}"></div>
+        <div class="gitter2"><div class="feld"><label for="m-std">Stundenumfang laut Vertrag</label><input type="number" id="m-std" min="0" max="200" value="${p.wochenstunden}"></div>
+          <div class="feld"><label for="m-einheit">je</label><select id="m-einheit"><option value="woche" ${p.stundenEinheit !== "monat" ? "selected" : ""}>Woche</option><option value="monat" ${p.stundenEinheit === "monat" ? "selected" : ""}>Monat</option></select></div></div>
+        <div class="gitter2"><div class="feld"><label for="m-urlaub">Urlaubsanspruch (Tage im Jahr)</label><input type="number" id="m-urlaub" min="0" max="40" value="${p.urlaubsanspruch != null ? p.urlaubsanspruch : 30}"></div>
+          <div class="feld"><label for="m-uebertrag">Übertrag aus dem Vorjahr</label><input type="number" id="m-uebertrag" min="0" max="40" value="${p.urlaubUebertrag || 0}"></div></div>
+        <div class="feld"><label for="m-bildung">Bildungsurlaub (Tage im Jahr)</label><input type="number" id="m-bildung" min="0" max="10" value="${p.bildungsurlaub != null ? p.bildungsurlaub : 5}"></div>
         <label class="haken"><input type="checkbox" id="m-springer" ${p.springer ? "checked" : ""}><span><b>Springer</b>: darf in anderen Filialen aushelfen</span></label>
         <div class="feld"><span class="lbl">Einsetzbar in (zusätzlich zur Stammfiliale)</span>${S.filialen.filter((f) => f.id !== p.stammfiliale).map((f) => `<label class="haken"><input type="checkbox" data-einsatz="${f.id}" ${p.einsatzfilialen.includes(f.id) ? "checked" : ""}><span>${esc(f.name)}</span></label>`).join("")}</div>
         <label class="haken"><input type="checkbox" id="m-aktiv" ${p.aktiv !== false ? "checked" : ""}><span>aktiv (ausgetretene Mitarbeiter abwählen)</span></label>
@@ -817,7 +873,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   };
 
   V.hilfe = () => `${titel("Frag Frootie")}${frootie("Hier findest du zu jedem Bereich eine kurze Erklärung. Videoanleitungen zu allen Funktionen kommen mit der nächsten Version.")}
-    <div class="liste">${[["dienst", "🗓️ Mein Dienstplan"], ["wuensche", "📝 Dienstwünsche"], ["krank", "🤒 Krank melden"], ["urlaub", "🏖️ Urlaub"], ["stechuhr", "⏱️ Stechuhr"], ["hygiene", "🧼 Hygiene"], ["rezepte", "📖 Rezepte"], ["quiz", "🎯 Quiz"], ["plan", "📅 Einsatzplan (Leitung)"], ["hygregeln", "⚙️ Regeln & Geräte (Leitung)"], ["ma", "👤 Mitarbeiter und Springer (Zentrale)"]]
+    <div class="liste">${[["dienst", "🗓️ Mein Dienstplan"], ["wuensche", "📝 Dienstwünsche"], ["abwesenheit", "🏖️ Abwesenheit und Urlaubskonto"], ["stechuhr", "⏱️ Stechuhr"], ["hygiene", "🧼 Hygiene"], ["rezepte", "📖 Rezepte"], ["quiz", "🎯 Quiz"], ["plan", "📅 Einsatzplan (Leitung)"], ["hygregeln", "⚙️ Regeln & Geräte (Leitung)"], ["ma", "👤 Mitarbeiter und Springer (Zentrale)"]]
       .map(([k, t]) => `<div class="karte"><b>${t}</b><p class="muted">${FROOTIE_TIPPS[k]}</p><p class="klein muted">🎬 Video folgt</p></div>`).join("")}</div>`;
   V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
 
@@ -826,7 +882,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
-    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix"];
+    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
@@ -834,7 +890,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
     if (nurQualitaet.includes(rechte) && !qualitaet()) rechte = "start";
     if (berater() && ["quiz", "pinnwand"].includes(rechte)) rechte = "start";
-    if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "stechuhr"].includes(rechte)) rechte = "start";
+    if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(rechte)) rechte = "start";
     ansicht = rechte;
     const inhalt = (V[ansicht] || V.start)();
     $("#app").innerHTML = `${updateBand}${kopf()}<main>${inhalt}</main>${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
@@ -858,22 +914,27 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
       speichern(); zeichnen();
     },
     "wunsch-schicht": (el) => { const w = L.wunschAm(S, ICH().id, el.dataset.datum); if (w) { w.schicht = el.dataset.schicht; speichern(); zeichnen(); } },
-    krank: () => {
-      const von = $("#k-von").value, bis = $("#k-bis").value, p = ICH();
+    "abw-art": (el) => { abwArtWahl = el.dataset.a; zeichnen(); },
+    "abw-senden": () => {
+      const von = $("#ab-von").value, bis = $("#ab-bis").value, p = ICH(), art = L.abwArt(abwArtWahl);
       if (!von || !bis || bis < von) return meldung("Bitte Zeitraum prüfen");
-      S.abwesenheiten.push({ id: neueId("a"), personId: p.id, art: "krank", von, bis, status: "gemeldet" });
-      const betr = L.betroffeneSchichten(S, p.id, von, bis);
+      if (art.genehmigung && von < heute()) return meldung("Anträge gehen nur für heute oder später");
+      if (art.konto) { const k = L.urlaubskonto(S, p, von.slice(0, 4), heute(), art.konto), t = L.urlaubsTage(von, bis, S.parameter.urlaubTage); if (t === 0) return meldung("In diesem Zeitraum liegt kein Arbeitstag"); if (k.rest - k.beantragt - t < 0) meldung(`Hinweis: Konto reicht nicht (Rest ${k.rest - k.beantragt}, beantragt ${t})`); }
+      const a = { id: neueId("a"), personId: p.id, art: abwArtWahl, von, bis, status: art.genehmigung ? "beantragt" : "gemeldet", notiz: $("#ab-notiz").value.trim(), zeit: jetztIso() };
+      S.abwesenheiten.push(a);
       S.meldungen = S.meldungen || [];
-      for (const fid of new Set([p.stammfiliale, ...betr.map((s) => s.filiale)]))
-        S.meldungen.push({ id: neueId("m"), filiale: fid, text: `🤒 ${name(p)} ist krank (${L.datumKurz(von)}–${L.datumKurz(bis)}). ${betr.filter((s) => s.filiale === fid).length} Schicht(en) betroffen.`, zeit: jetztIso() });
-      speichern(); meldung("Gute Besserung! Deine Shopleitung ist informiert."); gehe("start");
+      if (!art.genehmigung) {
+        const betr = L.betroffeneSchichten(S, p.id, von, bis);
+        for (const fid of new Set([p.stammfiliale, ...betr.map((x) => x.filiale)])) S.meldungen.push({ id: neueId("m"), filiale: fid, text: `${art.sym} ${name(p)}: ${art.name} (${L.datumKurz(von)}–${L.datumKurz(bis)}). ${betr.filter((x) => x.filiale === fid).length} Schicht(en) betroffen.`, zeit: jetztIso() });
+        speichern(); meldung(abwArtWahl === "krank" ? "Gute Besserung! Deine Shopleitung ist informiert." : "Gemeldet. Deine Shopleitung ist informiert."); return gehe("start");
+      }
+      speichern(); meldung(`${art.name} beantragt. Deine Shopleitung entscheidet.`); zeichnen();
     },
-    urlaub: () => {
-      const von = $("#u-von").value, bis = $("#u-bis").value;
-      if (!von || !bis || bis < von) return meldung("Bitte Zeitraum prüfen");
-      S.abwesenheiten.push({ id: neueId("a"), personId: ICH().id, art: "urlaub", von, bis, status: "beantragt", notiz: $("#u-notiz").value.trim() });
-      speichern(); meldung("Antrag gestellt"); zeichnen();
-    },
+    "abw-zurueck": (el) => { const a = S.abwesenheiten.find((x) => x.id === el.dataset.id); a.status = "zurueckgezogen"; speichern(); zeichnen(); },
+    "ueb-alle": () => { uebFilialen = (zentrale() ? S.filialen : S.filialen.filter((f) => f.betreiber === FIL().betreiber || !f.betreiber)).map((f) => f.id); zeichnen(); },
+    "ueb-fil": (el) => { const id = el.dataset.id; uebFilialen = uebFilialen.includes(id) ? uebFilialen.filter((x) => x !== id) : [...uebFilialen, id]; if (!uebFilialen.length) uebFilialen = [id]; zeichnen(); },
+    "ueb-art": (el) => { uebArt = el.dataset.a; zeichnen(); },
+    "ueb-ansicht": (el) => { uebAnsicht = el.dataset.a; zeichnen(); },
     stempel: (el) => { S.stempel.push({ id: neueId("t"), personId: ICH().id, filiale: FIL().id, art: el.dataset.art, zeit: jetztIso() }); speichern(); meldung({ kommen: "Guten Start!", pause: "Gute Pause!", weiter: "Weiter geht's", gehen: "Schönen Feierabend!" }[el.dataset.art]); zeichnen(); },
     hygfilter: (el) => { hygFilter = el.dataset.f; zeichnen(); },
     ppwahl: (el) => { entwurf.werte[el.dataset.i] = el.dataset.w; zeichnen(); },
@@ -937,7 +998,16 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     },
     "plan-plus": (el) => { kandidatenFenster(el.dataset.datum, el.dataset.schicht); zeichnen(); },
     einteilen: (el) => {
-      S.plan.push({ id: neueId("s"), filiale: FIL().id, datum: el.dataset.datum, schicht: el.dataset.schicht, personId: el.dataset.id, quelle: "hand" });
+      const p = person(el.dataset.id), f = FIL(), z = L.schichtZeit(f, el.dataset.datum, el.dataset.schicht), st = L.stundenStand(S, p, el.dataset.datum, z ? z.ende - z.start : 0);
+      if (st.ueber && !el.dataset.trotzdem) {
+        fenster = `<h2>⚠️ Stundenumfang überschritten</h2><p><b>${esc(name(p))}</b> hat einen Stundenumfang von <b>${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}</b>.</p>
+          <p>Mit dieser Schicht käme ${esc(p.vorname)} auf <b>${st.neu} Std.</b> (bisher ${st.ist} Std.).</p>${p.rolle === "aushilfe" ? '<p class="hinweis">Bei Aushilfen auf die Minijob-Grenze achten.</p>' : ""}
+          <p><b>Trotzdem einplanen?</b></p>
+          <button class="btn gross" data-act="einteilen" data-trotzdem="1" data-id="${p.id}" data-datum="${el.dataset.datum}" data-schicht="${el.dataset.schicht}">Ja, trotzdem einplanen</button>
+          <button class="btn drei" data-act="plan-plus" data-datum="${el.dataset.datum}" data-schicht="${el.dataset.schicht}">Nein, andere Person wählen</button>`;
+        return zeichnen();
+      }
+      S.plan.push({ id: neueId("s"), filiale: FIL().id, datum: el.dataset.datum, schicht: el.dataset.schicht, personId: el.dataset.id, quelle: "hand", ueberStunden: !!el.dataset.trotzdem });
       if (S.veroeffentlicht[`${FIL().id}|${L.montag(el.dataset.datum)}`]) S.meldungen = S.meldungen || [];
       speichern(); fenster = null; meldung(`${person(el.dataset.id).vorname} eingeteilt`); zeichnen();
     },
@@ -949,11 +1019,11 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     },
     veroeffentlichen: (el) => { S.veroeffentlicht[`${FIL().id}|${el.dataset.mo}`] = true; speichern(); meldung("Plan veröffentlicht. Das Team sieht ihn jetzt."); zeichnen(); },
     genehmigen: (el) => {
-      const a = S.abwesenheiten.find((x) => x.id === el.dataset.id); a.status = "genehmigt";
+      const a = S.abwesenheiten.find((x) => x.id === el.dataset.id); a.status = "genehmigt"; a.entschieden = jetztIso(); a.vonLeitung = ICH().id;
       const betr = L.betroffeneSchichten(S, a.personId, a.von, a.bis); S.plan = S.plan.filter((s) => !betr.includes(s));
       speichern(); meldung(`Genehmigt${betr.length ? `, ${betr.length} Schicht(en) sind jetzt offen` : ""}`); zeichnen();
     },
-    ablehnen: (el) => { S.abwesenheiten.find((x) => x.id === el.dataset.id).status = "abgelehnt"; speichern(); zeichnen(); },
+    ablehnen: (el) => { const a = S.abwesenheiten.find((x) => x.id === el.dataset.id); a.status = "abgelehnt"; a.entschieden = jetztIso(); a.vonLeitung = ICH().id; speichern(); zeichnen(); },
     "meldung-ok": (el) => { S.meldungen.find((m) => m.id === el.dataset.id).erledigt = true; speichern(); zeichnen(); },
     "geraet-neu": () => {
       const typ = $("#g-typ").value, n = $("#g-name").value.trim() || (S.hygiene.geraetetypen.find((t) => t.id === typ) || {}).name;
@@ -964,7 +1034,7 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     "ma-speichern": (el) => {
       const p = person(el.dataset.id);
       Object.assign(p, { vorname: $("#m-vor").value.trim() || p.vorname, nachname: $("#m-nach").value.trim(), rolle: $("#m-rolle").value, stammfiliale: $("#m-stamm").value,
-        wochenstunden: Number($("#m-std").value) || 0, springer: $("#m-springer").checked, aktiv: $("#m-aktiv").checked,
+        wochenstunden: Number($("#m-std").value) || 0, stundenEinheit: $("#m-einheit").value, urlaubsanspruch: Number($("#m-urlaub").value) || 0, urlaubUebertrag: Number($("#m-uebertrag").value) || 0, bildungsurlaub: Number($("#m-bildung").value) || 0, springer: $("#m-springer").checked, aktiv: $("#m-aktiv").checked,
         einsatzfilialen: [...document.querySelectorAll("[data-einsatz]")].filter((x) => x.checked).map((x) => x.dataset.einsatz).filter((x) => x !== $("#m-stamm").value) });
       speichern(); meldung("Gespeichert"); gehe("ma");
     },
@@ -1147,6 +1217,12 @@ const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in
     else if (el.dataset.act === "geraet-status") { S.hygiene.geraete.find((g) => g.id === el.dataset.id).status = el.value; speichern(); zeichnen(); }
     else if (el.dataset.act === "uhrzeit") { const k = `${el.dataset.r}|${FIL().id}`; S.hygiene.zuteilung[k] = { ...(S.hygiene.zuteilung[k] || { status: "aktiv" }), uhrzeit: el.value || null }; speichern(); meldung("Uhrzeit gespeichert"); }
     else if (el.dataset.oz) { const [fid, t, i] = el.dataset.oz.split("|"); const f = filiale(fid); const z = f.oeffnung[t] ? [...f.oeffnung[t]] : ["10:00", "19:00"]; z[i] = el.value; f.oeffnung[t] = z[0] && z[1] ? z : null; speichern(); zeichnen(); }
+    else if (el.id === "ab-von" || el.id === "ab-bis") {
+      const von = $("#ab-von").value, bis = $("#ab-bis").value, art = L.abwArt(abwArtWahl), t = $("#ab-tage");
+      if (t && art.konto && von && bis && bis >= von) { const n = L.urlaubsTage(von, bis, S.parameter.urlaubTage), k = L.urlaubskonto(S, ICH(), von.slice(0, 4), heute(), art.konto);
+        t.textContent = `${n} Arbeitstage · Rest danach ${k.rest - k.beantragt - n} Tage${k.rest - k.beantragt - n < 0 ? " (reicht nicht)" : ""}`; }
+      else if (t) t.textContent = "";
+    }
     else if (el.dataset.mx) {
       const [i, k] = el.dataset.mx.split("|"), b = FIL().matrix[matrixTyp][Number(i)];
       if (k === "von" || k === "bis") { if (el.value) b[k] = el.value; }

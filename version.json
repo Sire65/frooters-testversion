@@ -1,9 +1,10 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "datum": "2026-11-04",
   "stufe": "DEV",
   "neu": [
-    "Pinnwand wie in der Club-App: Farben, Empfänger, wichtig, Lesebestätigung, Antworten, Erinnern, Abnehmen, Admin-Einstellungen",
-    "Besetzung: grafische Wochenübersicht, Lückenliste und Besetzungsmatrix mit Vorgaben für Shopleitung, Stellvertretung, Mitarbeiter und Aushilfen"
+    "Stundenumfang je Mitarbeiter (Woche oder Monat), beim Einplanen über den Umfang kommt die Frage „Trotzdem einplanen?“",
+    "Abwesenheit statt Krank und Urlaub: Urlaub, Krankmeldung, Kind krank, Bildungsurlaub und mehr, mit Urlaubskonto",
+    "Urlaubsübersicht für die Leitung mit Filter nach Filialen und Art: Kalender, Urlaubskonten, Liste"
   ]
 }

@@ -199,3 +199,19 @@ table.mx th { font-size: .75rem; color: var(--muted); text-align: left; padding:
 table.mx td { padding: 3px; }
 table.mx input { padding: 6px; min-width: 52px; }
 table.mx input[type=time] { min-width: 92px; }
+
+/* Urlaubskonto und Urlaubsübersicht */
+.konto { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; }
+.konto > div { background: var(--tint); border-radius: 12px; padding: 8px 10px; display: grid; }
+.konto small { color: var(--muted); font-size: .78rem; } .konto b { font-family: var(--f-display); font-size: 1.4rem; }
+.konto .rot { background: var(--red-soft); } .konto .gelb { background: var(--amber-soft); }
+.rot-txt { color: var(--red); }
+table.ukal { border-collapse: separate; border-spacing: 1px; font-size: .72rem; }
+table.ukal th { padding: 2px 4px; white-space: nowrap; font-weight: 700; text-align: left; }
+table.ukal thead th { text-align: center; min-width: 22px; } table.ukal thead small, table.ukal tbody th small { display: block; font-weight: 400; color: var(--muted); }
+table.ukal td { width: 22px; height: 24px; text-align: center; border-radius: 4px; background: var(--tint); }
+.u-so { opacity: .5; }
+.u-urlaub, .u-sonderurlaub, .u-unbezahlt, .u-freizeitausgleich { background: #cfeab2 !important; } .u-krank, .u-kind_krank { background: #f7b5c2 !important; }
+.u-bildungsurlaub, .u-schule { background: #d4e4f5 !important; } .u-antrag { background: #ffe3a3 !important; } .u-abw { background: #e2e3d6 !important; }
+.u-summe td { background: transparent; font-weight: 700; } .u-viel { color: var(--red); }
+.legende > span[class^="u-"] { border-radius: 99px; padding: 2px 10px; font-weight: 700; color: #1d1d1b; }

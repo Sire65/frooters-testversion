@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v5";
+  const SCHLUESSEL = "frooters_demo_v6";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -40,7 +40,7 @@
       rr: { einsatz: [B("00:00", "23:59", 2, 0, 1, 1)] },
     };
     for (const f of filialen) f.matrix = MATRIX[f.id];
-    const P = (vorname, nachname, rolle, stamm, extra) => Object.assign({ id: id("p"), vorname, nachname, rolle, stammfiliale: stamm, springer: false, einsatzfilialen: [], wochenstunden: 30, pin: "1234", aktiv: true }, extra || {});
+    const P = (vorname, nachname, rolle, stamm, extra) => Object.assign({ id: id("p"), vorname, nachname, rolle, stammfiliale: stamm, springer: false, einsatzfilialen: [], wochenstunden: 30, stundenEinheit: "woche", urlaubsanspruch: 30, urlaubUebertrag: 0, bildungsurlaub: 5, pin: "1234", aktiv: true }, extra || {});
     // Bezirksleitung macht laut Fragebogen der Inhaber selbst. Eine feste Person pflegt Rezepte und Hygiene, ein externer Berater liest mit.
     const personen = [
       P("Inhaber", "(Demo)", "zentrale", null, { wochenstunden: 0 }),
@@ -50,18 +50,18 @@
       P("Tom", "Krüger", "stv", "och", { wochenstunden: 35 }),
       P("Lena", "Hoffmann", "mitarbeiter", "och", { wochenstunden: 25 }),
       P("Leonie", "Fischer", "mitarbeiter", "och", { wochenstunden: 20 }),
-      P("Jonas", "Wagner", "aushilfe", "och", { wochenstunden: 12, springer: true, einsatzfilialen: ["rr", "osn"] }),
+      P("Jonas", "Wagner", "aushilfe", "och", { stundenEinheit: "monat", urlaubsanspruch: 20, wochenstunden: 40, springer: true, einsatzfilialen: ["rr", "osn"] }),
       P("Anna", "Wolf", "shopleitung", "obh", { wochenstunden: 38 }),
       P("Lukas", "Braun", "mitarbeiter", "obh", { wochenstunden: 30 }),
       P("Can", "Öztürk", "mitarbeiter", "obh", { wochenstunden: 20 }),
-      P("Emma", "Neumann", "aushilfe", "obh", { wochenstunden: 10, springer: true, einsatzfilialen: ["rr"] }),
+      P("Emma", "Neumann", "aushilfe", "obh", { stundenEinheit: "monat", urlaubsanspruch: 20, wochenstunden: 35, springer: true, einsatzfilialen: ["rr"] }),
       P("Mehmet", "Yilmaz", "shopleitung", "sin", { wochenstunden: 38 }),
       P("Julia", "Schmitz", "stv", "sin", { wochenstunden: 32 }),
       P("Paul", "Richter", "mitarbeiter", "sin", { wochenstunden: 25 }),
-      P("Sophie", "Klein", "aushilfe", "sin", { wochenstunden: 12 }),
+      P("Sophie", "Klein", "aushilfe", "sin", { stundenEinheit: "monat", urlaubsanspruch: 20, wochenstunden: 45 }),
       P("Nina", "Vogel", "shopleitung", "osn", { wochenstunden: 38 }),
       P("Ben", "Hartmann", "mitarbeiter", "osn", { wochenstunden: 30 }),
-      P("Mia", "Schulz", "aushilfe", "osn", { wochenstunden: 12, springer: true, einsatzfilialen: ["och", "rr"] }),
+      P("Mia", "Schulz", "aushilfe", "osn", { stundenEinheit: "monat", urlaubsanspruch: 20, wochenstunden: 40, springer: true, einsatzfilialen: ["och", "rr"] }),
     ];
     const pid = (vorname) => personen.find((p) => p.vorname === vorname).id;
 
@@ -139,7 +139,7 @@
     ];
 
     const state = {
-      version: 5, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 6, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
       betreiber: [
         { id: "gm", name: "Genussmanufaktur (eigene Filialen)", art: "eigen", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: { antrag: true }, pruefung: {}, freigegeben: false },
@@ -154,6 +154,14 @@
     state.wuensche.push({ id: id("w"), personId: pid("Lena"), datum: L.plusTage(naechste, 1), art: "nicht", schicht: "egal", notiz: "Arzttermin" });
     state.wuensche.push({ id: id("w"), personId: pid("Mia"), datum: L.plusTage(mo, 11), art: "moechte", schicht: "spaet", notiz: "Road Runner Stadtfest" });
     state.wuensche.push({ id: id("w"), personId: pid("Jonas"), datum: L.plusTage(naechste, 5), art: "moechte", schicht: "frueh", notiz: "" });
+    // Urlaub dieses Jahres (genommen) und Übertrag, für das Urlaubskonto
+    const jahr = heuteIso.slice(0, 4);
+    const U = (vorname, von, bis, art, status) => state.abwesenheiten.push({ id: id("a"), personId: pid(vorname), art: art || "urlaub", von: `${jahr}-${von}`, bis: `${jahr}-${bis}`, status: status || "genehmigt", notiz: "" });
+    U("Lena", "03-02", "03-13"); U("Lena", "07-20", "07-31"); U("Sandra", "05-11", "05-22"); U("Sandra", "08-17", "08-28"); U("Tom", "06-01", "06-12");
+    U("Leonie", "09-07", "09-11"); U("Anna", "04-06", "04-17"); U("Mehmet", "07-06", "07-24"); U("Nina", "10-12", "10-23"); U("Ben", "02-16", "02-20");
+    U("Tom", "11-23", "11-25", "bildungsurlaub", "beantragt");
+    U("Lena", "12-21", "12-24", "urlaub", "beantragt");
+    state.personen.find((x) => x.vorname === "Sandra").urlaubUebertrag = 3;
     state.abwesenheiten.push({ id: id("a"), personId: pid("Paul"), art: "urlaub", von: L.plusTage(naechste, 2), bis: L.plusTage(naechste, 4), status: "beantragt", notiz: "Familienfeier" });
     // Plan dieser Woche automatisch füllen und veröffentlichen
     // erst alle Filialen mit eigenem Team, dann Lücken mit Springern füllen

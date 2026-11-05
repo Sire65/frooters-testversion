@@ -85,9 +85,61 @@
     if (p.springer) (p.einsatzfilialen || []).forEach((f) => s.add(f));
     return [...s].filter(Boolean);
   }
+  // Arten der Abwesenheit (Registry): Krank und Kind krank gelten sofort, alles andere nach Genehmigung durch die Leitung
+  const ABW_ARTEN = {
+    urlaub: { name: "Urlaub", sym: "🏖️", genehmigung: true, konto: "urlaub" },
+    krank: { name: "Krankmeldung", sym: "🤒", genehmigung: false },
+    kind_krank: { name: "Kind krank", sym: "🧸", genehmigung: false },
+    bildungsurlaub: { name: "Bildungsurlaub", sym: "🎓", genehmigung: true, konto: "bildung" },
+    sonderurlaub: { name: "Sonderurlaub", sym: "💐", genehmigung: true },
+    freizeitausgleich: { name: "Freizeitausgleich", sym: "⏳", genehmigung: true },
+    schule: { name: "Schule / Berufsschule", sym: "📚", genehmigung: true },
+    unbezahlt: { name: "Unbezahlter Urlaub", sym: "💤", genehmigung: true },
+  };
+  const abwArt = (a) => ABW_ARTEN[a] || { name: a, sym: "•", genehmigung: true };
+  function abwGilt(a) { return a.status !== "zurueckgezogen" && a.status !== "abgelehnt" && (abwArt(a.art).genehmigung ? a.status === "genehmigt" : true); }
   function abwesenheitAm(state, personId, datum) {
-    return (state.abwesenheiten || []).find((a) => a.personId === personId && zwischen(datum, a.von, a.bis) &&
-      (a.art === "krank" || a.status === "genehmigt"));
+    return (state.abwesenheiten || []).find((a) => a.personId === personId && zwischen(datum, a.von, a.bis) && abwGilt(a));
+  }
+  // Urlaubstage eines Zeitraums: Arbeitstage nach Parameter (Standard Mo–Fr, also 5-Tage-Woche)
+  function urlaubsTage(von, bis, zaehlen) {
+    const tage = zaehlen === "mo-sa" ? ["mo", "di", "mi", "do", "fr", "sa"] : ["mo", "di", "mi", "do", "fr"];
+    let n = 0;
+    for (let d = von; d <= bis; d = plusTage(d, 1)) if (tage.includes(wochentag(d))) n++;
+    return n;
+  }
+  // Konto je Person und Jahr: Anspruch + Übertrag, genommen (vor heute), geplant (ab heute), beantragt, Rest
+  function urlaubskonto(state, p, jahr, heute, konto) {
+    const k = konto || "urlaub";
+    const zaehlen = ((state.parameter || {}).urlaubTage) || "mo-fr";
+    const anspruch = k === "bildung" ? (p.bildungsurlaub != null ? p.bildungsurlaub : 5) : (p.urlaubsanspruch != null ? p.urlaubsanspruch : 30);
+    const uebertrag = k === "bildung" ? 0 : (p.urlaubUebertrag || 0);
+    let genommen = 0, geplant = 0, beantragt = 0;
+    for (const a of state.abwesenheiten || []) {
+      if (a.personId !== p.id || abwArt(a.art).konto !== k) continue;
+      const von = a.von < `${jahr}-01-01` ? `${jahr}-01-01` : a.von, bis = a.bis > `${jahr}-12-31` ? `${jahr}-12-31` : a.bis;
+      if (von > bis) continue;
+      if (a.status === "genehmigt") {
+        if (bis < heute) genommen += urlaubsTage(von, bis, zaehlen);
+        else if (von >= heute) geplant += urlaubsTage(von, bis, zaehlen);
+        else { genommen += urlaubsTage(von, plusTage(heute, -1), zaehlen); geplant += urlaubsTage(heute, bis, zaehlen); }
+      } else if (a.status === "beantragt") beantragt += urlaubsTage(von, bis, zaehlen);
+    }
+    return { anspruch, uebertrag, genommen, geplant, beantragt, rest: anspruch + uebertrag - genommen - geplant };
+  }
+  // Stundenumfang: geplante Stunden in der Woche oder im Monat (je nach Vertrag) mit einer zusätzlichen Schicht
+  function stundenImMonat(state, personId, datum) {
+    const monat = datum.slice(0, 7);
+    let min = 0;
+    for (const s of state.plan || []) if (s.personId === personId && s.datum.slice(0, 7) === monat) { const z = planZeit(state, s); if (z) min += z.ende - z.start; }
+    return min / 60;
+  }
+  function stundenStand(state, p, datum, zusatzMin) {
+    const einheit = p.stundenEinheit === "monat" ? "monat" : "woche";
+    const ist = einheit === "monat" ? stundenImMonat(state, p.id, datum) : stundenInWoche(state, p.id, montag(datum));
+    const neu = Math.round((ist + (zusatzMin || 0) / 60) * 10) / 10;
+    const soll = p.wochenstunden || 0;
+    return { einheit, soll, ist: Math.round(ist * 10) / 10, neu, ueber: soll > 0 && neu > soll };
   }
 
   // ---------- Einsatzplanung ----------
@@ -143,11 +195,12 @@
         else if (w.art === "moechte") { punkte += 3; gruende.push("möchte"); }
         else if (w.art === "kann") { punkte += 1; gruende.push("kann"); }
       }
+      const stand = stundenStand(state, p, datum, z ? z.ende - z.start : 0);
       const std = stundenInWoche(state, p.id, mo);
-      const soll = p.wochenstunden || 0;
-      if (soll && std >= soll) { punkte -= 3; gruende.push(`schon ${std} von ${soll} Std.`); }
+      if (stand.soll && stand.ist >= stand.soll) { punkte -= 3; gruende.push(`Stunden voll: ${stand.ist} von ${stand.soll} Std. ${stand.einheit === "monat" ? "im Monat" : "in der Woche"}`); }
+      else if (stand.ueber) { punkte -= 2; gruende.push(`käme auf ${stand.neu} von ${stand.soll} Std. ${stand.einheit === "monat" ? "im Monat" : "in der Woche"}`); }
       if (p.stammfiliale !== filialeId) { punkte -= 1; gruende.push("Springer"); }
-      return { person: p, moeglich, punkte, stunden: std, gruende };
+      return { person: p, moeglich, punkte, stunden: std, stand, gruende };
     }).sort((a, b) => (b.moeglich - a.moeglich) || (b.punkte - a.punkte) || (a.stunden - b.stunden) || a.person.vorname.localeCompare(b.person.vorname));
   }
   function abdeckung(state, filialeId, datum, schichtId) {
@@ -173,7 +226,7 @@
           const z = schichtZeit(f, datum, sch.id);
           const gr = besetzungTag(arbeit, filialeId, datum).slots.filter((x) => z && x.m >= z.start && x.m < z.ende).flatMap((x) => x.gruende).join(" ");
           const brauchtLeitung = /Shopleitung|Leitung/.test(gr), brauchtFest = /feste Mitarbeiter/.test(gr) || /zu viele Aushilfen/.test(gr);
-          const ks = kandidaten(arbeit, filialeId, datum, sch.id).filter((x) => x.moeglich && x.punkte > -3 && (!nurStamm || x.person.stammfiliale === filialeId));
+          const ks = kandidaten(arbeit, filialeId, datum, sch.id).filter((x) => x.moeglich && x.punkte > -3 && !x.stand.ueber && (!nurStamm || x.person.stammfiliale === filialeId));
           const k = (brauchtLeitung && ks.find((x) => x.person.rolle === "shopleitung" || x.person.rolle === "stv")) || (brauchtFest && ks.find((x) => x.person.rolle !== "aushilfe")) || ks[0];
           if (!k) break;
           const s = { id: neueId(), filiale: filialeId, datum, schicht: sch.id, personId: k.person.id, quelle: "vorschlag" };
@@ -284,8 +337,8 @@
     if (tagMin > maxTag) gruende.push(`käme über ${maxTag / 60} Std. am Tag`);
     const w = wunschAm(state, p.id, datum);
     if (w && w.art === "nicht") hinweise.push("hat für den Tag „kann nicht“ angegeben");
-    const soll = p.wochenstunden || 0, std = stundenInWoche(state, p.id, montag(datum));
-    if (soll && std + (zeit.ende - zeit.start) / 60 > soll) hinweise.push(`käme auf ${Math.round((std + (zeit.ende - zeit.start) / 60) * 10) / 10} von ${soll} Std.`);
+    const st = stundenStand(state, p, datum, zeit.ende - zeit.start);
+    if (st.ueber) hinweise.push(`käme auf ${st.neu} von ${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}`);
     return { gruende, hinweise };
   }
   function tauschPruefen(state, angebot, nehmerId, gegenId) {
@@ -658,6 +711,7 @@
   return {
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
+    ABW_ARTEN, abwArt, abwGilt, urlaubsTage, urlaubskonto, stundenImMonat, stundenStand,
     planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
     matrixTyp, bedarfBloecke, slotPruefen, besetzungTag, besetzungsLuecken, passendeSchicht,
     PIN_STANDARD, pinEinstellungen, pinEmpfaenger, pinAktiv, pinSichtbar, pinStand, pinUngelesen, pinEigeneAktiv, pinErinnern,
