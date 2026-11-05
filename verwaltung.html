@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frooters Verwaltung · PC-Version</title>
+<style>
+:root{--sage:#a3a983;--sage-soft:#eceee2;--rot:#c10230;--rot-soft:#fbe5ea;--gruen:#76bc21;--gruen-dk:#4f8a12;--gruen-soft:#eef6e2;--gelb:#a86a00;--gelb-soft:#fdf0db;--ink:#1d1d1b;--muted:#5d604f;--line:#e2e3d6;--bg:#fafaf6;--weiss:#fff}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Didact Gothic","Segoe UI",Arial,sans-serif;line-height:1.5}
+h1,h2,h3{font-family:Arvo,Rockwell,Georgia,serif;margin:0;line-height:1.2}
+.band{background:var(--sage);padding:28px max(16px,4vw)} .band .in{max-width:1240px;margin:0 auto;display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
+.band .plate{background:#fff;border-radius:14px;padding:10px 16px} .band .plate img{height:56px;display:block}
+.band h1{color:#fff;font-size:clamp(1.6rem,3.6vw,2.4rem)} .band p{color:#fff;margin:4px 0 0;max-width:70ch}
+.wrap{max-width:1240px;margin:0 auto;padding:28px max(16px,4vw) 60px;display:grid;gap:40px}
+.eyebrow{font-weight:700;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rot)}
+.intro{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:24px;align-items:center} .intro img{width:150px}
+.intro p{margin:.5em 0 0;max-width:75ch}
+/* PC-Fenster */
+.pc{min-width:0;background:#2b2b28;border-radius:14px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.18)}
+.pc-leiste{display:flex;gap:6px;align-items:center;padding:2px 6px 10px} .pc-leiste i{width:11px;height:11px;border-radius:50%;background:#e0605a;display:block} .pc-leiste i:nth-child(2){background:#e3b341} .pc-leiste i:nth-child(3){background:#5fbf4f}
+.pc-leiste span{margin-left:12px;background:#43433f;color:#d8d8d0;border-radius:6px;padding:2px 12px;font-size:12px;flex:1;max-width:420px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.scroller{overflow-x:auto;border-radius:8px}
+.fenster{min-width:1080px;background:var(--bg);display:grid;grid-template-columns:220px minmax(0,1fr);height:720px;font-size:13.5px}
+nav.seite{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px 10px;gap:2px}
+nav.seite img{height:34px;margin:0 6px 14px;align-self:flex-start}
+nav.seite button{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;color:var(--ink)} nav.seite button:hover{background:var(--sage-soft)}
+nav.seite button.an{background:var(--rot-soft);color:var(--rot);font-weight:700}
+nav.seite button:focus-visible{outline:2px solid var(--gruen)}
+nav.seite .ich{margin-top:auto;display:flex;gap:8px;align-items:center;padding:8px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.kreis{width:28px;height:28px;border-radius:50%;background:var(--rot);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.haupt{display:flex;flex-direction:column;min-width:0}
+.kopf{display:flex;gap:12px;align-items:center;padding:12px 20px;background:#fff;border-bottom:3px solid var(--sage)}
+.kopf h2{font-size:20px} .kopf .such{margin-left:auto;border:1px solid var(--line);border-radius:99px;padding:5px 14px;color:var(--muted);width:240px;background:var(--bg)}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 10px;font-size:12px;border:1px solid var(--line);background:#fff;white-space:nowrap}
+.chip.g{background:var(--gruen-soft);color:var(--gruen-dk);border-color:#cfe5b3;font-weight:700} .chip.r{background:var(--rot-soft);color:var(--rot);border-color:#f2c2cd;font-weight:700} .chip.y{background:var(--gelb-soft);color:var(--gelb);border-color:#f0d9ab;font-weight:700} .chip.s{background:var(--sage-soft);color:var(--muted)}
+.btn{border-radius:99px;padding:6px 14px;font-weight:700;font-size:12.5px;background:var(--rot);color:#fff;border:0;white-space:nowrap} .btn.h{background:var(--gruen-soft);color:var(--gruen-dk)}
+.inhalt{flex:1;overflow:auto;padding:16px 20px;display:none;gap:14px}
+.inhalt.an{display:grid;align-content:start}
+.zwei{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);gap:16px;align-items:start}
+.karte{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start;min-width:0;overflow-x:auto}
+.zwei.ma{grid-template-columns:minmax(0,1.7fr) minmax(330px,1fr)} .zwei.ma table{font-size:12px} .zwei.ma>.karte:first-child{display:block} .zwei.ma td:first-child{white-space:nowrap}
+.karte h3{font-size:15px} .klein{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:12.8px} th{text-align:left;color:var(--muted);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle} tr.wahl td{background:var(--gruen-soft)} td.z{text-align:right;font-variant-numeric:tabular-nums}
+.leiste{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.feld{display:grid;gap:4px} .feld label{font-size:11.5px;color:var(--muted);font-weight:700}
+.eing{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--bg)}
+.raster{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opts{display:flex;flex-wrap:wrap;gap:6px} .opt{border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:12px;background:#fff} .opt.an{background:var(--gruen-soft);border-color:var(--gruen);color:var(--gruen-dk);font-weight:700}
+.schalt{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--gelb-soft)} .schalt b.knopf{width:34px;height:20px;border-radius:99px;background:var(--gruen);position:relative;flex:none} .schalt b.knopf::after{content:"";position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+.punkt{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--rot);vertical-align:middle} .punkt.sp{background:#fff;border:2px solid var(--rot)}
+.weg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.weg .karte.emp{border:2px solid var(--gruen)}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px} .kpi .karte b{font-size:26px;font-family:Arvo,Georgia,serif}
+.hinweis{background:var(--gelb-soft);border-radius:10px;padding:10px 12px;font-size:12.5px}
+/* Text unten */
+.abschnitt{display:grid;gap:12px} .abschnitt h2{font-size:1.5rem}
+.stufen{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stufen .karte b{color:var(--rot);font-family:Arvo,Georgia,serif}
+ol.fragen{margin:0;padding-left:1.3em;display:grid;gap:6px;max-width:80ch}
+.fuss{color:var(--muted);font-size:.9rem}
+@media (max-width:700px){.intro{grid-template-columns:1fr}.intro img{width:110px}}
+</style></head>
+<body>
+<header class="band"><div class="in"><div class="plate"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDIyLjEuMCwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8IURPQ1RZUEUgc3ZnIFBVQkxJQyAiLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4iICJodHRwOi8vd3d3LnczLm9yZy9HcmFwaGljcy9TVkcvMS4xL0RURC9zdmcxMS5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHdpZHRoPSIzNzZweCIgaGVpZ2h0PSIxMzcuM3B4IiB2aWV3Qm94PSIwIDAgMzc2IDEzNy4zIiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAzNzYgMTM3LjM7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KPHN0eWxlIHR5cGU9InRleHQvY3NzIj4KCS5zdDB7ZmlsbDojQTNBOTgzO30KCS5zdDF7ZmlsbDojQzEwMjMwO30KCS5zdDJ7ZmlsbDojNzZCQzIxO30KCS5zdDN7ZmlsbDojMUQxRDFCO30KPC9zdHlsZT4KPGc+Cgk8Zz4KCQk8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMzUzLDQxLjRjLTEtMC4xLTAuOSwwLjQsMCwwLjVjMTAuNCwxLjQsOS40LDQuMSw0LDVjLTYuNCwxLTE0LjcsMS41LTMwLjcsMS41Yy03LjYsMC0xMy44LTAuMy0xOS44LTAuNgoJCQljMC0wLjMtMC4xLTAuNy0wLjEtMUMzMDQuNiwyMS4xLDMxMi45LDYsMzI0LjgsNmMzLjgsMCw3LjMsMC45LDEwLjYsMy41YzAuMSwwLjEsMC40LTAuMSwwLjItMC4zYy0zLjctMy44LTcuNC01LjItMTItNS4yCgkJCWMtMTAuMSwwLTI0LjgsMTEuOS0yMy42LDQzLjVsMCwwYzAsMCwwLDAsMCwwYzAsMC41LDAsMSwwLDEuNWMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMGM3LjMsMC42LDE2LjQsMC45LDI2LjEsMC45CgkJCWMxNy40LDAsMzIuNS0xLjEsMzkuNi0yLjdjLTUuNSwxNS45LTIxLjIsMjcuNC0zOS42LDI3LjRzLTM0LTExLjUtMzkuNi0yNy40YzIuMSwwLjUsNC45LDAuOSw4LjMsMS4zYy0wLjEtMi4zLDAtNC42LDAuMS02LjcKCQkJYy03LjgsMC45LTEzLjgsMi0xMy41LDMuM2gwYzQuOSwxOC45LDIzLjUsMzMuNyw0NC43LDMzLjdjMjEuMiwwLDM5LjgtMTQuOCw0NC43LTMzLjdsMCwwQzM3MS4zLDQzLjcsMzYzLjcsNDIuMywzNTMsNDEuNHoiLz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MSIgZD0iTTM0Ny45LDM3LjljNS4zLTYuNywxLjYtMTIuOC0xLjMtMTUuMWMtNC4xLTMuMy05LjktMS41LTkuOS0xLjVzMCwwLDAsMGMwLDAsMCwwLDAsMHMwLjUtNi0zLjYtOS4zCgkJCQljLTIuOS0yLjMtOS43LTQuNi0xNSwyLjFjLTkuNiwxMi4xLTEuOCwyNy4yLDEsMjkuNGwwLDB2MGMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMEMzMjEuOCw0NS44LDMzOC4zLDUwLDM0Ny45LDM3Ljl6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik0zNDkuMSwxNS43YzQtNCwzLjctMTAuOSwzLjctMTAuOXMtNi45LTAuNC0xMC45LDMuNmMtNCw0LTMuNywxMC45LTMuNywxMC45UzM0NS4xLDE5LjcsMzQ5LjEsMTUuN3oiLz4KCQk8L2c+Cgk8L2c+Cgk8Zz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MyIgZD0iTTI5Ni44LDExNC40Yy0xLjgtNy42LTEwLjMtOS40LTE2LjgtMTNjLTkuOC01LjMtNi4xLTE4LjUsNi40LTE2LjVjMS42LDAuMywzLjgsMS41LDUuMSwxLjMKCQkJCWMwLjctMy4yLTIuMi03LTQuNC04LjVjLTQuOC0zLjMtMTEuOC0yLjctMTguMSwxLjNjLTQuNiwyLjktMTAuMSw3LjItMTQuOCwxMi43YzAuMy0zLjQsMi40LTYuNCwxLjEtMTAuNAoJCQkJYy0wLjgtMi4zLTYuNi04LjMtOS41LTUuMmMtMC4zLDguOC0wLjksMTcuNy0zLjUsMjIuOWMtNC4yLDguNi0xNy4yLDI3LjMtMjcuNiwyNS40Yy0yLTAuNC0zLjQtMy45LTMuNy02LjgKCQkJCWM4LjctNi43LDI3LjEtMjIuNywyMi4zLTMzLjJjLTEuMS0yLjMtNS40LTUuNy03LjItNi41Yy0xMC00LjUtMjIuNSw2LjItMjUuNSwyMy41Yy0wLjcsNC0wLjUsMTEuNSwwLjgsMTYuNAoJCQkJYy01LjIsNC03LjQsNS42LTkuNiw0LjljLTUtMS44LTQuOC03LjQtNC44LTEwLjZjMC05LjEsNi41LTI2LDEyLjgtMzljMTMtMSwyNS44LTQsMzcuMi05LjFjMS4yLTAuNSwyLjctMS4yLDQuNC0yLjEKCQkJCWMxLjYtMC45LDMuMy0yLjIsNC44LTMuOGMwLjYtMC43LDAuNy0xLjMsMC41LTEuN2MtMC4xLTAuMi0wLjItMC40LTAuMy0wLjVjLTAuMS0wLjEtMC4xLTAuMS0wLjItMC4xYzAsMC0wLjItMC4xLTAuMi0wLjEKCQkJCWwtMC4xLDAuMWMtMTMuNSw1LjktMjcuOCw5LTQyLjMsMTAuMWMyLjUtNS4zLDcuNS0xMy44LDcuNS0xNC40YzAtMC42LTAuOS0xLjItMC45LTEuMmMtOS40LTcuNy0xNi4yLDUuMy0yMS4zLDE1LjkKCQkJCWMtNi0wLjItMTIuMi0wLjctMTguMS0xLjVjMCwwLTEuMSwwLjMtMS42LDMuOWMtMC4yLDEuOCwwLjksMi44LDIuMywzLjRjMC43LDAuMywxLjUsMC40LDIuNCwwLjZjMC45LDAuMSwxLjgsMC4yLDIuOCwwLjMKCQkJCWMzLDAuMyw2LDAuNSw5LjEsMC42Yy0xLjQsMy44LTIuNyw4LjEtNCwxMi42Yy01LjYsOS41LTEwLjEsOC40LTEwLjEsOC40YzAuMS0xLjUtMC4yLTMuMi0wLjktNC40Yy0zLjMtNi42LTEwLjEtNC43LTEwLjEtNC44CgkJCQljMC40LTAuNCwyLjQtMS4zLDIuNi0xLjVjMC4xLTAuMSwwLjEtMC4yLDAuMS0wLjJjLTAuNC0yLjktNS4yLTUuNi04LjEtNi4yYy0yLjctMC42LTUuMiwxLTYuNiwxLjkKCQkJCWMtOS40LDYuNC0xOS42LDI4LjgtMTEuMSw0NC44YzMuMiw2LDEyLjQsOC41LDE5LjQsMy44YzcuMi00LjksMTMuNC0xNSwxNC4yLTI3LjZjMCwwLDQuMy0wLjMsOC0zLjFjLTMuNCwxNi43LTIsMjguNCw1LjIsMzEuNwoJCQkJYzYuMSwyLjgsMTAuNCwwLjksMTktNS42YzMuNyw2LjUsNy4zLDcuMiwxMi4yLDYuOWMxNC4xLTAuNywyNC41LTE3LjUsMjQuNS0xNy41YzAsMC0xLjEsNC41LTEuOSw4LjVjLTAuOCw0LTEuNyw4LjksMi40LDguOAoJCQkJYzQtMC4xLDcuMy0yLjksNy4zLTIuOWMxLjgtNC4zLDMuNC0xMS42LDUuNy0yMC45YzMuMi03LjgsNy44LTE0LjQsMTEuNC0xNy4xYy0yLjgsNy4zLDIuMSwxMi4yLDUuNSwxNC40CgkJCQljMy45LDIuNSw2LjksMy40LDExLjUsNi45YzEwLjksOC4xLTQuNiwxOC44LTE4LjEsMTQuNmMtMi40LDAuOC0xLjMsMy4zLDAuNCw0LjNjNS4yLDIuOSwxNS4yLDQuNSwyNC40LTAuMwoJCQkJQzI5NS45LDEyNS40LDI5OC4yLDEyMC42LDI5Ni44LDExNC40eiBNMTU2LjMsMTIxLjFjLTEuNCwyLTQuNyw1LjMtOC4xLDMuMmMtMy4yLTItMy45LTguNi0zLjEtMTMuN2MxLjUtOS4yLDQuNi0xOC4yLDExLjItMjIuNgoJCQkJYy0wLjUsMi44LTAuOSw5LjIsOCwxMkMxNjMuNCwxMDcuOCwxNjAuOCwxMTQuOCwxNTYuMywxMjEuMXogTTIyOC4xLDg2LjhjMywzLjQtOS4xLDE3LjEtMTcuOCwyNC4zCgkJCQlDMjA4LjcsOTUuOCwyMjIuNSw4MC4yLDIyOC4xLDg2Ljh6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik0xMTEuNCw4Ni44Yy0xLjUsMS0wLjYsMS40LTAuMSwxLjZjNC4zLDEuNCw3LjksMi42LDkuMiw5LjJjMS41LDcuNS0yLjksMTguMi02LjIsMjMKCQkJCWMtMC45LDEuMy0zLjUsNC41LTYuMSwzLjVjLTIuOS0xLjEtNC4zLTUuMS00LjctOS4zYy0xLjMtMTIuMywyLTIyLjMsNi42LTI4YzUuMi02LjQsOS44LTcuMiw4LjYtOC40CgkJCQljLTIuNy0yLjctMTAuOS0xLjItMTMuMywwLjFjLTMuNSwxLjgtNi4xLDYuMi02LjEsNi4yYy05LjcsNS40LTExLjIsMC42LTE0LTMuNmMtMS40LTIuMi0yLjQtNC0zLjItNC45YzAsMC00LjYsMS41LTUuNSwyLjUKCQkJCWMtMi4zLDIuNi0xLjYsMi42LTEuMiwxMC4xYzAuMiwyLjYsMC40LDMuNiwwLjMsMy43Yy0wLjMsMC4xLTQuNi0xMi43LTE1LjQtMTIuMWMtMy4zLDAuMi0zLjQsMC4zLTYuNywwLjgKCQkJCWMtMC42LTEwLjMtMi4xLTE4LjUtNC45LTIxLjNjLTIuMS0yLTkuMywyLjEtMTEuMSwzLjZjLTEuNSwxLjMtMC44LDIuNy0wLjUsMy40YzIuNSw2LjUsMy43LDEyLDQuMywxN2MtNy44LDIuMi0xNi4zLDQuNy0yMi4yLDcKCQkJCWMtMi4yLDAuOS0xLjksNy42LDAsOS44YzEuNSwxLjcsMy40LDAuNSw1LjItMC4yYzYuOS0yLjcsMTIuNy00LjgsMTcuNi02LjZjMC45LDI3LjktNy44LDQwLjUsMCwzOS41CgkJCQljNy4yLTAuOSwxMC4xLTE3LjQsMTAuOC0yMi44YzAuNy01LjQsMS40LTExLjcsMS4yLTIwLjNjMi0wLjYsMy44LTEuMyw2LjMtMS4yYzE1LjQsMC44LDkuNCwyNi4yLDkuMSwzOC42CgkJCQljLTAuMSw0LjEsNi4zLDIuOCwxMC0wLjZjMC44LTAuNywzLjUtNyw0LjItMjAuOGMwLjMtNS4zLTAuOS0xMi4zLTEuMS0xNi4xYzMuOCw0LDguNSw0LjksMTIuOCwyYy0wLjgsMS44LTIuNyw3LjQtMywxMy42CgkJCQljLTAuOSwxNi44LDEwLjksMjkuNSwyMy40LDIyLjVjMTctOS40LDE4LjItMzMuMSwxNC4xLTM5LjRDMTI0LjksODEuMiwxMTMuNyw4NS4zLDExMS40LDg2Ljh6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik01Ni4yLDQ1LjdjNS43LTEuNiwxMC0yLjUsMTUuNi0xLjJjMywwLjcsNi41LDIuNiw3LjYsNS4zYzIuMSw1LjUtMS40LDEwLTUuOCwxNC40YzAuOCwzLjMsNC45LDIuNCw3LjctMC4xCgkJCQljNy40LTYuNSw4LjMtMTQuNCw2LjQtMTguOWMtMS45LTQuNS02LjMtNy40LTExLjEtOC45QzU1LjksMjkuOCwzMC42LDQwLDkuMSw1Mi44bC0yLjksMS45Yy0xLDIuMSwzLjIsMTQuMiwxMy40LDguMwoJCQkJQzMyLjYsNTUuNiw0NS4xLDQ4LjksNTYuMiw0NS43eiIvPgoJCTwvZz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MyIgZD0iTTI5OS4zLDc5YzAsMi0xLjYsMy41LTMuNiwzLjVjLTIsMC0zLjYtMS42LTMuNi0zLjVjMC0yLDEuNi0zLjUsMy42LTMuNUMyOTcuNyw3NS42LDI5OS4zLDc3LjEsMjk5LjMsNzl6CgkJCQkgTTI5Myw3OWMwLDEuNiwxLjIsMi44LDIuNywyLjhjMS41LDAsMi43LTEuMiwyLjctMi44YzAtMS42LTEuMi0yLjgtMi43LTIuOEMyOTQuMSw3Ni4zLDI5Myw3Ny41LDI5Myw3OXogTTI5NS4xLDgwLjloLTAuOHYtMy41CgkJCQljMC4zLDAsMC44LTAuMSwxLjMtMC4xYzAuNywwLDEsMC4xLDEuMiwwLjNjMC4yLDAuMiwwLjQsMC40LDAuNCwwLjdjMCwwLjQtMC4zLDAuNy0wLjcsMC44djBjMC4zLDAuMSwwLjUsMC40LDAuNiwwLjkKCQkJCWMwLjEsMC41LDAuMiwwLjcsMC4zLDAuOWgtMC45Yy0wLjEtMC4xLTAuMi0wLjQtMC4zLTAuOWMtMC4xLTAuNC0wLjMtMC41LTAuNy0wLjVoLTAuNFY4MC45eiBNMjk1LjEsNzguOWgwLjQKCQkJCWMwLjQsMCwwLjgtMC4xLDAuOC0wLjVjMC0wLjMtMC4yLTAuNS0wLjctMC41Yy0wLjIsMC0wLjQsMC0wLjUsMFY3OC45eiIvPgoJCTwvZz4KCTwvZz4KPC9nPgo8L3N2Zz4K" alt="frooters"></div>
+<div><h1>frooters Verwaltung am PC</h1><p>Konzept: Hier wird alles eingestellt, was die Team-App braucht. Filialen, Mitarbeiter mit Beschäftigungsart, Stundenumfang und Einsatzprofil, Rezepte und Allergene, Sortiment und Bestellung, die Kasse.</p></div></div></header>
+<main class="wrap">
+<section class="intro"><div><div class="eyebrow">Eine App, zwei Oberflächen</div><h2>Am Handy arbeiten, am PC einstellen</h2>
+<p>Die PC-Version ist dieselbe App mit denselben Daten. Ab breitem Bildschirm zeigt sie eine Seitenleiste, große Tabellen und Bearbeiten in mehreren Zeilen. Was am PC geändert wird, sieht das Team sofort auf dem Handy.</p>
+<p class="klein">Alle Namen und Zahlen auf dieser Seite sind Beispiele. Klickt links im Fenster auf die Bereiche.</p></div><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjMwIDMwIDE2NSAxOTAiIHdpZHRoPSI2NjAiIGhlaWdodD0iNzYwIj4KICAgICAgPHBhdGggZD0iTTEwMCA3NCBDMTUwIDc0IDE2OCAxMTIgMTU0IDE1NCBDMTQxIDE5MiAxMTYgMjEyIDEwMCAyMTIgQzg0IDIxMiA1OSAxOTIgNDYgMTU0IEMzMiAxMTIgNTAgNzQgMTAwIDc0IFoiIGZpbGw9IiNjMTAyMzAiLz4KICAgICAgPHBhdGggZD0iTTU2IDE1MCBDNTMgMTM2IDU1IDEyNCA2MSAxMTQiIHN0cm9rZT0iI2UyNDA1ZiIgc3Ryb2tlLXdpZHRoPSI2IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii43Ii8+CiAgICAgIDxnIGZpbGw9IiNmZmQ5YTAiPgogICAgICAgIDxlbGxpcHNlIGN4PSI2NiIgY3k9IjEzMCIgcng9IjIuNiIgcnk9IjMuNiIvPjxlbGxpcHNlIGN4PSIxMzQiIGN5PSIxMzAiIHJ4PSIyLjYiIHJ5PSIzLjYiLz4KICAgICAgICA8ZWxsaXBzZSBjeD0iNTgiIGN5PSIxNTgiIHJ4PSIyLjYiIHJ5PSIzLjYiLz48ZWxsaXBzZSBjeD0iMTQyIiBjeT0iMTU4IiByeD0iMi42IiByeT0iMy42Ii8+CiAgICAgICAgPGVsbGlwc2UgY3g9Ijc4IiBjeT0iMTgyIiByeD0iMi42IiByeT0iMy42Ii8+PGVsbGlwc2UgY3g9IjEyMiIgY3k9IjE4MiIgcng9IjIuNiIgcnk9IjMuNiIvPgogICAgICAgIDxlbGxpcHNlIGN4PSIxMDAiIGN5PSIxOTgiIHJ4PSIyLjYiIHJ5PSIzLjYiLz48ZWxsaXBzZSBjeD0iMTAwIiBjeT0iMTcyIiByeD0iMi42IiByeT0iMy42Ii8+CiAgICAgIDwvZz4KICAgIDxnIHRyYW5zZm9ybT0icm90YXRlKDE2IDEwMCA5OCkiPgogICAgICA8cGF0aCBkPSJNNDcgMTAyIFE0NiA1MCAxMDAgNDYgUTE1NCA1MCAxNTMgMTAyIFExMDAgMTE2IDQ3IDEwMiBaIiBmaWxsPSIjNzZiYzIxIi8+CiAgICAgIDxwYXRoIGQ9Ik0xMDAgNDcgTDEwMCAxMDkiIHN0cm9rZT0iIzFkMWQxYiIgc3Ryb2tlLW9wYWNpdHk9Ii4xOCIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICAgIDxwYXRoIGQ9Ik03NCA1MyBRNjQgNzYgNjYgMTA3IiBzdHJva2U9IiMxZDFkMWIiIHN0cm9rZS1vcGFjaXR5PSIuMTQiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPgogICAgICA8cGF0aCBkPSJNMTI2IDUzIFExMzYgNzYgMTM0IDEwNyIgc3Ryb2tlPSIjMWQxZDFiIiBzdHJva2Utb3BhY2l0eT0iLjE0IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICAgICAgPHBhdGggZD0iTTQ3IDk0IFExMDAgMTA4IDE1MyA5NCBMMTUzIDEwMiBRMTAwIDExNiA0NyAxMDIgWiIgZmlsbD0iIzFkMWQxYiIgZmlsbC1vcGFjaXR5PSIuMjIiLz4KICAgICAgPHBhdGggZD0iTTE0MCA5OSBRMTUxIDExNSAxMjYgMTExIFoiIGZpbGw9IiMxZDFkMWIiIGZpbGwtb3BhY2l0eT0iLjEyIi8+CiAgICAgIDxwYXRoIGQ9Ik0xMzAgOTkgUTE2MCA5MCAxODAgMTAyIFExNzkgMTE0IDE2MiAxMTYgUTE0NCAxMTcgMTI3IDExMCBaIiBmaWxsPSIjYTNhOTgzIi8+CiAgICAgIDxwYXRoIGQ9Ik0xMzQgMTAxIFExNjAgOTUgMTc2IDEwNCIgc3Ryb2tlPSIjMWQxZDFiIiBzdHJva2Utb3BhY2l0eT0iLjE1IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICAgICAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNDciIHI9IjUiIGZpbGw9IiNmZmZmZmYiLz4KICAgICAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNzYiIHI9IjkiIGZpbGw9IiNmZmZmZmYiLz4KICAgICAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNzcuNSIgcj0iNS42IiBmaWxsPSIjYzEwMjMwIi8+CiAgICAgIDxwYXRoIGQ9Ik0xMDAgNzIgUTEwNCA2NyAxMDggNjkiIHN0cm9rZT0iIzc2YmMyMSIgc3Ryb2tlLXdpZHRoPSIyLjQiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPC9nPjxlbGxpcHNlIGN4PSI4MCIgY3k9IjEyMCIgcng9IjExIiByeT0iMTIiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSI4MyIgY3k9IjEyMSIgcj0iNS41IiBmaWxsPSIjMWQxZDFiIi8+PGNpcmNsZSBjeD0iODUiIGN5PSIxMTguNSIgcj0iMS44IiBmaWxsPSIjZmZmIi8+CjxwYXRoIGQ9Ik0xMTAgMTIxIFExMjAgMTEzIDEzMCAxMjEiIHN0cm9rZT0iIzFkMWQxYiIgc3Ryb2tlLXdpZHRoPSI0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPGVsbGlwc2UgY3g9IjY2IiBjeT0iMTQyIiByeD0iOCIgcnk9IjUiIGZpbGw9IiNmZjhhYTAiIG9wYWNpdHk9Ii42Ii8+PGVsbGlwc2UgY3g9IjEzNiIgY3k9IjE0MiIgcng9IjgiIHJ5PSI1IiBmaWxsPSIjZmY4YWEwIiBvcGFjaXR5PSIuNiIvPgo8cGF0aCBkPSJNODQgMTQ2IFExMDAgMTYwIDExOCAxNDQiIHN0cm9rZT0iIzFkMWQxYiIgc3Ryb2tlLXdpZHRoPSI0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" alt="Frootie"></section>
+
+<section class="pc" aria-label="Vorschau PC-Version"><div class="pc-leiste"><i></i><i></i><i></i><span>frooters Verwaltung · Testversion</span></div>
+<div class="scroller"><div class="fenster">
+<nav class="seite" aria-label="Bereiche"><img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDIyLjEuMCwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8IURPQ1RZUEUgc3ZnIFBVQkxJQyAiLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4iICJodHRwOi8vd3d3LnczLm9yZy9HcmFwaGljcy9TVkcvMS4xL0RURC9zdmcxMS5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHdpZHRoPSIzNzZweCIgaGVpZ2h0PSIxMzcuM3B4IiB2aWV3Qm94PSIwIDAgMzc2IDEzNy4zIiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAzNzYgMTM3LjM7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KPHN0eWxlIHR5cGU9InRleHQvY3NzIj4KCS5zdDB7ZmlsbDojQTNBOTgzO30KCS5zdDF7ZmlsbDojQzEwMjMwO30KCS5zdDJ7ZmlsbDojNzZCQzIxO30KCS5zdDN7ZmlsbDojMUQxRDFCO30KPC9zdHlsZT4KPGc+Cgk8Zz4KCQk8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMzUzLDQxLjRjLTEtMC4xLTAuOSwwLjQsMCwwLjVjMTAuNCwxLjQsOS40LDQuMSw0LDVjLTYuNCwxLTE0LjcsMS41LTMwLjcsMS41Yy03LjYsMC0xMy44LTAuMy0xOS44LTAuNgoJCQljMC0wLjMtMC4xLTAuNy0wLjEtMUMzMDQuNiwyMS4xLDMxMi45LDYsMzI0LjgsNmMzLjgsMCw3LjMsMC45LDEwLjYsMy41YzAuMSwwLjEsMC40LTAuMSwwLjItMC4zYy0zLjctMy44LTcuNC01LjItMTItNS4yCgkJCWMtMTAuMSwwLTI0LjgsMTEuOS0yMy42LDQzLjVsMCwwYzAsMCwwLDAsMCwwYzAsMC41LDAsMSwwLDEuNWMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMGM3LjMsMC42LDE2LjQsMC45LDI2LjEsMC45CgkJCWMxNy40LDAsMzIuNS0xLjEsMzkuNi0yLjdjLTUuNSwxNS45LTIxLjIsMjcuNC0zOS42LDI3LjRzLTM0LTExLjUtMzkuNi0yNy40YzIuMSwwLjUsNC45LDAuOSw4LjMsMS4zYy0wLjEtMi4zLDAtNC42LDAuMS02LjcKCQkJYy03LjgsMC45LTEzLjgsMi0xMy41LDMuM2gwYzQuOSwxOC45LDIzLjUsMzMuNyw0NC43LDMzLjdjMjEuMiwwLDM5LjgtMTQuOCw0NC43LTMzLjdsMCwwQzM3MS4zLDQzLjcsMzYzLjcsNDIuMywzNTMsNDEuNHoiLz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MSIgZD0iTTM0Ny45LDM3LjljNS4zLTYuNywxLjYtMTIuOC0xLjMtMTUuMWMtNC4xLTMuMy05LjktMS41LTkuOS0xLjVzMCwwLDAsMGMwLDAsMCwwLDAsMHMwLjUtNi0zLjYtOS4zCgkJCQljLTIuOS0yLjMtOS43LTQuNi0xNSwyLjFjLTkuNiwxMi4xLTEuOCwyNy4yLDEsMjkuNGwwLDB2MGMwLDAsMCwwLDAsMGMwLDAsMCwwLDAsMEMzMjEuOCw0NS44LDMzOC4zLDUwLDM0Ny45LDM3Ljl6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik0zNDkuMSwxNS43YzQtNCwzLjctMTAuOSwzLjctMTAuOXMtNi45LTAuNC0xMC45LDMuNmMtNCw0LTMuNywxMC45LTMuNywxMC45UzM0NS4xLDE5LjcsMzQ5LjEsMTUuN3oiLz4KCQk8L2c+Cgk8L2c+Cgk8Zz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MyIgZD0iTTI5Ni44LDExNC40Yy0xLjgtNy42LTEwLjMtOS40LTE2LjgtMTNjLTkuOC01LjMtNi4xLTE4LjUsNi40LTE2LjVjMS42LDAuMywzLjgsMS41LDUuMSwxLjMKCQkJCWMwLjctMy4yLTIuMi03LTQuNC04LjVjLTQuOC0zLjMtMTEuOC0yLjctMTguMSwxLjNjLTQuNiwyLjktMTAuMSw3LjItMTQuOCwxMi43YzAuMy0zLjQsMi40LTYuNCwxLjEtMTAuNAoJCQkJYy0wLjgtMi4zLTYuNi04LjMtOS41LTUuMmMtMC4zLDguOC0wLjksMTcuNy0zLjUsMjIuOWMtNC4yLDguNi0xNy4yLDI3LjMtMjcuNiwyNS40Yy0yLTAuNC0zLjQtMy45LTMuNy02LjgKCQkJCWM4LjctNi43LDI3LjEtMjIuNywyMi4zLTMzLjJjLTEuMS0yLjMtNS40LTUuNy03LjItNi41Yy0xMC00LjUtMjIuNSw2LjItMjUuNSwyMy41Yy0wLjcsNC0wLjUsMTEuNSwwLjgsMTYuNAoJCQkJYy01LjIsNC03LjQsNS42LTkuNiw0LjljLTUtMS44LTQuOC03LjQtNC44LTEwLjZjMC05LjEsNi41LTI2LDEyLjgtMzljMTMtMSwyNS44LTQsMzcuMi05LjFjMS4yLTAuNSwyLjctMS4yLDQuNC0yLjEKCQkJCWMxLjYtMC45LDMuMy0yLjIsNC44LTMuOGMwLjYtMC43LDAuNy0xLjMsMC41LTEuN2MtMC4xLTAuMi0wLjItMC40LTAuMy0wLjVjLTAuMS0wLjEtMC4xLTAuMS0wLjItMC4xYzAsMC0wLjItMC4xLTAuMi0wLjEKCQkJCWwtMC4xLDAuMWMtMTMuNSw1LjktMjcuOCw5LTQyLjMsMTAuMWMyLjUtNS4zLDcuNS0xMy44LDcuNS0xNC40YzAtMC42LTAuOS0xLjItMC45LTEuMmMtOS40LTcuNy0xNi4yLDUuMy0yMS4zLDE1LjkKCQkJCWMtNi0wLjItMTIuMi0wLjctMTguMS0xLjVjMCwwLTEuMSwwLjMtMS42LDMuOWMtMC4yLDEuOCwwLjksMi44LDIuMywzLjRjMC43LDAuMywxLjUsMC40LDIuNCwwLjZjMC45LDAuMSwxLjgsMC4yLDIuOCwwLjMKCQkJCWMzLDAuMyw2LDAuNSw5LjEsMC42Yy0xLjQsMy44LTIuNyw4LjEtNCwxMi42Yy01LjYsOS41LTEwLjEsOC40LTEwLjEsOC40YzAuMS0xLjUtMC4yLTMuMi0wLjktNC40Yy0zLjMtNi42LTEwLjEtNC43LTEwLjEtNC44CgkJCQljMC40LTAuNCwyLjQtMS4zLDIuNi0xLjVjMC4xLTAuMSwwLjEtMC4yLDAuMS0wLjJjLTAuNC0yLjktNS4yLTUuNi04LjEtNi4yYy0yLjctMC42LTUuMiwxLTYuNiwxLjkKCQkJCWMtOS40LDYuNC0xOS42LDI4LjgtMTEuMSw0NC44YzMuMiw2LDEyLjQsOC41LDE5LjQsMy44YzcuMi00LjksMTMuNC0xNSwxNC4yLTI3LjZjMCwwLDQuMy0wLjMsOC0zLjFjLTMuNCwxNi43LTIsMjguNCw1LjIsMzEuNwoJCQkJYzYuMSwyLjgsMTAuNCwwLjksMTktNS42YzMuNyw2LjUsNy4zLDcuMiwxMi4yLDYuOWMxNC4xLTAuNywyNC41LTE3LjUsMjQuNS0xNy41YzAsMC0xLjEsNC41LTEuOSw4LjVjLTAuOCw0LTEuNyw4LjksMi40LDguOAoJCQkJYzQtMC4xLDcuMy0yLjksNy4zLTIuOWMxLjgtNC4zLDMuNC0xMS42LDUuNy0yMC45YzMuMi03LjgsNy44LTE0LjQsMTEuNC0xNy4xYy0yLjgsNy4zLDIuMSwxMi4yLDUuNSwxNC40CgkJCQljMy45LDIuNSw2LjksMy40LDExLjUsNi45YzEwLjksOC4xLTQuNiwxOC44LTE4LjEsMTQuNmMtMi40LDAuOC0xLjMsMy4zLDAuNCw0LjNjNS4yLDIuOSwxNS4yLDQuNSwyNC40LTAuMwoJCQkJQzI5NS45LDEyNS40LDI5OC4yLDEyMC42LDI5Ni44LDExNC40eiBNMTU2LjMsMTIxLjFjLTEuNCwyLTQuNyw1LjMtOC4xLDMuMmMtMy4yLTItMy45LTguNi0zLjEtMTMuN2MxLjUtOS4yLDQuNi0xOC4yLDExLjItMjIuNgoJCQkJYy0wLjUsMi44LTAuOSw5LjIsOCwxMkMxNjMuNCwxMDcuOCwxNjAuOCwxMTQuOCwxNTYuMywxMjEuMXogTTIyOC4xLDg2LjhjMywzLjQtOS4xLDE3LjEtMTcuOCwyNC4zCgkJCQlDMjA4LjcsOTUuOCwyMjIuNSw4MC4yLDIyOC4xLDg2Ljh6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik0xMTEuNCw4Ni44Yy0xLjUsMS0wLjYsMS40LTAuMSwxLjZjNC4zLDEuNCw3LjksMi42LDkuMiw5LjJjMS41LDcuNS0yLjksMTguMi02LjIsMjMKCQkJCWMtMC45LDEuMy0zLjUsNC41LTYuMSwzLjVjLTIuOS0xLjEtNC4zLTUuMS00LjctOS4zYy0xLjMtMTIuMywyLTIyLjMsNi42LTI4YzUuMi02LjQsOS44LTcuMiw4LjYtOC40CgkJCQljLTIuNy0yLjctMTAuOS0xLjItMTMuMywwLjFjLTMuNSwxLjgtNi4xLDYuMi02LjEsNi4yYy05LjcsNS40LTExLjIsMC42LTE0LTMuNmMtMS40LTIuMi0yLjQtNC0zLjItNC45YzAsMC00LjYsMS41LTUuNSwyLjUKCQkJCWMtMi4zLDIuNi0xLjYsMi42LTEuMiwxMC4xYzAuMiwyLjYsMC40LDMuNiwwLjMsMy43Yy0wLjMsMC4xLTQuNi0xMi43LTE1LjQtMTIuMWMtMy4zLDAuMi0zLjQsMC4zLTYuNywwLjgKCQkJCWMtMC42LTEwLjMtMi4xLTE4LjUtNC45LTIxLjNjLTIuMS0yLTkuMywyLjEtMTEuMSwzLjZjLTEuNSwxLjMtMC44LDIuNy0wLjUsMy40YzIuNSw2LjUsMy43LDEyLDQuMywxN2MtNy44LDIuMi0xNi4zLDQuNy0yMi4yLDcKCQkJCWMtMi4yLDAuOS0xLjksNy42LDAsOS44YzEuNSwxLjcsMy40LDAuNSw1LjItMC4yYzYuOS0yLjcsMTIuNy00LjgsMTcuNi02LjZjMC45LDI3LjktNy44LDQwLjUsMCwzOS41CgkJCQljNy4yLTAuOSwxMC4xLTE3LjQsMTAuOC0yMi44YzAuNy01LjQsMS40LTExLjcsMS4yLTIwLjNjMi0wLjYsMy44LTEuMyw2LjMtMS4yYzE1LjQsMC44LDkuNCwyNi4yLDkuMSwzOC42CgkJCQljLTAuMSw0LjEsNi4zLDIuOCwxMC0wLjZjMC44LTAuNywzLjUtNyw0LjItMjAuOGMwLjMtNS4zLTAuOS0xMi4zLTEuMS0xNi4xYzMuOCw0LDguNSw0LjksMTIuOCwyYy0wLjgsMS44LTIuNyw3LjQtMywxMy42CgkJCQljLTAuOSwxNi44LDEwLjksMjkuNSwyMy40LDIyLjVjMTctOS40LDE4LjItMzMuMSwxNC4xLTM5LjRDMTI0LjksODEuMiwxMTMuNyw4NS4zLDExMS40LDg2Ljh6Ii8+CgkJCTxwYXRoIGNsYXNzPSJzdDMiIGQ9Ik01Ni4yLDQ1LjdjNS43LTEuNiwxMC0yLjUsMTUuNi0xLjJjMywwLjcsNi41LDIuNiw3LjYsNS4zYzIuMSw1LjUtMS40LDEwLTUuOCwxNC40YzAuOCwzLjMsNC45LDIuNCw3LjctMC4xCgkJCQljNy40LTYuNSw4LjMtMTQuNCw2LjQtMTguOWMtMS45LTQuNS02LjMtNy40LTExLjEtOC45QzU1LjksMjkuOCwzMC42LDQwLDkuMSw1Mi44bC0yLjksMS45Yy0xLDIuMSwzLjIsMTQuMiwxMy40LDguMwoJCQkJQzMyLjYsNTUuNiw0NS4xLDQ4LjksNTYuMiw0NS43eiIvPgoJCTwvZz4KCQk8Zz4KCQkJPHBhdGggY2xhc3M9InN0MyIgZD0iTTI5OS4zLDc5YzAsMi0xLjYsMy41LTMuNiwzLjVjLTIsMC0zLjYtMS42LTMuNi0zLjVjMC0yLDEuNi0zLjUsMy42LTMuNUMyOTcuNyw3NS42LDI5OS4zLDc3LjEsMjk5LjMsNzl6CgkJCQkgTTI5Myw3OWMwLDEuNiwxLjIsMi44LDIuNywyLjhjMS41LDAsMi43LTEuMiwyLjctMi44YzAtMS42LTEuMi0yLjgtMi43LTIuOEMyOTQuMSw3Ni4zLDI5Myw3Ny41LDI5Myw3OXogTTI5NS4xLDgwLjloLTAuOHYtMy41CgkJCQljMC4zLDAsMC44LTAuMSwxLjMtMC4xYzAuNywwLDEsMC4xLDEuMiwwLjNjMC4yLDAuMiwwLjQsMC40LDAuNCwwLjdjMCwwLjQtMC4zLDAuNy0wLjcsMC44djBjMC4zLDAuMSwwLjUsMC40LDAuNiwwLjkKCQkJCWMwLjEsMC41LDAuMiwwLjcsMC4zLDAuOWgtMC45Yy0wLjEtMC4xLTAuMi0wLjQtMC4zLTAuOWMtMC4xLTAuNC0wLjMtMC41LTAuNy0wLjVoLTAuNFY4MC45eiBNMjk1LjEsNzguOWgwLjQKCQkJCWMwLjQsMCwwLjgtMC4xLDAuOC0wLjVjMC0wLjMtMC4yLTAuNS0wLjctMC41Yy0wLjIsMC0wLjQsMC0wLjUsMFY3OC45eiIvPgoJCTwvZz4KCTwvZz4KPC9nPgo8L3N2Zz4K" alt="frooters">
+<button data-z="uebersicht">🏠 Übersicht</button>
+<button data-z="filialen">📍 Filialen</button>
+<button data-z="ma" class="an">👥 Mitarbeiter</button>
+<button data-z="rezepte">🥣 Rezepte &amp; Allergene</button>
+<button data-z="bestellung">📦 Sortiment &amp; Bestellung</button>
+<button data-z="kasse">🧮 Kasse &amp; Schnittstellen</button>
+<button data-z="einst">⚙️ Einstellungen</button>
+<div class="ich"><span class="kreis">CK</span><span>Inhaber<br>alle Filialen</span></div></nav>
+<div class="haupt">
+<div class="kopf"><h2 id="ztitel">Mitarbeiter</h2><span class="chip g">📍 alle Filialen</span><span class="such">🔍 Suchen …</span></div>
+
+<!-- Übersicht -->
+<div class="inhalt" id="z-uebersicht" data-t="Übersicht">
+<div class="kpi"><div class="karte"><span class="klein">Schichten diese Woche nicht richtig besetzt</span><b>4</b></div><div class="karte"><span class="klein">offene Anträge</span><b>3</b></div><div class="karte"><span class="klein">Belehrungen laufen ab (30 Tage)</span><b>2</b></div><div class="karte"><span class="klein">Bestellungen zur Freigabe</span><b>2</b></div></div>
+<div class="zwei"><div class="karte"><h3>Was ist offen?</h3><table><tr><th>Was</th><th>Filiale</th><th>Bis</th><th></th></tr>
+<tr><td>Sa Spätdienst: Leitung fehlt</td><td>Ochtrup</td><td>Sa</td><td><span class="chip r">rot</span></td></tr>
+<tr><td>Belehrung § 43 IfSG läuft ab: Mia</td><td>Oberhausen</td><td>28.11.</td><td><span class="chip y">bald</span></td></tr>
+<tr><td>Bestellung Obst &amp; Gemüse freigeben</td><td>Ochtrup</td><td>heute</td><td><span class="chip y">offen</span></td></tr>
+<tr><td>Rezept „Bowl Tropical“ wartet auf 2. Freigabe</td><td>alle</td><td>–</td><td><span class="chip s">4 Augen</span></td></tr>
+<tr><td>Jonas über Stundenumfang (+3 Std., erlaubt)</td><td>Ochtrup</td><td>KW 46</td><td><span class="chip g">ok</span></td></tr></table></div>
+<div class="karte"><h3>Letzte Änderungen</h3><table><tr><td>Sandra</td><td>Lena: Stundenumfang 15 → 18 Std./Woche</td></tr><tr><td>Petra</td><td>Zutat „Karamellsoße“: Milch ergänzt</td></tr><tr><td>Inhaber</td><td>Pick-Nick: Öffnungszeiten Sa</td></tr></table><p class="klein">Jede Änderung wird mit Person und Zeit gespeichert.</p></div></div>
+</div>
+
+<!-- Filialen -->
+<div class="inhalt" id="z-filialen" data-t="Filialen">
+<div class="leiste"><button class="btn">+ Filiale</button><span class="klein">Filialen werden nie gelöscht, nur geschlossen. Die alten Daten bleiben im Archiv.</span></div>
+<div class="karte"><table><tr><th>Filiale</th><th>Art</th><th>Bundesland</th><th>Öffnung Mo–Fr</th><th>Sortiment</th><th>Matrix</th><th>Betreiber</th></tr>
+<tr><td><b>Ochtrup</b> · Designer Outlet <span class="chip g">Pilot</span></td><td>Shop</td><td>NRW</td><td>10–20 Uhr</td><td>frooters komplett</td><td><span class="chip g">✓</span></td><td>eigene</td></tr>
+<tr><td><b>Oberhausen</b> · Centro</td><td>Shop</td><td>NRW</td><td>10–20 Uhr</td><td>frooters komplett</td><td><span class="chip g">✓</span></td><td>eigene</td></tr>
+<tr><td><b>Sinsheim</b> · Therme</td><td>Shop</td><td>Baden-Württ.</td><td>11–21 Uhr</td><td>frooters komplett</td><td><span class="chip y">Sa fehlt</span></td><td>eigene</td></tr>
+<tr><td><b>Osnabrück</b> · Bowls &amp; Smoothie</td><td>Café</td><td>Niedersachsen</td><td>10–19 Uhr</td><td>Bowls, Smoothie, Kaffee</td><td><span class="chip g">✓</span></td><td>eigene</td></tr>
+<tr><td><b>Pick-Nick</b></td><td>Shop</td><td>?</td><td>?</td><td>?</td><td><span class="chip r">fehlt</span></td><td>eigene</td></tr>
+<tr><td><b>Road Runner</b> · mobil</td><td>mobiler Stand</td><td>je Einsatzort</td><td>nach Einsätzen</td><td>Froyo, Smoothie, Obst</td><td><span class="chip g">✓</span></td><td>eigene</td></tr></table></div>
+<p class="klein">Das Bundesland steuert die Feiertage (Urlaubstage, Zuschläge, Öffnung). „?“ = noch nicht bekannt, wird nicht geraten.</p>
+</div>
+
+<!-- Mitarbeiter -->
+<div class="inhalt an" id="z-ma" data-t="Mitarbeiter">
+<div class="leiste"><button class="btn">+ Mitarbeiter</button><button class="btn h">⬆ Excel einlesen</button><span class="chip s">Beschäftigung: alle ▾</span><span class="chip s">Einsatz: alle ▾</span><span class="chip s">Springer ▾</span></div>
+<div class="zwei ma"><div class="karte"><table><tr><th>Name · Filiale · Rolle</th><th>Beschäftigung</th><th>Umfang</th><th>Einsatz</th></tr>
+<trNone><td>Sandra K.<br><span class="klein">Ochtrup · Shopleitung</span></td><td>Vollzeit</td><td class="z">40 / Wo</td><td>flexibel</td></tr>
+<tr class="wahl"><td><b>Jonas B.</b><br><span class="klein">Ochtrup · Mitarbeiter</span></td><td>Teilzeit</td><td class="z">20 / Wo <span class="chip g">+5</span></td><td>nur Spätdienst · 🔁 Springer</td></tr>
+<trNone><td>Lena M.<br><span class="klein">Ochtrup · Aushilfe</span></td><td>Minijob</td><td class="z">40 / Mon</td><td>nur Wochenende</td></tr>
+<trNone><td>Leonie S.<br><span class="klein">Ochtrup · Aushilfe</span></td><td>Schülerin <span class="chip y">u18</span></td><td class="z">8 / Wo</td><td>nur nachmittags</td></tr>
+<trNone><td>Mia T.<br><span class="klein">Oberhausen · Stellvertretung</span></td><td>Vollzeit</td><td class="z">40 / Wo</td><td>nur Frühdienst</td></tr>
+<trNone><td>Tim R.<br><span class="klein">Oberhausen · Mitarbeiter</span></td><td>Azubi</td><td class="z">40 / Wo</td><td>nicht Di (Berufsschule)</td></tr>
+<trNone><td>Ayla Y.<br><span class="klein">Sinsheim · Mitarbeiter</span></td><td>Werkstudentin</td><td class="z">20 / Wo</td><td>abends ab 16 Uhr · 🛎 Bereitschaft</td></tr>
+<trNone><td>Ben H.<br><span class="klein">Road Runner · Mitarbeiter</span></td><td>kurzfristig</td><td class="z">52 / 70 Tage</td><td>flexibel · 🚐 Führerschein</td></tr></table></div>
+<div class="karte"><h3>Jonas B. · Ochtrup</h3>
+<div class="raster"><div class="feld"><label>Rolle in der App</label><span class="eing">Mitarbeiter</span></div><div class="feld"><label>Eintritt / befristet bis</label><span class="eing">01.03.2025 / –</span></div></div>
+<div class="feld"><label>Beschäftigungsart</label><div class="opts"><span class="opt">Vollzeit</span><span class="opt an">Teilzeit</span><span class="opt">Minijob</span><span class="opt">kurzfristig</span><span class="opt">Werkstudent</span><span class="opt">Azubi</span><span class="opt">Schüler/Ferienjob</span><span class="opt">Praktikum</span></div></div>
+<div class="raster"><div class="feld"><label>Stundenumfang</label><span class="eing">20 Std. je Woche</span></div><div class="feld"><label>Urlaub Anspruch / Übertrag</label><span class="eing">25 Tage / 2 Tage</span></div></div>
+<div class="schalt"><b class="knopf" aria-hidden="true"></b><div><b>Darf Stunden überschreiten</b><br><span class="klein">bis +5 Std. je Woche ohne Rückfrage. Die 10 Std. am Tag gelten trotzdem.</span></div></div>
+<div class="feld"><label>Einsatz: wann?</label><div class="opts"><span class="opt">total flexibel</span><span class="opt">nur Frühdienst</span><span class="opt an">nur Spätdienst</span><span class="opt">nur morgens bis … Uhr</span><span class="opt">nur abends ab … Uhr</span><span class="opt">nur Wochenende</span><span class="opt">feste Tage</span><span class="opt">nicht an …</span></div></div>
+<div class="feld"><label>Bereitschaft</label><div class="opts"><span class="opt an">🛎 Sa 10–14 Uhr</span><span class="opt">+ Zeit</span></div></div>
+<div class="feld"><label>Springer für</label><div class="opts"><span class="opt an">🔁 Oberhausen · Auto · 55 Min.</span><span class="opt an">🔁 Road Runner</span><span class="opt">Sinsheim</span><span class="opt">Osnabrück</span><span class="opt">Pick-Nick</span></div></div>
+<div class="feld"><label>Qualifikationen</label><div class="opts"><span class="chip g">§ 43 IfSG bis 03/2027</span><span class="chip y">Hygieneschulung bis 12/2026</span><span class="chip g">Kasse</span><span class="chip s">Führerschein B</span></div></div>
+<p class="klein">Steuer-ID, SV-Nummer, IBAN und Gehalt stehen nicht in der App. Diese Daten bleiben beim Steuerberater.</p></div></div>
+</div>
+
+<!-- Rezepte -->
+<div class="inhalt" id="z-rezepte" data-t="Rezepte & Allergene">
+<div class="hinweis">Die Allergene werden <b>an der Zutat</b> gepflegt. Jedes Rezept rechnet sie aus seinen Zutaten aus. Ändert sich eine Zutat, stimmen danach alle Rezepte, der Allergen-Aushang und das Quiz.</div>
+<div class="zwei"><div class="karte"><h3>Zutaten</h3><table><tr><th>Zutat</th><th>Lieferant</th><th>Milch</th><th>Gluten</th><th>Schalenfr.</th><th>Soja</th><th>Sellerie</th><th>geprüft</th></tr>
+<tr><td>Froyo-Basis Natur</td><td>Beispiel GmbH</td><td><span class="punkt"></span></td><td></td><td></td><td></td><td></td><td>Petra · 02.11.</td></tr>
+<tr><td>Krokant</td><td>Beispiel GmbH</td><td></td><td><span class="punkt"></span></td><td><span class="punkt"></span></td><td><span class="punkt sp"></span></td><td></td><td>Petra · 02.11.</td></tr>
+<tr><td>Karamellsoße</td><td>Beispiel KG</td><td><span class="punkt"></span></td><td></td><td></td><td></td><td></td><td><span class="chip y">neu, prüfen</span></td></tr>
+<tr><td>Granola</td><td>Beispiel KG</td><td></td><td><span class="punkt"></span></td><td><span class="punkt sp"></span></td><td></td><td></td><td>Petra · 28.10.</td></tr>
+<tr><td>Erdbeeren frisch</td><td>Großmarkt</td><td></td><td></td><td></td><td></td><td></td><td>Petra · 28.10.</td></tr></table>
+<p class="klein"><span class="punkt"></span> enthalten · <span class="punkt sp"></span> Spuren · alle 14 Hauptallergene sind in der Verwaltung als Spalten da</p></div>
+<div class="karte"><h3>Froyo Krokant-Karamell <span class="chip s">Fassung 3</span></h3>
+<table><tr><th>Zutat</th><th class="z">S</th><th class="z">M</th><th class="z">L</th></tr><tr><td>Froyo-Basis Natur</td><td class="z">150 g</td><td class="z">220 g</td><td class="z">300 g</td></tr><tr><td>Krokant</td><td class="z">10 g</td><td class="z">15 g</td><td class="z">20 g</td></tr><tr><td>Karamellsoße</td><td class="z">15 g</td><td class="z">20 g</td><td class="z">25 g</td></tr></table>
+<div class="feld"><label>Allergene (berechnet)</label><div class="opts"><span class="chip r">Milch</span><span class="chip r">Gluten</span><span class="chip r">Schalenfrüchte</span><span class="chip y">Spuren: Soja</span></div></div>
+<div class="feld"><label>Preis je Größe</label><span class="eing">S … € · M … € · L … €</span></div>
+<div class="leiste"><span class="chip g">✓ freigegeben von Petra</span><span class="chip y">wartet auf 2. Freigabe</span><button class="btn">Freigeben</button></div>
+<p class="klein">Bis zur 2. Freigabe zeigt das Handy noch Fassung 2.</p></div></div>
+</div>
+
+<!-- Bestellung -->
+<div class="inhalt" id="z-bestellung" data-t="Sortiment & Bestellung">
+<div class="leiste"><span class="chip g">📍 Ochtrup</span><span class="chip s">Inventur vom 05.11., 18:40 · Sandra (Handy)</span><button class="btn">Bestellung freigeben</button><button class="btn h">🖨 PDF</button></div>
+<div class="karte"><h3>Bestellvorschlag = Sollbestand − Istbestand, auf volle Gebinde aufgerundet</h3>
+<table><tr><th>Artikel</th><th>Lieferant</th><th>Lager</th><th>Gebinde</th><th class="z">Soll</th><th class="z">Ist</th><th class="z">Vorschlag</th><th class="z">bestellen</th><th></th></tr>
+<tr><td>Froyo-Basis Natur</td><td>Beispiel GmbH</td><td>Kühlung</td><td>Karton 6 × 1 l</td><td class="z">24 l</td><td class="z">5 l</td><td class="z">4 Kartons</td><td class="z"><b>4</b></td><td><span class="chip r">unter Mindestbestand</span></td></tr>
+<tr><td>Erdbeeren frisch</td><td>Großmarkt</td><td>Kühlung</td><td>Schale 2 kg</td><td class="z">8 kg</td><td class="z">3 kg</td><td class="z">3 Schalen</td><td class="z"><b>3</b></td><td></td></tr>
+<tr><td>Krokant</td><td>Beispiel GmbH</td><td>trocken</td><td>Beutel 1 kg</td><td class="z">3 kg</td><td class="z">2,5 kg</td><td class="z">1 Beutel</td><td class="z"><b>0</b></td><td><span class="chip s">von Hand geändert</span></td></tr>
+<tr><td>Becher M</td><td>Verpackung AG</td><td>trocken</td><td>Karton 500</td><td class="z">1000</td><td class="z">1200</td><td class="z">–</td><td class="z">0</td><td><span class="chip g">genug</span></td></tr></table></div>
+<div class="zwei"><div class="karte"><h3>Wareneingang (Stufe 2)</h3><p class="klein">Lieferschein mit der Bestellung abgleichen: fehlt, zu viel, beschädigt. Dazu Temperatur und MHD wie in der Hygiene.</p></div>
+<div class="karte"><h3>Aus dem Verkauf (Stufe 3)</h3><p class="klein">Verkaufte Becher × Rezeptmenge = Verbrauch. Der Vergleich mit der Inventur zeigt Schwund oder zu große Portionen.</p></div></div>
+<p class="klein">Nichts wird automatisch verschickt. Die Shopleitung prüft und gibt frei.</p>
+</div>
+
+<!-- Kasse -->
+<div class="inhalt" id="z-kasse" data-t="Kasse & Schnittstellen">
+<p>Aus der Kasse werden gebraucht: <b>Verkäufe je Artikel und Tag</b>, <b>Umsatz je Stunde</b> für die Dienstplanung, später die <b>Preise</b>.</p>
+<div class="weg">
+<div class="karte emp"><span class="chip g">Empfehlung Start</span><h3>A · Gastronovi-Export einlesen</h3><p class="klein">Tagesbericht als CSV/Excel aus Gastronovi hier hochladen. Ob Gastronovi diesen Export bei euch anbietet, ist noch <b>unbekannt</b> und muss nachgesehen werden.</p></div>
+<div class="karte"><span class="chip y">bei Gastronovi anfragen</span><h3>B · Gastronovi-Schnittstelle</h3><p class="klein">Automatisch jede Nacht. Ob es das für euren Vertrag gibt und was es kostet, ist <b>unbekannt</b>.</p></div>
+<div class="karte emp"><span class="chip g">Empfehlung</span><h3>C1 · KC Bilderrechner zur Erfassung</h3><p class="klein">Große Bildkacheln wie im Köcheclub, aber <b>ohne Bezahlung</b>: Inventur, Bestellung, Bruch und Abschriften, Personalessen. Die Kacheln kommen aus Sortiment und Rezepten. Keine TSE nötig.</p></div>
+<div class="karte"><span class="chip r">erst Steuerberater</span><h3>C · KC Bilderrechner als Kasse</h3><p class="klein">Als echte Kasse braucht sie eine zertifizierte TSE (KassenSichV), den DSFinV-K-Export, Belege und die Meldung ans Finanzamt. Das ist ein eigenes Projekt. Gastronovi erfüllt das heute schon.</p></div>
+<div class="karte emp"><span class="chip g">sofort</span><h3>D · Stunden an den Steuerberater</h3><p class="klein">Export je Monat und Person. Das Format (CSV, Excel, DATEV) wird beim Steuerberater erfragt.</p></div>
+</div></div>
+
+<!-- Einstellungen -->
+<div class="inhalt" id="z-einst" data-t="Einstellungen">
+<div class="zwei"><div class="karte"><h3>Beschäftigungsarten und Grenzen</h3><table><tr><th>Art</th><th>Grenze</th><th>gilt ab</th></tr>
+<tr><td>Minijob</td><td>Verdienstgrenze 603 € / Monat <span class="chip y">bestätigen</span></td><td>01.01.2026</td></tr>
+<tr><td>kurzfristig</td><td>70 Arbeitstage im Jahr</td><td>–</td></tr>
+<tr><td>unter 18</td><td>8 Std./Tag, 40 Std./Woche, 5 Tage, abends Grenze <span class="chip y">bestätigen</span></td><td>–</td></tr>
+<tr><td>alle</td><td>höchstens 10 Std. am Tag</td><td>–</td></tr>
+<tr><td>Azubi</td><td>Berufsschultage nicht verplanen</td><td>–</td></tr></table>
+<p class="klein">Bis zur Bestätigung warnt die App nur und sperrt nichts.</p></div>
+<div class="karte"><h3>Weitere Einstellungen</h3><table><tr><td>Schichtzeiten</td><td>Früh: Öffnung −30 Min. bis 15 Uhr · Spät: 14 Uhr bis Schluss +30 Min.</td></tr><tr><td>Feiertage</td><td>nach Bundesland der Filiale, automatisch</td></tr><tr><td>Urlaub</td><td>Mo–Fr <span class="chip y">offen: Mo–Sa?</span> · Übertrag bis 31.03.</td></tr><tr><td>Rechte</td><td>Rollen × Bereiche wie im Büro</td></tr><tr><td>Betreiber &amp; Datenbank</td><td>Franchise mit eigener Supabase/Neon (Frankfurt)</td></tr></table></div></div>
+</div>
+
+</div></div></div></section>
+
+<section class="abschnitt"><div class="eyebrow">So geht es weiter</div><h2>Stufenplan</h2>
+<div class="stufen">
+<div class="karte"><b>Stufe 1</b><span>PC-Ansicht, Filialen, Mitarbeiter mit Beschäftigungsart, Umfang, „darf überschreiten“, Einsatzprofil, Springer, Qualifikationen, Excel-Import</span></div>
+<div class="karte"><b>Stufe 2</b><span>Zutaten mit Allergenen, Rezepte rechnen Allergene aus, Freigabe nach 4 Augen, Fassungen</span></div>
+<div class="karte"><b>Stufe 3</b><span>Artikel, Sortiment je Filiale, Inventur am Handy, Bestellliste Soll − Ist, Bestellung als PDF</span></div>
+<div class="karte"><b>Stufe 4</b><span>Gastronovi-Export einlesen, Umsatz je Stunde in der Dienstplanung, Stunden für den Steuerberater</span></div>
+<div class="karte"><b>Stufe 5</b><span>Prognose aus dem Verkauf, Soll-/Ist-Verbrauch, Bilderrechner zur Erfassung</span></div>
+<div class="karte"><b>Stufe 6</b><span>Bilderrechner als Kasse, nur nach Freigabe durch den Steuerberater</span></div>
+</div>
+<p class="klein">Bis die Datenbank (Supabase plus Neon in Frankfurt) freigegeben ist, läuft alles mit Beispieldaten im Browser. Echte Mitarbeiterdaten kommen erst danach.</p></section>
+
+<section class="abschnitt"><div class="eyebrow">Bitte beantworten</div><h2>Offene Fragen an frooters</h2>
+<ol class="fragen">
+<li>Welche Beschäftigungsarten gibt es heute, und wie viele Personen je Art?</li>
+<li>Soll es Bereitschaft geben, und wird sie bezahlt?</li>
+<li>„Darf Stunden überschreiten“: Grenze je Person oder eine Grenze für alle?</li>
+<li>Gibt es Mitarbeiter unter 18 oder Azubis? Welche Berufsschultage?</li>
+<li>Kann Gastronovi bei euch Tagesberichte als CSV/Excel exportieren? Gibt es eine Schnittstelle im Vertrag?</li>
+<li>Wer bestellt heute bei welchen Lieferanten, und wie? Gibt es eine Bestellliste als Excel?</li>
+<li>Gibt es Datenblätter der Lieferanten mit Allergenen für alle Zutaten?</li>
+<li>Welches Format braucht der Steuerberater für die Stunden?</li>
+<li>KC Bilderrechner: zuerst zur Erfassung (C1) oder gleich als Kasse (C)?</li>
+<li>Pick-Nick: Ort, Öffnungszeiten und Sortiment?</li>
+</ol>
+<p class="fuss">frooters Team-App · Konzept PC-Version · Stand 05.11.2026 · Entwurf, alle Daten sind Beispiele</p></section>
+</main>
+<script>
+document.querySelectorAll("nav.seite button").forEach(function (b) {
+  b.addEventListener("click", function () {
+    document.querySelectorAll("nav.seite button").forEach(function (x) { x.classList.toggle("an", x === b); });
+    document.querySelectorAll(".inhalt").forEach(function (z) { z.classList.toggle("an", z.id === "z-" + b.dataset.z); });
+    document.getElementById("ztitel").textContent = document.getElementById("z-" + b.dataset.z).dataset.t;
+  });
+});
+</script>
+</body></html>
