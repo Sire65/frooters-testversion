@@ -1,4 +1,4 @@
-const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 9) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 10) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -84,6 +84,8 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    bestellung: "Erst den Bestand zählen, dann schlage ich vor, was fehlt: Soll minus Ist, auf volle Kartons gerundet. Du prüfst und gibst frei, verschickt wird nichts automatisch.",
+    artikel: "Hier legt die Zentrale Artikel mit Lieferant, Gebinde und Lagerort an. Das Soll je Filiale stellt die Shopleitung ein.",
     zutaten: "Hier stehen alle Zutaten mit ihren Allergenen. Trag sie vom Datenblatt des Lieferanten ein. Die Rezepte rechnen ihre Allergene daraus aus.",
     freigaben: "Hier gibst du Änderungen anderer frei. Eigene Änderungen muss immer eine zweite Person freigeben.",
     ma: "Hier pflegst du die Mitarbeiter: Beschäftigungsart, Stundenumfang (mit „darf überschreiten“), Einsatzprofil, Bereitschaft, Springer und Qualifikationen. Am PC siehst du alles als Tabelle.",
@@ -120,7 +122,7 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", inventur: "bestellung", lagersoll: "bestellung", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -176,6 +178,7 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
         ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
+        ${kachel("📦", "Bestellung", "Bestand zählen, Bestellliste", "bestellung", bestellZaehler(f.id))}
         ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · Grafik & Druck`, "buero")}
         ${rolle() === "shopleitung" ? kachel("📝", "Rezepte pflegen", "Zutaten, Allergene, Freigaben", "rezeptpflege", meineFreigaben().length) : ""}
@@ -188,6 +191,7 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("📊", "Auswertung", "Jede Filiale und gesamt", "auswertung")}
         ${kachel("👤", "Mitarbeiter", "Beschäftigung, Einsatz, Springer", "ma", L.qualiAblauf({ personen: maSichtbar() }, d, 30).length)}
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
+        ${kachel("🏷️", "Artikel & Lieferanten", "Für Sortiment und Bestellung", "artikel")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
         ${kachel("📝", "Rezepte pflegen", "Zutaten, Allergene, Freigaben", "rezeptpflege", meineFreigaben().length)}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · alles für die Zentrale`, "buero")}
@@ -1155,6 +1159,101 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
       <button class="btn gross" data-act="rezept-speichern" data-id="${r.id}">Zur Freigabe speichern</button>
       ${fassungenHtml(r, "rezept")}`;
   };
+  // ----- Sortiment & Bestellung (Shopleitung) · Artikel & Lieferanten (Zentrale) -----
+  const W = () => L.waren(S);
+  const lieferant = (id) => W().lieferanten.find((x) => x.id === id) || { name: "?" };
+  const artikelVon = (id) => W().artikel.find((x) => x.id === id);
+  const lagerSym = (id) => (L.LAGERORTE.find((x) => x.id === id) || { sym: "" }).sym;
+  const zahlTxt = (n) => n == null ? "–" : String(Math.round(n * 100) / 100).replace(".", ",");
+  const gebindeTxt = (a) => a.gebinde && a.gebinde.menge > 1 ? `${a.gebinde.name} à ${a.gebinde.menge} ${a.einheit}` : a.einheit;
+  const bestTabs = (an) => `<div class="wahl tabs">${[["bestellung", "📦 Bestellung"], ["inventur", "📋 Bestand aufnehmen"], ["lagersoll", "⚙️ Sortiment & Soll"]].map(([v, t]) => `<button class="${an === v ? "an" : ""}" data-go="${v}">${t}</button>`).join("")}</div>`;
+  const bestellZaehler = (fid) => { const v = L.bestellVorschlag(S, fid); return v.filter((z) => z.unterMin).length + W().bestellungen.filter((b) => b.filiale === fid && b.status === "frei").length; };
+  function bestellungKarte(b) {
+    const lf = lieferant(b.lieferant), st = L.BESTELL_STATUS[b.status];
+    const mail = lf.email ? `mailto:${encodeURIComponent(lf.email)}?subject=${encodeURIComponent(`Bestellung frooters ${FIL().kurz}`)}&body=${encodeURIComponent(bestellText(b))}` : "";
+    return `<div class="karte"><div class="reihe zw"><h3>${esc(lf.name)}</h3><span class="marke-s ${b.status === "geliefert" ? "gruen" : b.status === "storniert" ? "" : "gelb"}">${st}</span></div>
+      <p class="klein muted">angelegt ${zeitKurz(b.erstellt)} von ${wer(b.von)}${b.geschickt ? ` · bestellt ${zeitKurz(b.geschickt.am)}` : ""}${b.geliefert ? ` · geliefert ${zeitKurz(b.geliefert.am)}` : ""}</p>
+      <ul class="aend">${b.posten.map((x) => { const a = artikelVon(x.artikel) || { name: "?", einheit: "" }; const ab = b.geliefert && b.geliefert.abweichungen.find((y) => y.artikel === x.artikel); return `<li>${esc(L.mengeText(a, x.menge))} · <b>${esc(a.name)}</b>${a.bestellNr ? ` <span class="klein muted">Nr. ${esc(a.bestellNr)}</span>` : ""}${ab ? ` <span class="marke-s rot">geliefert: ${ab.geliefert}</span>` : ""}</li>`; }).join("")}</ul>
+      ${b.status === "frei" || b.status === "geschickt" ? `<div class="reihe"><button class="btn drei" data-act="best-drucken" data-id="${b.id}">🖨️ Drucken / PDF</button>
+        ${mail ? `<a class="btn drei" href="${mail}">✉️ E-Mail vorbereiten</a>` : '<span class="klein muted">Keine E-Mail-Adresse beim Lieferanten.</span>'}
+        ${b.status === "frei" ? `<button class="btn drei" data-act="best-geschickt" data-id="${b.id}">Als bestellt markieren</button>` : ""}
+        <button class="btn zwei" data-act="best-eingang" data-id="${b.id}">📥 Ware ist da</button>
+        <button class="chip" data-act="best-storno" data-id="${b.id}">stornieren</button></div>` : ""}</div>`;
+  }
+  function bestellText(b) {
+    const lf = lieferant(b.lieferant), f = FIL();
+    return `Guten Tag${lf.kontakt ? " " + lf.kontakt : ""},\n\nbitte liefern Sie an frooters ${f.name}:\n\n${b.posten.map((x) => { const a = artikelVon(x.artikel); return `- ${L.mengeText(a, x.menge)} ${a.name}${a.bestellNr ? ` (Nr. ${a.bestellNr})` : ""}`; }).join("\n")}\n\nVielen Dank!\n${name(ICH())}, frooters ${f.kurz}`;
+  }
+  V.bestellung = () => {
+    const f = FIL(), inv = L.letzteInventur(S, f.id), v = L.bestellVorschlag(S, f.id, inv);
+    const offen = W().bestellungen.filter((b) => b.filiale === f.id && (b.status === "frei" || b.status === "geschickt"));
+    const fertig = W().bestellungen.filter((b) => b.filiale === f.id && b.status === "geliefert").sort((a, b) => b.geliefert.am.localeCompare(a.geliefert.am)).slice(0, 3);
+    const proL = {}; for (const z of v) (proL[z.lieferant] = proL[z.lieferant] || []).push(z);
+    return `${titel("Bestellung " + esc(f.kurz))}${breit() ? "" : frootie(FROOTIE_TIPPS.bestellung)}${bestTabs("bestellung")}
+      ${inv ? `<p class="klein muted">Bestand aufgenommen ${zeitKurz(inv.zeit)} von ${wer(inv.von)}. ${inv.datum < L.plusTage(heute(), -2) ? '<b class="warn-txt">Älter als 2 Tage, bitte neu zählen.</b>' : ""}</p>` : `<p class="hinweis">Noch kein Bestand aufgenommen. Ohne gezählten Bestand gibt es keinen Vorschlag. <button class="chip" data-go="inventur">📋 Jetzt zählen</button></p>`}
+      <div class="karte"><h2>Bestellvorschlag</h2><p class="klein muted">Vorschlag = Sollbestand − Istbestand − schon unterwegs, aufgerundet auf volle Gebinde. Mengen prüfen und anpassen, dann freigeben. Nichts wird automatisch verschickt.</p>
+        ${Object.entries(proL).map(([lid, zs]) => `<h3>${esc(lieferant(lid).name)}${lieferant(lid).bestelltage ? ` <span class="klein muted">· bestellen: ${esc(lieferant(lid).bestelltage)}</span>` : ""}</h3>
+          <div class="tab-karte"><table class="pc-tab best-tab"><thead><tr><th>Artikel</th><th class="z">Soll</th><th class="z">Ist</th><th class="z">unterwegs</th><th>Vorschlag</th><th class="z">bestellen</th></tr></thead><tbody>
+          ${zs.map((z) => `<tr class="${z.unterMin ? "unter" : ""}"><td>${lagerSym(z.artikel.lager)} <b>${esc(z.artikel.name)}</b><small>${esc(gebindeTxt(z.artikel))}${z.unterMin ? " · <b>unter Mindestbestand</b>" : ""}</small></td>
+            <td class="z">${zahlTxt(z.soll)} ${esc(z.artikel.einheit)}</td><td class="z">${z.gezaehlt ? zahlTxt(z.ist) : '<span class="marke-s gelb">nicht gezählt</span>'}</td><td class="z">${z.unterwegs ? zahlTxt(z.unterwegs) : "–"}</td>
+            <td>${z.gebinde ? esc(L.mengeText(z.artikel, z.gebinde)) : z.gezaehlt ? '<span class="muted">genug da</span>' : "–"}</td>
+            <td class="z"><input type="number" class="bm" min="0" max="999" step="1" data-bm="${z.artikel.id}" value="${z.gebinde || 0}" aria-label="${esc(z.artikel.name)} bestellen (${esc(z.artikel.gebinde ? z.artikel.gebinde.mehrzahl : "Stück")})"></td></tr>`).join("")}</tbody></table></div>`).join("") || '<p class="leer">Noch kein Sortiment hinterlegt. Unter „Sortiment & Soll“ einrichten.</p>'}
+        ${v.length ? `<button class="btn gross" data-act="best-anlegen">✅ Bestellung freigeben</button>` : ""}</div>
+      <div class="abschnitt"><h2>Offene Bestellungen</h2>${offen.map(bestellungKarte).join("") || '<p class="leer">Keine offenen Bestellungen.</p>'}</div>
+      ${fertig.length ? `<div class="abschnitt"><h2>Zuletzt geliefert</h2>${fertig.map(bestellungKarte).join("")}</div>` : ""}`;
+  };
+  V.inventur = () => {
+    const f = FIL(), so = W().sortiment[f.id] || {}, inv = L.letzteInventur(S, f.id);
+    const arts = W().artikel.filter((a) => so[a.id] && a.aktiv !== false);
+    return `${titel("Bestand aufnehmen", "bestellung")}${bestTabs("inventur")}
+      <p class="klein muted">Im Lager zählen und die Menge in der angegebenen Einheit eintragen (z. B. 2 Kartons à 6 l = 12). Leer lassen = nicht gezählt. Grau = letzter Wert${inv ? ` vom ${L.datumKurz(inv.datum)}` : ""}.</p>
+      ${L.LAGERORTE.map((lo) => { const xs = arts.filter((a) => a.lager === lo.id); return xs.length ? `<div class="karte"><h2>${lo.sym} ${lo.name}</h2>${xs.map((a) => `<div class="inv-zeile"><label for="inv-${a.id}"><b>${esc(a.name)}</b><small>${esc(gebindeTxt(a))}</small></label><span class="inv-feld"><input type="number" inputmode="decimal" min="0" step="any" id="inv-${a.id}" data-inv="${a.id}" placeholder="${inv && inv.posten[a.id] != null ? zahlTxt(inv.posten[a.id]) : ""}"><span>${esc(a.einheit)}</span></span></div>`).join("")}</div>` : ""; }).join("") || '<p class="leer">Noch kein Sortiment hinterlegt.</p>'}
+      ${arts.length ? '<button class="btn gross" data-act="inv-speichern">Bestand speichern</button>' : ""}`;
+  };
+  V.lagersoll = () => {
+    const f = FIL(), so = W().sortiment[f.id] || {};
+    return `${titel("Sortiment & Sollbestand", "bestellung")}${bestTabs("lagersoll")}
+      <p class="klein muted">Welche Artikel führt ${esc(f.kurz)}? <b>Soll</b> = so viel soll nach der Lieferung da sein. <b>Mindestbestand</b> = darunter wird es knapp (steht im Vorschlag oben in Rot).</p>
+      <div class="karte tab-karte"><table class="pc-tab"><thead><tr><th>führen</th><th>Artikel</th><th>Lieferant</th><th class="z">Soll</th><th class="z">Mindestbestand</th></tr></thead><tbody>
+      ${W().artikel.filter((a) => a.aktiv !== false).map((a) => { const x = so[a.id]; return `<tr><td><input type="checkbox" data-ls-an="${a.id}" ${x ? "checked" : ""} aria-label="${esc(a.name)} führen"></td><td>${lagerSym(a.lager)} <b>${esc(a.name)}</b><small>${esc(gebindeTxt(a))}</small></td><td>${esc(lieferant(a.lieferant).name)}</td>
+        <td class="z"><input type="number" class="bm" min="0" step="any" data-ls-soll="${a.id}" value="${x ? x.soll : ""}" aria-label="Soll ${esc(a.name)}"> ${esc(a.einheit)}</td><td class="z"><input type="number" class="bm" min="0" step="any" data-ls-min="${a.id}" value="${x ? x.min : ""}" aria-label="Mindestbestand ${esc(a.name)}"> ${esc(a.einheit)}</td></tr>`; }).join("")}</tbody></table></div>
+      <button class="btn gross" data-act="ls-speichern">Speichern</button>
+      <p class="klein muted">Neue Artikel und Lieferanten legt die Zentrale an.</p>`;
+  };
+  const artTabs = (an) => `<div class="wahl tabs">${[["artikel", "🏷️ Artikel"], ["lieferanten", "🚚 Lieferanten"]].map(([v, t]) => `<button class="${an === v ? "an" : ""}" data-go="${v}">${t}</button>`).join("")}</div>`;
+  V.artikel = () => `${titel("Artikel & Lieferanten")}${breit() ? "" : frootie(FROOTIE_TIPPS.artikel)}${artTabs("artikel")}
+    <div class="reihe"><button class="btn zwei" data-act="artikel-neu">+ Neuer Artikel</button><span class="klein muted">${W().artikel.length} Artikel · Beispiele, mit frooters abstimmen</span></div>
+    <div class="karte tab-karte"><table class="pc-tab"><thead><tr><th>Artikel</th><th>Lieferant</th><th>Lager</th><th>Gebinde</th><th>Bestell-Nr.</th><th>Zutat</th><th class="z">Filialen</th></tr></thead><tbody>
+    ${W().artikel.slice().sort((a, b) => a.name.localeCompare(b.name)).map((a) => `<tr data-go="artikel-edit" data-arg="${a.id}" tabindex="0" class="${a.aktiv === false ? "inaktiv" : ""}"><td><b>${esc(a.name)}</b></td><td>${esc(lieferant(a.lieferant).name)}</td><td>${lagerSym(a.lager)} ${esc((L.LAGERORTE.find((x) => x.id === a.lager) || {}).name || "")}</td><td>${esc(gebindeTxt(a))}</td><td>${esc(a.bestellNr || "–")}</td><td>${a.zutatId ? esc((S.rezepte.zutaten.find((z) => z.id === a.zutatId) || {}).name || "") : "–"}</td><td class="z">${S.filialen.filter((f) => (W().sortiment[f.id] || {})[a.id]).length}</td></tr>`).join("")}</tbody></table></div>`;
+  V["artikel-edit"] = () => {
+    const a = artikelVon(arg); if (!a) return `${titel("Artikel", "artikel")}<p class="leer">Nicht gefunden.</p>`;
+    const g = a.gebinde || { name: "Stück", mehrzahl: "Stück", menge: 1 };
+    return `${titel(esc(a.name), "artikel")}<div class="karte">
+      <div class="gitter2"><div class="feld"><label for="ar-name">Name</label><input type="text" id="ar-name" maxlength="60" value="${esc(a.name)}"></div>
+        <div class="feld"><label for="ar-lief">Lieferant</label><select id="ar-lief">${W().lieferanten.map((l) => `<option value="${l.id}" ${l.id === a.lieferant ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></div></div>
+      <div class="gitter2"><div class="feld"><label for="ar-nr">Bestellnummer beim Lieferanten</label><input type="text" id="ar-nr" maxlength="30" value="${esc(a.bestellNr || "")}"></div>
+        <div class="feld"><label for="ar-lager">Lagerort</label><select id="ar-lager">${L.LAGERORTE.map((l) => `<option value="${l.id}" ${l.id === a.lager ? "selected" : ""}>${l.sym} ${l.name}</option>`).join("")}</select></div></div>
+      <div class="gitter3"><div class="feld"><label for="ar-einheit">Einheit</label><input type="text" id="ar-einheit" maxlength="10" value="${esc(a.einheit)}" placeholder="kg, l, Stk"></div>
+        <div class="feld"><label for="ar-gname">Gebinde</label><input type="text" id="ar-gname" maxlength="20" value="${esc(g.name)}" placeholder="Karton"></div>
+        <div class="feld"><label for="ar-gmenge">Inhalt je Gebinde</label><input type="number" id="ar-gmenge" min="1" step="any" value="${g.menge}"></div></div>
+      <div class="gitter2"><div class="feld"><label for="ar-gmehr">Gebinde Mehrzahl</label><input type="text" id="ar-gmehr" maxlength="20" value="${esc(g.mehrzahl || g.name)}" placeholder="Kartons"></div>
+        <div class="feld"><label for="ar-zutat">Zutat (für Allergene und später den Verbrauch)</label><select id="ar-zutat"><option value="">keine (z. B. Verpackung)</option>${S.rezepte.zutaten.slice().sort((x, y) => x.name.localeCompare(y.name)).map((z) => `<option value="${z.id}" ${z.id === a.zutatId ? "selected" : ""}>${esc(z.name)}</option>`).join("")}</select></div></div>
+      <div class="feld"><label for="ar-ek">Einkaufspreis je Gebinde (freiwillig, nur Zentrale)</label><input type="number" id="ar-ek" min="0" step="0.01" value="${a.ekPreis != null ? a.ekPreis : ""}" placeholder="leer lassen, wenn unbekannt"></div>
+      <label class="haken"><input type="checkbox" id="ar-aktiv" ${a.aktiv !== false ? "checked" : ""}><span>aktiv (nicht mehr geführte Artikel abwählen)</span></label>
+      <button class="btn gross" data-act="artikel-speichern" data-id="${a.id}">Speichern</button></div>`;
+  };
+  V.lieferanten = () => `${titel("Artikel & Lieferanten")}${artTabs("lieferanten")}
+    <div class="reihe"><button class="btn zwei" data-act="lieferant-neu">+ Neuer Lieferant</button></div>
+    <div class="liste">${W().lieferanten.map((l) => `<button class="zeile" data-go="lieferant-edit" data-arg="${l.id}"><span class="punkt gruen"></span><span><b>${esc(l.name)}</b><small>${W().artikel.filter((a) => a.lieferant === l.id).length} Artikel${l.bestelltage ? ` · bestellen: ${esc(l.bestelltage)}` : ""}${l.email ? ` · ${esc(l.email)}` : " · keine E-Mail"}</small></span><span>›</span></button>`).join("")}</div>`;
+  V["lieferant-edit"] = () => {
+    const l = W().lieferanten.find((x) => x.id === arg); if (!l) return `${titel("Lieferant", "lieferanten")}<p class="leer">Nicht gefunden.</p>`;
+    const f = (id, lbl, wert, typ, ph) => `<div class="feld"><label for="${id}">${lbl}</label><input type="${typ || "text"}" id="${id}" maxlength="80" value="${esc(wert || "")}" placeholder="${ph || ""}"></div>`;
+    return `${titel(esc(l.name), "lieferanten")}<div class="karte">
+      <div class="gitter2">${f("lf-name", "Firma", l.name)}${f("lf-kontakt", "Ansprechpartner", l.kontakt)}</div>
+      <div class="gitter2">${f("lf-email", "E-Mail für Bestellungen", l.email, "email")}${f("lf-tel", "Telefon", l.telefon, "tel")}</div>
+      <div class="gitter2">${f("lf-tage", "Bestelltage / Annahmeschluss", l.bestelltage, "text", "z. B. Mo, Do bis 12 Uhr")}${f("lf-hinweis", "Hinweis", l.hinweis)}</div>
+      <button class="btn gross" data-act="lieferant-speichern" data-id="${l.id}">Speichern</button></div>`;
+  };
   V.export = () => {
     const f = FIL(), monat = arg || heute().slice(0, 7);
     const vor = (() => { const [y, m] = monat.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
@@ -1219,8 +1318,8 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
-    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
-    const nurZentrale = ["auswertung", "filialen", "admin", "admin-edit", "admin-pinnwand"];
+    const nurLeitung = ["bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
+    const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit"];
     if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
@@ -1607,6 +1706,65 @@ const APP_VERSION = "0.9.0"; // gleich halten mit sw.js, version.json und ?v= in
           : `<table class="zutaten"><tbody>${d.zutaten.map((z) => `<tr><td>${esc(z.name)}${(z.allergene || []).length ? ` <span class="marke-s rot">${z.allergene.map(esc).join(", ")}</span>` : ""}</td><td>${typeof z.menge === "object" ? d.groessen.map((g) => z.menge[g]).join("/") : z.menge} ${esc(z.einheit)}</td></tr>`).join("")}</tbody></table>
             <p>Allergene: <b>${L.allergeneVon(d).map(esc).join(", ") || "keine"}</b></p><ol class="schritte">${(d.schritte || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`}`;
       zeichnen();
+    },
+    "best-anlegen": () => {
+      const mengen = {};
+      for (const x of document.querySelectorAll("[data-bm]")) mengen[x.dataset.bm] = x.value;
+      const neu = L.bestellungenAnlegen(S, FIL().id, mengen, ICH().id, jetztIso(), () => neueId("bs"));
+      if (!neu.length) return meldung("Keine Mengen eingetragen.");
+      speichern(); meldung(`${neu.length} Bestellung${neu.length > 1 ? "en" : ""} freigegeben. Jetzt drucken oder per E-Mail schicken.`); zeichnen();
+    },
+    "best-drucken": (el) => { const b = W().bestellungen.find((x) => x.id === el.dataset.id); drucken(B.bestellungHtml(S, b, filiale(b.filiale), BILD, (id) => name(person(id))), false); },
+    "best-geschickt": (el) => { const b = W().bestellungen.find((x) => x.id === el.dataset.id); b.status = "geschickt"; b.geschickt = { am: jetztIso(), von: ICH().id }; speichern(); meldung("Als bestellt markiert"); zeichnen(); },
+    "best-storno": (el) => { const b = W().bestellungen.find((x) => x.id === el.dataset.id); b.status = "storniert"; b.storniert = { am: jetztIso(), von: ICH().id }; speichern(); meldung("Bestellung storniert"); zeichnen(); },
+    "best-eingang": (el) => {
+      const b = W().bestellungen.find((x) => x.id === el.dataset.id);
+      fenster = `<div class="reihe zw"><h2>📥 Ware ist da: ${esc(lieferant(b.lieferant).name)}</h2><button class="chip" data-act="zu">✕</button></div>
+        <p class="klein muted">Mit dem Lieferschein vergleichen. Stimmt alles, einfach bestätigen. Sonst die gelieferte Menge ändern.</p>
+        ${b.posten.map((x) => { const a = artikelVon(x.artikel); return `<div class="inv-zeile"><label for="we-${a.id}"><b>${esc(a.name)}</b><small>bestellt: ${esc(L.mengeText(a, x.menge))}</small></label><span class="inv-feld"><input type="number" min="0" step="1" id="we-${a.id}" data-we="${a.id}" value="${x.menge}"><span>${esc(x.menge === 1 ? a.gebinde.name : a.gebinde.mehrzahl)}</span></span></div>`; }).join("")}
+        <p class="hinweis">🧼 Kühlware: Temperatur und Haltbarkeit (MHD) wie in der Hygiene-Liste prüfen.</p>
+        <button class="btn gross" data-act="best-eingang-ok" data-id="${b.id}">Wareneingang bestätigen</button>`;
+      zeichnen();
+    },
+    "best-eingang-ok": (el) => {
+      const g = {}; for (const x of document.querySelectorAll("[data-we]")) g[x.dataset.we] = x.value;
+      const b = L.wareneingang(S, el.dataset.id, g, ICH().id, jetztIso()); if (!b) return;
+      if (b.geliefert.abweichungen.length) { S.meldungen = S.meldungen || []; S.meldungen.push({ id: neueId("m"), filiale: b.filiale, text: `📦 Lieferung ${lieferant(b.lieferant).name}: ${b.geliefert.abweichungen.map((x) => `${artikelVon(x.artikel).name} ${x.geliefert} statt ${x.bestellt}`).join(", ")}`, zeit: jetztIso() }); }
+      fenster = null; speichern(); meldung(b.geliefert.abweichungen.length ? "Gespeichert, Abweichung notiert" : "Wareneingang gespeichert"); zeichnen();
+    },
+    "inv-speichern": () => {
+      const posten = {}; let n = 0, leer = 0;
+      for (const x of document.querySelectorAll("[data-inv]")) { const v = x.value.trim().replace(",", "."); if (v === "") { leer++; continue; } const z = Number(v); if (isNaN(z) || z < 0) return meldung("Bitte nur Zahlen ab 0 eintragen."); posten[x.dataset.inv] = z; n++; }
+      if (!n) return meldung("Noch nichts gezählt.");
+      W().inventuren.push({ id: neueId("iv"), filiale: FIL().id, datum: heute(), zeit: jetztIso(), von: ICH().id, posten });
+      speichern(); meldung(`Bestand gespeichert (${n} Artikel${leer ? `, ${leer} nicht gezählt` : ""})`); gehe("bestellung");
+    },
+    "ls-speichern": () => {
+      const so = {};
+      for (const x of document.querySelectorAll("[data-ls-an]")) {
+        if (!x.checked) continue; const id = x.dataset.lsAn;
+        const soll = Number(($(`[data-ls-soll="${id}"]`).value || "").replace(",", ".")), min = Number(($(`[data-ls-min="${id}"]`).value || "0").replace(",", "."));
+        if (isNaN(soll) || soll <= 0) return meldung(`Bitte ein Soll für „${artikelVon(id).name}“ eintragen.`);
+        so[id] = { soll, min: isNaN(min) ? 0 : Math.min(min, soll) };
+      }
+      W().sortiment[FIL().id] = so; speichern(); meldung("Sortiment gespeichert"); gehe("bestellung");
+    },
+    "artikel-neu": () => { const a = { id: neueId("ar"), name: "Neuer Artikel", lieferant: (W().lieferanten[0] || {}).id, bestellNr: "", lager: "trocken", einheit: "Stk", gebinde: { name: "Karton", mehrzahl: "Kartons", menge: 1 }, ekPreis: null, zutatId: null, aktiv: true }; W().artikel.push(a); speichern(); gehe("artikel-edit", a.id); },
+    "artikel-speichern": (el) => {
+      const a = artikelVon(el.dataset.id), w = (id) => $(id).value.trim();
+      const menge = Number(w("#ar-gmenge").replace(",", "."));
+      if (!w("#ar-name") || !w("#ar-einheit") || !(menge > 0)) return meldung("Bitte Name, Einheit und Inhalt je Gebinde angeben.");
+      const ek = w("#ar-ek");
+      Object.assign(a, { name: w("#ar-name"), lieferant: w("#ar-lief"), bestellNr: w("#ar-nr"), lager: w("#ar-lager"), einheit: w("#ar-einheit"), gebinde: { name: w("#ar-gname") || "Stück", mehrzahl: w("#ar-gmehr") || w("#ar-gname") || "Stück", menge }, zutatId: w("#ar-zutat") || null, ekPreis: ek === "" ? null : Math.max(0, Number(ek.replace(",", ".")) || 0), aktiv: $("#ar-aktiv").checked });
+      speichern(); meldung("Artikel gespeichert"); gehe("artikel");
+    },
+    "lieferant-neu": () => { const l = { id: neueId("lf"), name: "Neuer Lieferant", kontakt: "", email: "", telefon: "", bestelltage: "", hinweis: "" }; W().lieferanten.push(l); speichern(); gehe("lieferant-edit", l.id); },
+    "lieferant-speichern": (el) => {
+      const l = W().lieferanten.find((x) => x.id === el.dataset.id), w = (id) => $(id).value.trim();
+      if (!w("#lf-name")) return meldung("Bitte den Namen eingeben.");
+      const mail = w("#lf-email"); if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return meldung("Die E-Mail-Adresse sieht nicht richtig aus.");
+      Object.assign(l, { name: w("#lf-name"), kontakt: w("#lf-kontakt"), email: mail, telefon: w("#lf-tel"), bestelltage: w("#lf-tage"), hinweis: w("#lf-hinweis") });
+      speichern(); meldung("Lieferant gespeichert"); gehe("lieferanten");
     },
     "export-csv": (el) => {
       const text = exportCsv(el.dataset.monat);

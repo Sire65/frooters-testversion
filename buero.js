@@ -108,6 +108,23 @@
       <div class="dp-fuss"><span>${esc(d.fuss || "")}</span>${d.frootie !== false ? `<img src="${bild.frootie}" alt="">` : ""}</div>
     </div>`;
   }
+  // Bestellung an einen Lieferanten (A4 hoch, frooters-Design)
+  function bestellungHtml(state, b, filiale, bild, nameVon) {
+    const W = L.waren(state), lf = W.lieferanten.find((x) => x.id === b.lieferant) || { name: "?" };
+    const zeilen = b.posten.map((x) => { const a = W.artikel.find((y) => y.id === x.artikel) || { name: "?", einheit: "" }; const g = a.gebinde || { name: "Stück", menge: 1 };
+      return `<tr><td>${esc(a.bestellNr || "–")}</td><td><b>${esc(a.name)}</b><small>${g.menge > 1 ? `${esc(g.name)} à ${g.menge} ${esc(a.einheit)}` : esc(a.einheit)}</small></td><td class="z"><b>${x.menge}</b> ${esc(x.menge === 1 ? g.name : (g.mehrzahl || g.name))}</td></tr>`; }).join("");
+    return `<div class="druckblatt hoch bestellblatt" style="--dp:#c10230;--dp-hell:#fbe5ea">
+      <div class="dp-kopf"><img src="${bild.logo}" alt="frooters"><span>${esc(filiale.name)}</span></div>
+      <div class="dp-rumpf">
+        <h1>Bestellung</h1>
+        <div class="bs-kopf"><div><small>an</small><b>${esc(lf.name)}</b>${lf.kontakt ? `<br>${esc(lf.kontakt)}` : ""}${lf.telefon ? `<br>${esc(lf.telefon)}` : ""}${lf.email ? `<br>${esc(lf.email)}` : ""}</div>
+          <div><small>von</small><b>frooters ${esc(filiale.kurz || filiale.name)}</b><br>${esc(nameVon ? nameVon(b.von) : "")}<br>${esc(L.datumKurz(b.erstellt.slice(0, 10)))}</div></div>
+        <table class="dp-bestell"><thead><tr><th>Best.-Nr.</th><th>Artikel</th><th class="z">Menge</th></tr></thead><tbody>${zeilen}</tbody></table>
+        <p class="dp-klein">Bitte Liefertermin bestätigen. Vielen Dank!</p>
+      </div>
+      <div class="dp-fuss"><span>frooters · Bestellung ${esc(b.id)}</span><img src="${bild.frootie}" alt=""></div>
+    </div>`;
+  }
   // Briefbogen im frooters-Design
   function briefHtml(d, absender, bild) {
     return `<div class="druckblatt hoch brief" style="--dp:#c10230;--dp-hell:#fbe5ea">
@@ -140,5 +157,5 @@
       <div class="dp-fuss"><span>Erstellt mit der frooters Team-App (Testversion, Beispieldaten). Nicht erledigte Aufgaben sind markiert.</span></div></div>`;
   }
 
-  return { ORDNER, FREIGABE_ROLLEN, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml };
+  return { ORDNER, FREIGABE_ROLLEN, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
 });

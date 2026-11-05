@@ -924,6 +924,65 @@
   }
   // Rezepte, die im Shop sichtbar sind (nie freigegebene neue Rezepte nicht)
   function rezepteFreigegeben(state) { return ((state.rezepte || {}).rezepte || []).filter((r) => !r.neu); }
+  // ---------- Sortiment & Bestellung ----------
+  const LAGERORTE = [{ id: "kuehl", name: "Kühlung", sym: "❄️" }, { id: "tk", name: "Tiefkühler", sym: "🧊" }, { id: "trocken", name: "Trockenlager", sym: "📦" }, { id: "verpackung", name: "Verpackung & Bedarf", sym: "🥤" }];
+  const BESTELL_STATUS = { frei: "freigegeben", geschickt: "bestellt", geliefert: "geliefert", storniert: "storniert" };
+  function waren(state) { return state.waren || { lieferanten: [], artikel: [], sortiment: {}, inventuren: [], bestellungen: [] }; }
+  function letzteInventur(state, filialeId) {
+    return waren(state).inventuren.filter((i) => i.filiale === filialeId).sort((a, b) => b.zeit.localeCompare(a.zeit))[0] || null;
+  }
+  // Ware, die bestellt, aber noch nicht geliefert ist (nach der letzten Inventur bestellt oder noch offen)
+  function unterwegs(state, filialeId, artikelId) {
+    let n = 0;
+    for (const b of waren(state).bestellungen) if (b.filiale === filialeId && (b.status === "frei" || b.status === "geschickt")) for (const x of b.posten) if (x.artikel === artikelId) n += x.menge;
+    return n;
+  }
+  // Bestellvorschlag = Soll − Ist − unterwegs, aufgerundet auf volle Gebinde. Ohne gezählten Bestand kein Vorschlag (nie raten).
+  function bestellVorschlag(state, filialeId, inventur) {
+    const W = waren(state), inv = inventur === undefined ? letzteInventur(state, filialeId) : inventur;
+    const so = W.sortiment[filialeId] || {};
+    const zeilen = [];
+    for (const a of W.artikel) {
+      const v = so[a.id]; if (!v || a.aktiv === false) continue;
+      const ist = inv && inv.posten[a.id] != null ? Number(inv.posten[a.id]) : null;
+      const proGebinde = Math.max(1, (a.gebinde && a.gebinde.menge) || 1);
+      const weg = unterwegs(state, filialeId, a.id) * proGebinde;
+      const fehlt = ist == null ? null : Math.max(0, v.soll - ist - weg);
+      const gebinde = fehlt == null || fehlt <= 0 ? 0 : Math.ceil(fehlt / proGebinde - 1e-9);
+      zeilen.push({ artikel: a, lieferant: a.lieferant, soll: v.soll, min: v.min || 0, ist, unterwegs: weg, fehlt, gebinde, unterMin: ist != null && ist + weg < (v.min || 0), gezaehlt: ist != null });
+    }
+    const lo = LAGERORTE.map((x) => x.id);
+    return zeilen.sort((a, b) => (b.unterMin - a.unterMin) || (lo.indexOf(a.artikel.lager) - lo.indexOf(b.artikel.lager)) || a.artikel.name.localeCompare(b.artikel.name));
+  }
+  // Aus geprüften Mengen (Gebinde je Artikel) je Lieferant eine Bestellung anlegen
+  function bestellungenAnlegen(state, filialeId, mengen, vonId, zeit, neueId) {
+    const W = waren(state), neu = [];
+    const proL = {};
+    for (const [artId, m] of Object.entries(mengen)) {
+      const n = Math.max(0, Math.round(Number(m) || 0)); if (!n) continue;
+      const a = W.artikel.find((x) => x.id === artId); if (!a) continue;
+      (proL[a.lieferant] = proL[a.lieferant] || []).push({ artikel: a.id, menge: n });
+    }
+    for (const [lid, posten] of Object.entries(proL)) {
+      const b = { id: neueId(), filiale: filialeId, lieferant: lid, status: "frei", erstellt: zeit, von: vonId, posten };
+      W.bestellungen.push(b); neu.push(b);
+    }
+    return neu;
+  }
+  // Wareneingang: geliefert mit Abweichungen je Posten (fehlt, zu viel, beschädigt)
+  function wareneingang(state, bestellungId, geliefert, vonId, zeit) {
+    const b = waren(state).bestellungen.find((x) => x.id === bestellungId);
+    if (!b || (b.status !== "frei" && b.status !== "geschickt")) return null;
+    const abw = [];
+    for (const x of b.posten) { const g = geliefert && geliefert[x.artikel] != null ? Math.max(0, Number(geliefert[x.artikel]) || 0) : x.menge; x.geliefert = g; if (g !== x.menge) abw.push({ artikel: x.artikel, bestellt: x.menge, geliefert: g }); }
+    b.status = "geliefert"; b.geliefert = { am: zeit, von: vonId, abweichungen: abw };
+    return b;
+  }
+  function mengeText(artikel, menge) {
+    const g = artikel.gebinde || { name: "Stück", menge: 1 };
+    const n = menge === 1 ? g.name : (g.mehrzahl || g.name);
+    return g.menge > 1 ? `${menge} ${n} à ${g.menge} ${artikel.einheit}` : `${menge} ${n}`;
+  }
   function mengeFuer(zutat, groesse) {
     const m = zutat.menge;
     return typeof m === "object" ? m[groesse] : m;
@@ -983,6 +1042,7 @@
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
+    LAGERORTE, BESTELL_STATUS, waren, letzteInventur, unterwegs, bestellVorschlag, bestellungenAnlegen, wareneingang, mengeText,
     allergeneVon, spurenVon, mengeFuer, quiz, zufall, mischen,
     FREIGABE_ROLLEN_REZEPT, zutatFinden, zutatAllergene, allergeneAktualisieren, zutatenZeilen, entwurfSpeichern, ungepruefteZutaten, freigabePruefen, freigeben, entwurfVerwerfen, offeneFreigaben, aenderungen, rezepteFreigegeben,
   };

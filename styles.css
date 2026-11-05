@@ -301,6 +301,7 @@ table.pc-tab { width: 100%; border-collapse: collapse; font-size: .86rem; }
 table.pc-tab th { text-align: left; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 8px; border-bottom: 2px solid var(--line); white-space: nowrap; }
 table.pc-tab td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.pc-tab td small { display: block; color: var(--muted); font-size: .8rem; }
+table.pc-tab th.z { text-align: right; }
 table.pc-tab td.z { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 table.pc-tab tr[data-go] { cursor: pointer; } table.pc-tab tr[data-go]:hover td { background: var(--tint); }
 table.pc-tab tr.gewaehlt td { background: var(--green-soft); } table.pc-tab tr.inaktiv td { opacity: .55; }
@@ -332,6 +333,25 @@ table.pc-tab small.warn { color: var(--amber); font-weight: 700; }
 .al-wahl .tagwahl.spuren input:checked + span { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
 .al-wahl .tagwahl.nein input:checked + span { background: var(--tint); border-color: var(--muted); color: var(--ink); }
 ul.aend { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; }
+
+/* ---------- 0.10.0: Sortiment & Bestellung ---------- */
+input.bm { width: 84px; text-align: right; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+table.best-tab tr.unter td { background: var(--red-soft); }
+.warn-txt { color: var(--red); }
+.inv-zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.inv-zeile label { display: grid; } .inv-zeile label small { color: var(--muted); font-size: .82rem; }
+.inv-feld { display: flex; align-items: center; gap: 6px; flex: none; }
+.inv-feld input { width: 96px; font-size: 1.1rem; text-align: right; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.inv-feld span { min-width: 2.4em; color: var(--muted); }
+a.btn { text-decoration: none; display: inline-block; }
+.bs-kopf { display: grid; grid-template-columns: 1fr 1fr; gap: 4cqw; font-size: 2.4cqw; line-height: 1.45; }
+.bs-kopf small { display: block; color: #5d604f; font-size: 1.8cqw; text-transform: uppercase; letter-spacing: .08em; }
+table.dp-bestell { width: 100%; border-collapse: collapse; font-size: 2.4cqw; }
+table.dp-bestell th { text-align: left; background: var(--dp-hell); padding: 1cqw; font-size: 1.9cqw; }
+table.dp-bestell td { padding: 1.2cqw 1cqw; border-bottom: .2cqw solid #e2e3d6; vertical-align: top; }
+table.dp-bestell td small { display: block; color: #5d604f; font-size: 1.8cqw; }
+table.dp-bestell .z { text-align: right; white-space: nowrap; }
+.bestellblatt h1 { text-align: left; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

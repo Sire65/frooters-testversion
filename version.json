@@ -1,11 +1,11 @@
 {
-  "version": "0.9.0",
+  "version": "0.10.0",
   "datum": "2026-11-05",
   "stufe": "DEV",
   "neu": [
-    "Zutaten & Allergene: Allergene (enthält / Spuren / nein) werden an der Zutat gepflegt, Rezepte rechnen sie aus",
-    "4-Augen-Freigabe: Änderungen an Rezepten und Zutaten gelten erst nach Freigabe durch eine zweite Person",
-    "Fassungen: jede Freigabe ergibt eine neue Fassung, alte bleiben lesbar",
-    "Allergen-Aushang und Rezepte zeigen auch Spuren"
+    "Sortiment & Bestellung: Artikel mit Lieferant, Gebinde und Lagerort, Soll- und Mindestbestand je Filiale",
+    "Bestand aufnehmen am Handy nach Lagerort",
+    "Automatische Bestellliste: Soll minus Ist minus unterwegs, auf volle Gebinde gerundet, je Lieferant",
+    "Bestellung freigeben, drucken oder als PDF speichern, E-Mail vorbereiten; Wareneingang mit Abweichungen"
   ]
 }

@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v9";
+  const SCHLUESSEL = "frooters_demo_v10";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -179,10 +179,56 @@
     const sauce = zutaten.find((z) => z.name === "Maracuja-Sauce");
     if (sauce) sauce.entwurf = { daten: { name: sauce.name, lieferant: "Beispiel-Lieferant", artNr: "", zusatzstoffe: "", allergene: { Milch: "spuren" } }, von: petra, am: L.plusTage(heuteIso, -1) + "T15:20" };
 
+    // Sortiment & Bestellung (alles Beispiele: Lieferanten, Gebinde und Mengen mit frooters abstimmen)
+    const lieferanten = [
+      { id: "lf1", name: "Molkerei Beispiel", kontakt: "", email: "", telefon: "", bestelltage: "Mo, Do", hinweis: "Beispiel" },
+      { id: "lf2", name: "Obst-Großmarkt Beispiel", kontakt: "", email: "", telefon: "", bestelltage: "täglich bis 14 Uhr", hinweis: "Beispiel" },
+      { id: "lf3", name: "Trockenwaren Beispiel", kontakt: "", email: "", telefon: "", bestelltage: "Di", hinweis: "Beispiel" },
+      { id: "lf4", name: "Verpackung Beispiel", kontakt: "", email: "", telefon: "", bestelltage: "alle 2 Wochen", hinweis: "Beispiel" },
+    ];
+    const zid = (n) => (zutaten.find((z) => z.name === n) || {}).id || null;
+    const AR = (name, lieferant, lager, einheit, gebinde, extra) => Object.assign({ id: id("ar"), name, lieferant, bestellNr: "", lager, einheit, gebinde, ekPreis: null, zutatId: zid(name), aktiv: true }, extra || {});
+    const K = (menge, name, mehrzahl) => ({ name: name || "Karton", mehrzahl: mehrzahl || (name ? name : "Kartons"), menge });
+    const artikel = [
+      AR("Froyo-Basis Natur", "lf1", "kuehl", "l", K(6)),
+      AR("Joghurt", "lf1", "kuehl", "kg", K(4, "Eimer", "Eimer")),
+      AR("Milch", "lf1", "kuehl", "l", K(12)),
+      AR("Magerquark", "lf1", "kuehl", "kg", K(5, "Eimer", "Eimer")),
+      AR("Erdbeeren", "lf2", "kuehl", "kg", K(2, "Schale", "Schalen")),
+      AR("Banane", "lf2", "kuehl", "kg", K(5, "Kiste", "Kisten")),
+      AR("Mango gewürfelt", "lf2", "tk", "kg", K(2, "Beutel", "Beutel")),
+      AR("Beerenmischung", "lf2", "tk", "kg", K(2, "Beutel", "Beutel")),
+      AR("Apfelsaft", "lf2", "trocken", "l", K(6)),
+      AR("Granola", "lf3", "trocken", "kg", K(1, "Beutel", "Beutel")),
+      AR("Mandelblättchen", "lf3", "trocken", "kg", K(1, "Beutel", "Beutel")),
+      AR("Waffelteig", "lf3", "kuehl", "kg", K(5, "Eimer", "Eimer")),
+      AR("Becher S", "lf4", "verpackung", "Stk", K(500)),
+      AR("Becher M", "lf4", "verpackung", "Stk", K(500)),
+      AR("Becher L", "lf4", "verpackung", "Stk", K(500)),
+      AR("Löffel Holz", "lf4", "verpackung", "Stk", K(1000)),
+      AR("Servietten", "lf4", "verpackung", "Stk", K(2000)),
+    ];
+    const SOLL = { "Froyo-Basis Natur": [24, 12], Joghurt: [8, 4], Milch: [24, 12], Magerquark: [5, 2], Erdbeeren: [8, 4], Banane: [10, 5], "Mango gewürfelt": [6, 2], Beerenmischung: [6, 2], Apfelsaft: [12, 6], Granola: [3, 1], "Mandelblättchen": [2, 1], Waffelteig: [10, 5], "Becher S": [1000, 500], "Becher M": [1000, 500], "Becher L": [500, 250], "Löffel Holz": [2000, 1000], Servietten: [2000, 1000] };
+    const sortimentWaren = {};
+    for (const f of filialen) {
+      sortimentWaren[f.id] = {};
+      const faktor = f.art === "mobil" ? 0.5 : 1;
+      for (const a of artikel) {
+        if (f.id === "osn" && ["Froyo-Basis Natur", "Waffelteig", "Magerquark"].includes(a.name)) continue;
+        const [so, mi] = SOLL[a.name]; sortimentWaren[f.id][a.id] = { soll: Math.round(so * faktor), min: Math.round(mi * faktor) };
+      }
+    }
+    const art = (n) => artikel.find((a) => a.name === n).id;
+    const sandra = personen.find((p) => p.vorname === "Sandra").id, anna = personen.find((p) => p.vorname === "Anna").id;
+    const inventuren = [{ id: id("iv"), filiale: "och", datum: L.plusTage(heuteIso, -1), zeit: L.plusTage(heuteIso, -1) + "T19:40", von: sandra,
+      posten: { [art("Froyo-Basis Natur")]: 5, [art("Joghurt")]: 6, [art("Milch")]: 10, [art("Magerquark")]: 4, [art("Erdbeeren")]: 3, [art("Banane")]: 6, [art("Mango gewürfelt")]: 1, [art("Beerenmischung")]: 4, [art("Apfelsaft")]: 12, [art("Granola")]: 2.5, [art("Mandelblättchen")]: 1, [art("Waffelteig")]: 8, [art("Becher S")]: 800, [art("Becher M")]: 1200, [art("Becher L")]: 200, [art("Löffel Holz")]: 1500, [art("Servietten")]: 2500 } }];
+    const bestellungen = [{ id: id("bs"), filiale: "obh", lieferant: "lf1", status: "geschickt", erstellt: L.plusTage(heuteIso, -1) + "T10:15", von: anna, geschickt: { am: L.plusTage(heuteIso, -1) + "T10:20" }, posten: [{ artikel: art("Froyo-Basis Natur"), menge: 3 }, { artikel: art("Milch"), menge: 1 }] }];
+
     const state = {
-      version: 9, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 10, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
+      waren: { lieferanten, artikel, sortiment: sortimentWaren, inventuren, bestellungen },
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
       betreiber: [
         { id: "gm", name: "Genussmanufaktur (eigene Filialen)", art: "eigen", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: { antrag: true }, pruefung: {}, freigegeben: false },
