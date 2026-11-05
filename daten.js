@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v7";
+  const SCHLUESSEL = "frooters_demo_v8";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -64,6 +64,30 @@
       P("Mia", "Schulz", "aushilfe", "osn", { stundenEinheit: "monat", urlaubsanspruch: 20, wochenstunden: 40, springer: true, einsatzfilialen: ["och", "rr"] }),
     ];
     const pid = (vorname) => personen.find((p) => p.vorname === vorname).id;
+    // Bundesland je Filiale (für Feiertage). Road Runner: je Einsatzort.
+    const LAND = { och: "NW", obh: "NW", sin: "BW", osn: "NI", rr: null };
+    for (const f of filialen) f.bundesland = LAND[f.id];
+    // Beschäftigungsart, Einsatzprofil, Qualifikationen (alles Beispiele)
+    const q = (tage) => L.plusTage(heuteIso, tage);
+    const PROFIL = {
+      Sandra: { beschaeftigung: "vollzeit", eintritt: "2021-04-01", quali: [{ art: "ifsg", bis: q(400) }, { art: "hygiene", bis: q(120) }, { art: "kasse", bis: null }, { art: "schluessel", bis: null }] },
+      Tom: { beschaeftigung: "vollzeit", eintritt: "2022-08-15", quali: [{ art: "ifsg", bis: q(18) }, { art: "kasse", bis: null }] },
+      Lena: { beschaeftigung: "teilzeit", ueberschreiten: { erlaubt: true, bisStd: 5 }, profil: { zeit: "spaet" }, quali: [{ art: "ifsg", bis: q(300) }] },
+      Leonie: { beschaeftigung: "azubi", unter18: true, ab16: true, profil: { zeit: "flexibel", nichtTage: ["di"], nichtGrund: "Berufsschule" }, quali: [{ art: "ifsg", bis: q(500) }] },
+      Jonas: { beschaeftigung: "minijob", profil: { zeit: "flexibel", tage: ["fr", "sa", "so"] }, springerInfo: { rr: { anreise: "auto", minuten: 0 }, osn: { anreise: "auto", minuten: 50 } }, quali: [{ art: "fuehrerschein", bis: null }, { art: "ifsg", bis: q(-3) }] },
+      Anna: { beschaeftigung: "vollzeit", quali: [{ art: "ifsg", bis: q(250) }, { art: "kasse", bis: null }] },
+      Lukas: { beschaeftigung: "teilzeit", profil: { zeit: "frueh" } },
+      Can: { beschaeftigung: "werkstudent", profil: { zeit: "abends", ab: "15:00" } },
+      Emma: { beschaeftigung: "minijob", profil: { zeit: "flexibel", tage: ["sa"] }, springerInfo: { rr: { anreise: "oepnv", minuten: 30 } } },
+      Mehmet: { beschaeftigung: "vollzeit" },
+      Julia: { beschaeftigung: "teilzeit", ueberschreiten: { erlaubt: true, bisStd: 8 } },
+      Paul: { beschaeftigung: "teilzeit", profil: { zeit: "morgens", bis: "16:00", bereitschaft: [{ tag: "sa", von: "10:00", bis: "14:00" }] } },
+      Sophie: { beschaeftigung: "kurzfristig", befristetBis: q(55) },
+      Nina: { beschaeftigung: "vollzeit" },
+      Ben: { beschaeftigung: "teilzeit", profil: { zeit: "flexibel", bereitschaft: [{ tag: "sa", von: "10:00", bis: "14:00" }, { tag: "so", von: "10:00", bis: "14:00" }] } },
+      Mia: { beschaeftigung: "minijob", springerInfo: { och: { anreise: "auto", minuten: 70 }, rr: { anreise: "auto", minuten: 0 } } },
+    };
+    for (const p of personen) Object.assign(p, { beschaeftigung: null, profil: { zeit: "flexibel" }, quali: [], ueberschreiten: { erlaubt: false, bisStd: 0 }, springerInfo: {} }, PROFIL[p.vorname] || {});
 
     const bereiche = [
       { id: "kuehl", name: "Kühlung" }, { id: "froyo", name: "Froyo-Station" }, { id: "saft", name: "Saftbar" },
@@ -139,7 +163,7 @@
     ];
 
     const state = {
-      version: 7, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 8, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.

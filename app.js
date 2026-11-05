@@ -1,4 +1,4 @@
-const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.8.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 7) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 8) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -83,7 +83,7 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
-    ma: "Hier pflegst du die Mitarbeiter. Springer bekommen einen Haken bei jeder Filiale, in der sie aushelfen dürfen.",
+    ma: "Hier pflegst du die Mitarbeiter: Beschäftigungsart, Stundenumfang (mit „darf überschreiten“), Einsatzprofil, Bereitschaft, Springer und Qualifikationen. Am PC siehst du alles als Tabelle.",
     regeln: "Die Hygieneregeln für alle Filialen. Die Shopleitungen sehen sie sofort.",
     auswertung: "Jede Filiale einzeln und alle zusammen.",
     tausch: "Du kannst nicht? Biete deine Schicht oder ein paar Stunden an. Ein Kollege übernimmt oder tauscht, deine Shopleitung bestätigt. Erst dann ändert sich der Plan.",
@@ -112,6 +112,16 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
   function titel(t, zurueck) {
     return `<div class="titel">${zurueck !== false ? `<button class="zurueck" data-go="${zurueck || "start"}" aria-label="Zurück">←</button>` : ""}<h1>${t}</h1>
       <button class="chip" data-act="hilfe" aria-label="Frootie fragen" style="margin-left:auto">❓</button></div>`;
+  }
+  // PC-Ansicht: ab 1100 Pixel Breite für Leitung, Zentrale und Qualität mit Seitenleiste
+  const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
+  function pcNav() {
+    const tmp = document.createElement("div"); tmp.innerHTML = V.start();
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const gesehen = new Set();
+    return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
+      ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
+        return `<h3>${esc(ab.querySelector("h2").textContent)}</h3>${ks.map((k) => `<button class="${aktiv === k.dataset.go ? "an" : ""}" data-go="${k.dataset.go}"><span aria-hidden="true">${esc(k.querySelector(".sym").textContent)}</span><span>${esc(k.querySelector("b").textContent)}</span>${k.querySelector(".zahl") ? `<span class="zahl">${esc(k.querySelector(".zahl").textContent)}</span>` : ""}</button>`).join("")}`; }).join("")}</nav>`;
   }
   function kachel(sym, t, u, go, zahl) { return `<button class="kachel" data-go="${go}"><span class="sym" aria-hidden="true">${sym}</span><b>${t}</b><span>${u}</span>${zahl ? `<span class="zahl">${zahl}</span>` : ""}</button>`; }
 
@@ -165,13 +175,14 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
         ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · Grafik & Druck`, "buero")}
+        ${zentrale() ? "" : kachel("👤", "Mitarbeiter", "Stunden, Einsatz, Qualifikationen", "ma", L.qualiAblauf({ personen: maSichtbar() }, d, 30).length)}
         ${kachel("👥", "Team", "Inklusive Springer", "team")}
       </div></div>`;
     }
     if (zentrale()) {
       k += `<div class="abschnitt"><h2>Zentrale</h2><div class="kacheln">
         ${kachel("📊", "Auswertung", "Jede Filiale und gesamt", "auswertung")}
-        ${kachel("👤", "Mitarbeiter", "Stammdaten, Springer", "ma")}
+        ${kachel("👤", "Mitarbeiter", "Beschäftigung, Einsatz, Springer", "ma", L.qualiAblauf({ personen: maSichtbar() }, d, 30).length)}
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
         ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
@@ -195,7 +206,9 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
     </div>`;
     const erinnernKarte = pinErinnern.length ? `<div class="hinweis">📌 Dein Zettel „${esc(pinErinnern[0].text.slice(0, 50))}${pinErinnern[0].text.length > 50 ? "…" : ""}“ hängt seit ${Math.round((L.ausIso(d) - L.ausIso(pinErinnern[0].zeit.slice(0, 10))) / 864e5)} Tagen. <button class="chip" data-act="pin-abnehmen" data-id="${pinErinnern[0].id}">abnehmen</button> <button class="chip" data-act="pin-haengen" data-id="${pinErinnern[0].id}">hängen lassen</button></div>` : "";
-    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${pin.wichtig ? "❗ " : ""}${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${erinnernKarte}${heuteKarte}${k}`;
+    const qa = (leitung() || zentrale()) ? L.qualiAblauf({ personen: maSichtbar() }, d, 30) : [];
+    const qualiHinweis = qa.length ? `<button class="hinweis zeile-hinweis" data-go="ma">🎓 ${qa.length} Qualifikation${qa.length > 1 ? "en" : ""} ${qa.some((x) => x.abgelaufen) ? "abgelaufen oder bald fällig" : "bald fällig"}: ${qa.slice(0, 3).map((x) => `${esc(x.person.vorname)} (${esc(x.name)})`).join(", ")}${qa.length > 3 ? " …" : ""} ›</button>` : "";
+    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${pin.wichtig ? "❗ " : ""}${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${erinnernKarte}${qualiHinweis}${heuteKarte}${k}`;
   };
 
   // ----- Mitarbeiter -----
@@ -547,7 +560,7 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
       <p class="muted klein">${esc(f.kurz)} · ${zeitTxt(L.schichtZeit(f, d, schId))}. Grauer Rand = Springer aus einer anderen Filiale.</p>
       <div class="liste">${ks.map((k) => `<button class="zeile ${k.person.stammfiliale !== f.id ? "springer" : ""}" data-act="einteilen" data-id="${k.person.id}" data-datum="${d}" data-schicht="${schId}" ${k.moeglich ? "" : "disabled"} style="${k.moeglich ? "" : "opacity:.5"}">
         <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc(filiale(k.person.stammfiliale).kurz)}</span>` : ""}
-        <small>${L.ROLLEN[k.person.rolle].name} · ${k.stand.ist} von ${k.stand.soll || "–"} Std. ${k.stand.einheit === "monat" ? "im Monat" : "in der Woche"}${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? (k.stand.ueber ? "⚠️" : "+") : ""}</span></button>`).join("")}</div>`;
+        <small>${L.ROLLEN[k.person.rolle].name} · ${k.stand.ist} von ${k.stand.soll || "–"} Std. ${k.stand.einheit === "monat" ? "im Monat" : "in der Woche"}${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? (k.stand.ueberGrenze || k.profil.length || k.gesetz.length ? "⚠️" : "+") : ""}</span></button>`).join("")}</div>`;
   }
 
   // ---------- Besetzung: grafische Übersicht, Lückenliste, Tagesansicht, Matrix ----------
@@ -719,28 +732,145 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${zeile("Alle Filialen", sum.soll, sum.ist, sum.hyg, sum.hygG, sum.krank, sum.std, true)}</tbody></table></div></div>
       <p class="klein muted">Besetzt = besetzte Plätze dieser Woche laut Einsatzplan. Hygiene = heute erledigte Aufgaben von allen Aufgaben des Tages (auch noch nicht fällige). Std. = geplante Stunden dieser Woche.</p>`;
   };
-  V.ma = () => `${titel("Mitarbeiter")}${frootie(FROOTIE_TIPPS.ma)}
-    <button class="btn zwei" data-act="ma-neu">+ Mitarbeiter anlegen</button>
-    <div class="abschnitt"><h2>Zentrale & Beratung</h2><div class="liste">${S.personen.filter((p) => !p.stammfiliale).map((p) => `<div class="zeile"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · sieht alle Filialen</small></span><span></span></div>`).join("")}</div></div>
-    ${S.filialen.map((f) => `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${S.personen.filter((p) => p.stammfiliale === f.id).map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name} · ${p.wochenstunden} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"} · Urlaub ${p.urlaubsanspruch != null ? p.urlaubsanspruch : 30} Tage${p.springer ? ` · Springer: ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>`).join("")}`;
+  // ----- Mitarbeiter (Handy: Liste und Formular · PC: Tabelle mit Filtern und Details rechts) -----
+  const TAGE_KURZ = ["mo", "di", "mi", "do", "fr", "sa", "so"];
+  const ANREISE = { auto: "Auto", oepnv: "Bus/Bahn", fahrt: "braucht Fahrt" };
+  let maFilter = { fil: "alle", besch: "alle", einsatz: "alle", q: "" }, importText = "", importErgebnis = null;
+  const maSichtbar = () => S.personen.filter((p) => p.stammfiliale && (zentrale() || p.stammfiliale === FIL().id));
+  const beschName = (p) => (L.beschaeftigung(p.beschaeftigung) || { name: "–" }).name;
+  const umfangTxt = (p) => `${p.wochenstunden || 0} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"}`;
+  function einsatzTxt(p) {
+    const pr = p.profil || {}, t = [];
+    const z = L.EINSATZ_ZEIT.find((x) => x.id === (pr.zeit || "flexibel"));
+    t.push(pr.zeit === "morgens" ? `nur bis ${pr.bis || "?"} Uhr` : pr.zeit === "abends" ? `erst ab ${pr.ab || "?"} Uhr` : z.name);
+    if (pr.tage && pr.tage.length) t.push("nur " + pr.tage.map((x) => L.TAG_NAME[x].slice(0, 2)).join(", "));
+    if ((pr.nichtTage || []).length) t.push("nicht " + pr.nichtTage.map((x) => L.TAG_NAME[x].slice(0, 2)).join(", ") + (pr.nichtGrund ? ` (${pr.nichtGrund})` : ""));
+    if ((pr.bereitschaft || []).length) t.push("🛎 Bereitschaft " + pr.bereitschaft.map((b) => `${L.TAG_NAME[b.tag].slice(0, 2)} ${b.von}–${b.bis}`).join(", "));
+    return t.join(" · ");
+  }
+  function qualiStand(p) {
+    const r = L.qualiAblauf({ personen: [p] }, heute(), 30);
+    return r.length ? `<span class="marke-s ${r.some((x) => x.abgelaufen) ? "rot" : "gelb"}" title="${esc(r.map((x) => `${x.name} bis ${L.datumKurz(x.bis)}`).join(", "))}">${r.some((x) => x.abgelaufen) ? "abgelaufen" : "läuft ab"}</span>` : "";
+  }
+  function maFiltern(liste) {
+    const q = maFilter.q.trim().toLowerCase();
+    return liste.filter((p) => (maFilter.fil === "alle" || p.stammfiliale === maFilter.fil || (maFilter.fil === "springer" && p.springer))
+      && (maFilter.besch === "alle" || (p.beschaeftigung || "") === (maFilter.besch === "ohne" ? "" : maFilter.besch))
+      && (maFilter.einsatz === "alle" || (maFilter.einsatz === "bereitschaft" ? ((p.profil || {}).bereitschaft || []).length : ((p.profil || {}).zeit || "flexibel") === maFilter.einsatz))
+      && (!q || name(p).toLowerCase().includes(q)));
+  }
+  function rollenWahl(p) {
+    const eigen = L.ROLLEN[rolle()].stufe;
+    const r = Object.entries(L.ROLLEN).filter(([k, x]) => !L.UEBERGREIFEND.includes(k) && (zentrale() || x.stufe < eigen || k === p.rolle));
+    const fest = !zentrale() && L.ROLLEN[p.rolle].stufe >= eigen;
+    return `<select id="m-rolle" ${fest ? "disabled" : ""}>${r.map(([k, x]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${x.name}</option>`).join("")}</select>`;
+  }
+  function maForm(p) {
+    const pr = p.profil || {}, ue = p.ueberschreiten || {}, si = p.springerInfo || {};
+    const ber = [...(pr.bereitschaft || [])]; while (ber.length < 3) ber.push({ tag: "", von: "", bis: "" });
+    const tagChips = (attr, wahl) => `<div class="wahl">${TAGE_KURZ.map((t) => `<label class="tagwahl"><input type="checkbox" ${attr}="${t}" ${(wahl || []).includes(t) ? "checked" : ""}><span>${L.TAG_NAME[t].slice(0, 2)}</span></label>`).join("")}</div>`;
+    const q = (id) => (p.quali || []).find((x) => x.art === id);
+    const sperreUe = p.beschaeftigung === "minijob" || p.unter18;
+    return `<div class="karte ma-form">
+      <div class="gitter2"><div class="feld"><label for="m-vor">Vorname</label><input type="text" id="m-vor" value="${esc(p.vorname)}"></div><div class="feld"><label for="m-nach">Nachname</label><input type="text" id="m-nach" value="${esc(p.nachname)}"></div></div>
+      <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle in der App</label>${rollenWahl(p)}</div>
+        <div class="feld"><label for="m-stamm">Stammfiliale</label><select id="m-stamm" ${zentrale() ? "" : "disabled"}>${S.filialen.map((f) => `<option value="${f.id}" ${p.stammfiliale === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div></div>
+      <h3>Beschäftigung</h3>
+      <div class="feld"><label for="m-besch">Beschäftigungsart</label><select id="m-besch"><option value="">noch nicht angegeben</option>${L.BESCHAEFTIGUNG.map((b) => `<option value="${b.id}" ${p.beschaeftigung === b.id ? "selected" : ""}>${b.name}</option>`).join("")}</select>
+        ${L.beschaeftigung(p.beschaeftigung) && L.beschaeftigung(p.beschaeftigung).hinweis ? `<span class="klein muted">${esc(L.beschaeftigung(p.beschaeftigung).hinweis)}</span>` : ""}</div>
+      <div class="gitter2"><div class="feld"><label for="m-eintritt">Eintritt</label><input type="date" id="m-eintritt" value="${esc(p.eintritt || "")}"></div><div class="feld"><label for="m-befristet">befristet bis</label><input type="date" id="m-befristet" value="${esc(p.befristetBis || "")}"></div></div>
+      <label class="haken"><input type="checkbox" id="m-u18" ${p.unter18 ? "checked" : ""}><span><b>unter 18 Jahre</b> (Jugendschutz: höchstens 8 Std. am Tag, 40 in der Woche, 5 Tage, abends Grenze)</span></label>
+      <label class="haken" style="margin-left:28px"><input type="checkbox" id="m-ab16" ${p.ab16 ? "checked" : ""}><span>schon 16 (abends bis 22 Uhr statt 20 Uhr)</span></label>
+      <h3>Stunden</h3>
+      <div class="gitter2"><div class="feld"><label for="m-std">Stundenumfang laut Vertrag</label><input type="number" id="m-std" min="0" max="200" step="0.5" value="${p.wochenstunden || 0}"></div>
+        <div class="feld"><label for="m-einheit">je</label><select id="m-einheit"><option value="woche" ${p.stundenEinheit !== "monat" ? "selected" : ""}>Woche</option><option value="monat" ${p.stundenEinheit === "monat" ? "selected" : ""}>Monat</option></select></div></div>
+      <div class="ueber-box"><label class="haken"><input type="checkbox" id="m-ueber" ${ue.erlaubt ? "checked" : ""}><span><b>Darf Stunden überschreiten</b></span></label>
+        <div class="reihe"><span>bis</span><input type="number" id="m-ueberstd" min="0" max="40" step="0.5" value="${ue.bisStd || 0}" style="width:90px" aria-label="Stunden über dem Umfang"><span>Std. ohne Rückfrage</span></div>
+        <p class="klein muted">${sperreUe ? "⚠️ Bei Minijob und unter 18 gilt das nicht: Die App fragt trotzdem. " : ""}Die 10 Std. am Tag gelten immer.</p></div>
+      <h3>Einsatz: wann?</h3>
+      <div class="gitter2"><div class="feld"><label for="m-pzeit">Zeit</label><select id="m-pzeit">${L.EINSATZ_ZEIT.map((z) => `<option value="${z.id}" ${(pr.zeit || "flexibel") === z.id ? "selected" : ""}>${z.name}</option>`).join("")}</select></div>
+        <div class="gitter2"><div class="feld"><label for="m-pbis">bis Uhr</label><input type="time" id="m-pbis" value="${esc(pr.bis || "")}"></div><div class="feld"><label for="m-pab">ab Uhr</label><input type="time" id="m-pab" value="${esc(pr.ab || "")}"></div></div></div>
+      <div class="feld"><span class="lbl">Nur an diesen Tagen (nichts gewählt = alle Tage)</span>${tagChips("data-ptag", pr.tage)}</div>
+      <div class="feld"><span class="lbl">Nicht an diesen Tagen</span>${tagChips("data-pnicht", pr.nichtTage)}<input type="text" id="m-pgrund" maxlength="40" placeholder="Grund, z. B. Berufsschule" value="${esc(pr.nichtGrund || "")}"></div>
+      <div class="feld"><span class="lbl">🛎 Bereitschaftsdienst (kann kurzfristig einspringen)</span>
+        ${ber.map((b, i) => `<div class="ber-zeile"><select data-ber="${i}|tag" aria-label="Tag"><option value="">–</option>${TAGE_KURZ.map((t) => `<option value="${t}" ${b.tag === t ? "selected" : ""}>${L.TAG_NAME[t]}</option>`).join("")}</select><input type="time" data-ber="${i}|von" value="${esc(b.von)}" aria-label="von"><span>–</span><input type="time" data-ber="${i}|bis" value="${esc(b.bis)}" aria-label="bis"></div>`).join("")}</div>
+      <p class="klein muted">Das Profil ist die feste Regel: Der Planvorschlag hält sich daran, beim Einteilen von Hand fragt die App nach. Dienstwünsche gelten nur für eine Woche.</p>
+      <h3>Springer</h3>
+      <label class="haken"><input type="checkbox" id="m-springer" ${p.springer ? "checked" : ""}><span><b>Springer</b>: darf in anderen Filialen aushelfen</span></label>
+      ${S.filialen.filter((f) => f.id !== p.stammfiliale).map((f) => { const x = si[f.id] || {}; return `<div class="spr-zeile"><label class="haken"><input type="checkbox" data-einsatz="${f.id}" ${p.einsatzfilialen.includes(f.id) ? "checked" : ""}><span>${esc(f.kurz)}</span></label>
+        <select data-anreise="${f.id}" aria-label="Anreise ${esc(f.kurz)}"><option value="">Anreise</option>${Object.entries(ANREISE).map(([k, n]) => `<option value="${k}" ${x.anreise === k ? "selected" : ""}>${n}</option>`).join("")}</select>
+        <input type="number" data-minuten="${f.id}" min="0" max="300" value="${x.minuten != null ? x.minuten : ""}" placeholder="Min." aria-label="Fahrzeit in Minuten ${esc(f.kurz)}"></div>`; }).join("")}
+      <h3>Urlaub</h3>
+      <div class="gitter3"><div class="feld"><label for="m-urlaub">Anspruch (Tage)</label><input type="number" id="m-urlaub" min="0" max="40" value="${p.urlaubsanspruch != null ? p.urlaubsanspruch : 30}"></div>
+        <div class="feld"><label for="m-uebertrag">Übertrag</label><input type="number" id="m-uebertrag" min="0" max="40" value="${p.urlaubUebertrag || 0}"></div>
+        <div class="feld"><label for="m-bildung">Bildungsurlaub</label><input type="number" id="m-bildung" min="0" max="10" value="${p.bildungsurlaub != null ? p.bildungsurlaub : 5}"></div></div>
+      <h3>Qualifikationen</h3>
+      ${L.QUALI.map((x) => { const v = q(x.id); return `<div class="spr-zeile"><label class="haken"><input type="checkbox" data-quali="${x.id}" ${v ? "checked" : ""}><span>${x.name}</span></label><input type="date" data-qbis="${x.id}" value="${esc((v && v.bis) || "")}" aria-label="${x.name} gültig bis"><span class="klein muted">${v && v.bis ? (v.bis < heute() ? "⚠️ abgelaufen" : v.bis <= L.plusTage(heute(), 30) ? "läuft bald ab" : "gültig") : "ohne Ablauf"}</span></div>`; }).join("")}
+      <label class="haken"><input type="checkbox" id="m-aktiv" ${p.aktiv !== false ? "checked" : ""}><span>aktiv (ausgetretene Mitarbeiter abwählen)</span></label>
+      <p class="klein muted">Steuer-ID, Sozialversicherungsnummer, IBAN und Gehalt gehören nicht in die App. Diese Daten bleiben beim Steuerberater.</p>
+      <button class="btn gross" data-act="ma-speichern" data-id="${p.id}">Speichern</button></div>`;
+  }
+  function maTabelle(liste, wahl) {
+    return `<div class="karte tab-karte"><table class="pc-tab"><thead><tr><th>Name · Filiale · Rolle</th><th>Beschäftigung</th><th>Umfang</th><th>Einsatz</th><th>Urlaub</th></tr></thead><tbody>
+      ${liste.map((p) => { const k = L.urlaubskonto(S, p, heute().slice(0, 4), heute()); return `<tr class="${wahl && wahl.id === p.id ? "gewaehlt" : ""} ${p.aktiv === false ? "inaktiv" : ""}" data-go="ma" data-arg="${p.id}" tabindex="0">
+        <td><b>${esc(name(p))}</b> ${qualiStand(p)}<small>${esc((filiale(p.stammfiliale) || {}).kurz || "")} · ${L.ROLLEN[p.rolle].name}</small></td>
+        <td>${esc(beschName(p))}${p.unter18 ? ' <span class="marke-s gelb">u18</span>' : ""}</td>
+        <td class="z">${umfangTxt(p)}${L.darfUeberschreiten(p) ? ` <span class="marke-s gruen" title="darf überschreiten">+${L.darfUeberschreiten(p)}</span>` : ""}</td>
+        <td>${esc(einsatzTxt(p))}${p.springer ? `<small>🔁 Springer: ${p.einsatzfilialen.map((x) => esc((filiale(x) || {}).kurz || x)).join(", ")}</small>` : ""}</td>
+        <td class="z">${p.urlaubsanspruch ? `${k.rest} Tage` : "–"}</td></tr>`; }).join("") || '<tr><td colspan="5" class="leer">Niemand passt zum Filter.</td></tr>'}</tbody></table></div>`;
+  }
+  function maFilterLeiste() {
+    const sel = (k, opts, lbl) => `<label class="filter"><span>${lbl}</span><select data-mafilter="${k}">${opts.map(([v, t]) => `<option value="${v}" ${maFilter[k] === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>`;
+    return `<div class="reihe filterleiste">
+      ${zentrale() ? sel("fil", [["alle", "alle Filialen"], ...S.filialen.map((f) => [f.id, f.kurz]), ["springer", "nur Springer"]], "Filiale") : ""}
+      ${sel("besch", [["alle", "alle"], ...L.BESCHAEFTIGUNG.map((b) => [b.id, b.name]), ["ohne", "nicht angegeben"]], "Beschäftigung")}
+      ${sel("einsatz", [["alle", "alle"], ...L.EINSATZ_ZEIT.map((z) => [z.id, z.name]), ["bereitschaft", "mit Bereitschaft"]], "Einsatz")}
+      <label class="filter"><span>Suche</span><input type="search" data-mafilter="q" value="${esc(maFilter.q)}" placeholder="Name"></label></div>`;
+  }
+  function qualiKarte(liste) {
+    const r = L.qualiAblauf({ personen: liste }, heute(), 30);
+    if (!r.length) return "";
+    return `<div class="hinweis">🎓 <b>Qualifikationen:</b> ${r.slice(0, 6).map((x) => `${esc(x.person.vorname)} – ${esc(x.name)} ${x.abgelaufen ? "<b>abgelaufen</b> seit" : "bis"} ${L.datumKurz(x.bis)}`).join(" · ")}${r.length > 6 ? ` · und ${r.length - 6} weitere` : ""}</div>`;
+  }
+  V.ma = () => {
+    const alle = maSichtbar(), liste = maFiltern(alle);
+    const kopfZeile = `${titel(zentrale() ? "Mitarbeiter" : "Mitarbeiter " + esc(FIL().kurz))}${breit() ? "" : frootie(FROOTIE_TIPPS.ma)}
+      <div class="reihe"><button class="btn zwei" data-act="ma-neu">+ Mitarbeiter anlegen</button><button class="btn drei" data-go="ma-import">⬆️ Aus Excel einlesen</button><span class="klein muted">${liste.length} von ${alle.length}</span></div>
+      ${qualiKarte(alle)}${maFilterLeiste()}`;
+    if (breit()) {
+      const wahl = person(arg) && alle.includes(person(arg)) ? person(arg) : null;
+      return `${kopfZeile}<div class="ma-pc">${maTabelle(liste, wahl)}<div class="ma-detail">${wahl ? `<h2>${esc(name(wahl))}</h2>${maForm(wahl)}` : `<div class="karte"><p class="muted">Klicke links auf eine Person, um sie hier zu bearbeiten.</p></div>`}</div></div>`;
+    }
+    const gruppen = zentrale() ? S.filialen : [FIL()];
+    return `${kopfZeile}${gruppen.map((f) => { const l = liste.filter((p) => p.stammfiliale === f.id); return l.length ? `<div class="abschnitt"><h2>${esc(f.name)}</h2><div class="liste">${l.map((p) => `<button class="zeile" data-go="ma-edit" data-arg="${p.id}"><span class="punkt ${p.aktiv === false ? "" : "gruen"}"></span><span><b>${esc(name(p))}</b> ${qualiStand(p)}<small>${L.ROLLEN[p.rolle].name} · ${esc(beschName(p))} · ${umfangTxt(p)}${L.darfUeberschreiten(p) ? ` (+${L.darfUeberschreiten(p)})` : ""} · ${esc(einsatzTxt(p))}${p.springer ? ` · 🔁 ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ") || "keine Filiale gewählt"}` : ""}</small></span><span>›</span></button>`).join("")}</div></div>` : ""; }).join("") || '<p class="leer">Niemand passt zum Filter.</p>'}`;
+  };
   V["ma-edit"] = () => {
     const p = person(arg);
-    if (!p) return `${titel("Mitarbeiter", "ma")}<p class="leer">Nicht gefunden.</p>`;
-    return `${titel("Mitarbeiter bearbeiten", "ma")}
-      <div class="karte"><div class="gitter2"><div class="feld"><label for="m-vor">Vorname</label><input type="text" id="m-vor" value="${esc(p.vorname)}"></div><div class="feld"><label for="m-nach">Nachname</label><input type="text" id="m-nach" value="${esc(p.nachname)}"></div></div>
-        <div class="gitter2"><div class="feld"><label for="m-rolle">Rolle</label><select id="m-rolle">${Object.entries(L.ROLLEN).filter(([k]) => !L.UEBERGREIFEND.includes(k)).map(([k, r]) => `<option value="${k}" ${p.rolle === k ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>
-          <div class="feld"><label for="m-stamm">Stammfiliale</label><select id="m-stamm">${S.filialen.map((f) => `<option value="${f.id}" ${p.stammfiliale === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div></div>
-        <div class="gitter2"><div class="feld"><label for="m-std">Stundenumfang laut Vertrag</label><input type="number" id="m-std" min="0" max="200" value="${p.wochenstunden}"></div>
-          <div class="feld"><label for="m-einheit">je</label><select id="m-einheit"><option value="woche" ${p.stundenEinheit !== "monat" ? "selected" : ""}>Woche</option><option value="monat" ${p.stundenEinheit === "monat" ? "selected" : ""}>Monat</option></select></div></div>
-        <div class="gitter2"><div class="feld"><label for="m-urlaub">Urlaubsanspruch (Tage im Jahr)</label><input type="number" id="m-urlaub" min="0" max="40" value="${p.urlaubsanspruch != null ? p.urlaubsanspruch : 30}"></div>
-          <div class="feld"><label for="m-uebertrag">Übertrag aus dem Vorjahr</label><input type="number" id="m-uebertrag" min="0" max="40" value="${p.urlaubUebertrag || 0}"></div></div>
-        <div class="feld"><label for="m-bildung">Bildungsurlaub (Tage im Jahr)</label><input type="number" id="m-bildung" min="0" max="10" value="${p.bildungsurlaub != null ? p.bildungsurlaub : 5}"></div>
-        <label class="haken"><input type="checkbox" id="m-springer" ${p.springer ? "checked" : ""}><span><b>Springer</b>: darf in anderen Filialen aushelfen</span></label>
-        <div class="feld"><span class="lbl">Einsetzbar in (zusätzlich zur Stammfiliale)</span>${S.filialen.filter((f) => f.id !== p.stammfiliale).map((f) => `<label class="haken"><input type="checkbox" data-einsatz="${f.id}" ${p.einsatzfilialen.includes(f.id) ? "checked" : ""}><span>${esc(f.name)}</span></label>`).join("")}</div>
-        <label class="haken"><input type="checkbox" id="m-aktiv" ${p.aktiv !== false ? "checked" : ""}><span>aktiv (ausgetretene Mitarbeiter abwählen)</span></label>
-        <button class="btn gross" data-act="ma-speichern" data-id="${p.id}">Speichern</button></div>`;
+    if (!p || !maSichtbar().includes(p)) return `${titel("Mitarbeiter", "ma")}<p class="leer">Nicht gefunden.</p>`;
+    if (breit()) return V.ma();
+    return `${titel(esc(name(p)), "ma")}${maForm(p)}`;
   };
-  V.filialen = () => `${titel("Filialen")}${frootie(FROOTIE_TIPPS.filialen)}${S.filialen.map((f) => `<div class="karte"><div class="reihe zw"><h2>${esc(f.name)}</h2><span>${f.pilot ? '<span class="marke-s gruen">Pilot</span> ' : ""}<span class="marke-s">${esc(f.marke || "")}</span></span></div>
+  const IMPORT_VORLAGE = "Vorname;Nachname;Filiale;Rolle;Beschäftigung;Stunden;Einheit;Urlaub\nMax;Beispiel;Ochtrup;Aushilfe;Minijob;40;Monat;20\nErika;Muster;Oberhausen;Mitarbeiter;Teilzeit;25;Woche;30\n";
+  V["ma-import"] = () => {
+    const r = importErgebnis;
+    const ok = r ? r.zeilen.filter((z) => z.person && !z.doppelt && (zentrale() || z.person.stammfiliale === FIL().id)) : [];
+    return `${titel("Mitarbeiter aus Excel einlesen", "ma")}
+      <div class="karte"><p>So geht es: In Excel <b>Datei → Speichern unter → CSV (Trennzeichen-getrennt)</b> wählen und die Datei hier auswählen. Oder die Zeilen in Excel markieren, kopieren und unten einfügen.</p>
+        <p class="klein muted">Spalten in dieser Reihenfolge oder mit dieser Kopfzeile: ${L.IMPORT_SPALTEN.map((x) => `<code>${x}</code>`).join(" ")}. Excel-Dateien (.xlsx) direkt gehen noch nicht, nur CSV oder Kopieren und Einfügen.</p>
+        <div class="reihe"><label class="btn drei datei">📄 CSV-Datei wählen<input type="file" id="imp-datei" accept=".csv,.txt,text/csv" hidden></label><button class="btn drei" data-act="imp-vorlage">⬇️ Vorlage herunterladen</button></div>
+        <div class="feld"><label for="imp-text">Daten</label><textarea id="imp-text" rows="7" placeholder="${esc(IMPORT_VORLAGE)}">${esc(importText)}</textarea></div>
+        <button class="btn zwei" data-act="imp-pruefen">Prüfen</button></div>
+      ${r ? `<div class="karte"><h2>Vorschau</h2>${r.fehlerGesamt ? `<p class="hinweis">${esc(r.fehlerGesamt)}</p>` : `<div class="tab-karte"><table class="pc-tab"><thead><tr><th>Zeile</th><th>Name</th><th>Filiale · Rolle</th><th>Beschäftigung · Umfang</th><th>Ergebnis</th></tr></thead><tbody>
+        ${r.zeilen.map((z) => { const fremd = z.person && !zentrale() && z.person.stammfiliale !== FIL().id; return `<tr><td>${z.nr}</td><td>${z.person ? esc(z.person.vorname + " " + z.person.nachname) : "–"}</td><td>${z.person ? `${esc(filiale(z.person.stammfiliale).kurz)} · ${L.ROLLEN[z.person.rolle].name}` : ""}</td><td>${z.person ? `${esc((L.beschaeftigung(z.person.beschaeftigung) || { name: "–" }).name)} · ${z.person.wochenstunden} Std./${z.person.stundenEinheit === "monat" ? "Monat" : "Woche"}` : ""}</td>
+          <td>${z.fehler.length ? `<span class="marke-s rot">${esc(z.fehler.join(", "))}</span>` : z.doppelt ? '<span class="marke-s gelb">gibt es schon, wird übersprungen</span>' : fremd ? '<span class="marke-s gelb">andere Filiale, wird übersprungen</span>' : '<span class="marke-s gruen">wird angelegt</span>'}</td></tr>`; }).join("")}</tbody></table></div>
+        <button class="btn gross" data-act="imp-ok" ${ok.length ? "" : "disabled"}>${ok.length} Mitarbeiter anlegen</button><p class="klein muted">Einsatzprofil, Springer und Qualifikationen danach je Person ergänzen.</p>`}</div>` : ""}`;
+  };
+  const LAENDER = { BW: "Baden-Württemberg", BY: "Bayern", BE: "Berlin", BB: "Brandenburg", HB: "Bremen", HH: "Hamburg", HE: "Hessen", MV: "Mecklenburg-Vorpommern", NI: "Niedersachsen", NW: "Nordrhein-Westfalen", RP: "Rheinland-Pfalz", SL: "Saarland", SN: "Sachsen", ST: "Sachsen-Anhalt", SH: "Schleswig-Holstein", TH: "Thüringen" };
+  const oeffnungKurz = (f) => { if (f.art === "mobil") return "nach Einsätzen"; const z = f.oeffnung || {}; const mo = z.mo; return mo ? `Mo ${mo[0]}–${mo[1]}${z.sa && JSON.stringify(z.sa) !== JSON.stringify(mo) ? ` · Sa ${z.sa[0]}–${z.sa[1]}` : ""}${z.so ? ` · So ${z.so[0]}–${z.so[1]}` : " · So zu"}` : "?"; };
+  V.filialen = () => `${titel("Filialen")}${breit() ? "" : frootie(FROOTIE_TIPPS.filialen)}
+    ${breit() ? `<div class="karte tab-karte"><table class="pc-tab"><thead><tr><th>Filiale</th><th>Art</th><th>Bundesland</th><th>Öffnung</th><th>Sortiment</th><th>Matrix</th><th>Team</th></tr></thead><tbody>${S.filialen.map((f) => `<tr><td><b>${esc(f.kurz)}</b>${f.pilot ? ' <span class="marke-s gruen">Pilot</span>' : ""}<small>${esc(f.name)}</small></td><td>${f.art === "mobil" ? "mobiler Stand" : "Shop"}</td><td>${f.bundesland ? esc(LAENDER[f.bundesland]) : f.art === "mobil" ? "je Einsatzort" : '<span class="marke-s gelb">fehlt</span>'}</td><td>${esc(oeffnungKurz(f))}</td><td>${sortiment(f).length} Warengruppen</td><td>${f.matrix && Object.keys(f.matrix).length ? '<span class="marke-s gruen">✓</span>' : '<span class="marke-s gelb">fehlt</span>'}</td><td class="z">${S.personen.filter((p) => p.stammfiliale === f.id && p.aktiv !== false).length}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${S.filialen.map((f) => `<div class="karte"><div class="reihe zw"><h2>${esc(f.name)}</h2><span>${f.pilot ? '<span class="marke-s gruen">Pilot</span> ' : ""}<span class="marke-s">${esc(f.marke || "")}</span></span></div>
+    <div class="feld"><label for="land-${f.id}">Bundesland (für Feiertage)</label><select id="land-${f.id}" data-land="${f.id}"><option value="">${f.art === "mobil" ? "je Einsatzort" : "bitte wählen"}</option>${Object.entries(LAENDER).map(([k, n]) => `<option value="${k}" ${f.bundesland === k ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     ${f.art === "mobil" ? `<p class="muted klein">Mobiler Stand: geöffnet nur an Einsatztagen.</p>
       <div class="liste">${(f.einsaetze || []).slice().sort((a, b) => a.datum.localeCompare(b.datum)).map((e, i) => `<div class="zeile"><span class="punkt ${e.datum >= heute() ? "gruen" : ""}"></span><span><b>${datumLang(e.datum)}</b> ${e.von}–${e.bis}<small>📍 ${esc(e.ort)}</small></span><button class="chip" data-act="einsatz-weg" data-f="${f.id}" data-datum="${e.datum}">entfernen</button></div>`).join("") || '<p class="leer">Noch keine Einsätze.</p>'}</div>
       <div class="gitter2"><div class="feld"><label for="e-${f.id}-d">Datum</label><input type="date" id="e-${f.id}-d" value="${L.plusTage(heute(), 7)}"></div><div class="feld"><label for="e-${f.id}-o">Ort</label><input type="text" id="e-${f.id}-o" maxlength="80" placeholder="z. B. Stadtfest Ochtrup"></div></div>
@@ -1010,24 +1140,28 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
       .map(([k, t]) => `<div class="karte"><b>${t}</b><p class="muted">${FROOTIE_TIPPS[k]}</p><p class="klein muted">🎬 Video folgt</p></div>`).join("")}</div>`;
   V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
 
-  let updateBand = "", wartend = null;
+  let updateBand = "", wartend = null, letzteBreit = null, resizeTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (breit() !== letzteBreit) zeichnen(); }, 150); });
   // ---------- Zeichnen ----------
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
     const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
-    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit", "admin-pinnwand"];
+    const nurZentrale = ["auswertung", "filialen", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
     if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
     if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
     if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
+    if (["ma", "ma-edit", "ma-import"].includes(rechte) && !(zentrale() || leitung())) rechte = "start";
     if (nurQualitaet.includes(rechte) && !qualitaet()) rechte = "start";
     if (berater() && ["quiz", "pinnwand"].includes(rechte)) rechte = "start";
     if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(rechte)) rechte = "start";
     ansicht = rechte;
     const inhalt = (V[ansicht] || V.start)();
-    $("#app").innerHTML = `${updateBand}${kopf()}<main>${inhalt}</main>${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
+    const pc = breit(); letzteBreit = pc;
+    document.body.classList.toggle("pc", pc);
+    $("#app").innerHTML = `${updateBand}${kopf()}${pc ? `<div class="pc-rahmen">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
     einpassen($("#app"));
   }
   function gehe(v, a) { ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0); try { history.replaceState(null, "", "#" + v); } catch (e) { /* egal */ } }
@@ -1134,9 +1268,13 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
     "plan-plus": (el) => { kandidatenFenster(el.dataset.datum, el.dataset.schicht); zeichnen(); },
     einteilen: (el) => {
       const p = person(el.dataset.id), f = FIL(), z = L.schichtZeit(f, el.dataset.datum, el.dataset.schicht), st = L.stundenStand(S, p, el.dataset.datum, z ? z.ende - z.start : 0);
-      if (st.ueber && !el.dataset.trotzdem) {
-        fenster = `<h2>⚠️ Stundenumfang überschritten</h2><p><b>${esc(name(p))}</b> hat einen Stundenumfang von <b>${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}</b>.</p>
-          <p>Mit dieser Schicht käme ${esc(p.vorname)} auf <b>${st.neu} Std.</b> (bisher ${st.ist} Std.).</p>${p.rolle === "aushilfe" ? '<p class="hinweis">Bei Aushilfen auf die Minijob-Grenze achten.</p>' : ""}
+      const profil = L.profilPruefen(p, el.dataset.datum, z, el.dataset.schicht), gesetz = L.gesetzHinweise(S, p, el.dataset.datum, z);
+      if ((st.ueberGrenze || profil.length || gesetz.length) && !el.dataset.trotzdem) {
+        fenster = `<h2>⚠️ ${st.ueberGrenze ? "Stundenumfang überschritten" : profil.length ? "Passt nicht zum Einsatzprofil" : "Bitte prüfen"}</h2>
+          ${st.ueberGrenze ? `<p><b>${esc(name(p))}</b> hat einen Stundenumfang von <b>${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}</b>${st.erlaubt ? ` (darf bis +${st.erlaubt} Std.)` : ""}.</p>
+          <p>Mit dieser Schicht käme ${esc(p.vorname)} auf <b>${st.neu} Std.</b> (bisher ${st.ist} Std.).</p>${p.beschaeftigung === "minijob" || (!p.beschaeftigung && p.rolle === "aushilfe") ? '<p class="hinweis">Minijob: auf die Verdienstgrenze achten.</p>' : ""}` : ""}
+          ${profil.length ? `<p>Einsatzprofil von <b>${esc(name(p))}</b>: ${profil.map(esc).join(", ")}.</p>` : ""}
+          ${gesetz.length ? `<p class="hinweis">${gesetz.map(esc).join("<br>")}</p>` : ""}
           <p><b>Trotzdem einplanen?</b></p>
           <button class="btn gross" data-act="einteilen" data-trotzdem="1" data-id="${p.id}" data-datum="${el.dataset.datum}" data-schicht="${el.dataset.schicht}">Ja, trotzdem einplanen</button>
           <button class="btn drei" data-act="plan-plus" data-datum="${el.dataset.datum}" data-schicht="${el.dataset.schicht}">Nein, andere Person wählen</button>`;
@@ -1165,13 +1303,48 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
       S.hygiene.geraete.push({ id: neueId("g"), filiale: FIL().id, typ, name: n, status: "aktiv" }); speichern(); meldung("Gerät angelegt. Passende Aufgaben erscheinen in der Tagesliste."); zeichnen();
     },
     zuteilung: (el) => { S.hygiene.zuteilung[`${el.dataset.r}|${FIL().id}`] = { ...(S.hygiene.zuteilung[`${el.dataset.r}|${FIL().id}`] || {}), status: el.dataset.s, von: ICH().id, zeit: jetztIso() }; speichern(); zeichnen(); },
-    "ma-neu": () => { const p = { id: neueId("p"), vorname: "Neu", nachname: "", rolle: "aushilfe", stammfiliale: S.filialen[0].id, springer: false, einsatzfilialen: [], wochenstunden: 10, aktiv: true }; S.personen.push(p); speichern(); gehe("ma-edit", p.id); },
+    "ma-neu": () => { const p = { id: neueId("p"), vorname: "Neu", nachname: "", rolle: "aushilfe", stammfiliale: zentrale() && maFilter.fil !== "alle" && filiale(maFilter.fil) ? maFilter.fil : FIL().id, beschaeftigung: null, springer: false, einsatzfilialen: [], springerInfo: {}, wochenstunden: 10, stundenEinheit: "woche", urlaubsanspruch: 30, urlaubUebertrag: 0, bildungsurlaub: 5, profil: { zeit: "flexibel" }, quali: [], ueberschreiten: { erlaubt: false, bisStd: 0 }, pin: "1234", aktiv: true }; S.personen.push(p); speichern(); maFilter = { ...maFilter, besch: "alle", einsatz: "alle", q: "" }; gehe(breit() ? "ma" : "ma-edit", p.id); },
     "ma-speichern": (el) => {
       const p = person(el.dataset.id);
-      Object.assign(p, { vorname: $("#m-vor").value.trim() || p.vorname, nachname: $("#m-nach").value.trim(), rolle: $("#m-rolle").value, stammfiliale: $("#m-stamm").value,
-        wochenstunden: Number($("#m-std").value) || 0, stundenEinheit: $("#m-einheit").value, urlaubsanspruch: Number($("#m-urlaub").value) || 0, urlaubUebertrag: Number($("#m-uebertrag").value) || 0, bildungsurlaub: Number($("#m-bildung").value) || 0, springer: $("#m-springer").checked, aktiv: $("#m-aktiv").checked,
-        einsatzfilialen: [...document.querySelectorAll("[data-einsatz]")].filter((x) => x.checked).map((x) => x.dataset.einsatz).filter((x) => x !== $("#m-stamm").value) });
-      speichern(); meldung("Gespeichert"); gehe("ma");
+      const wert = (sel) => { const x = $(sel); return x ? x.value.trim() : ""; };
+      const zahl = (sel, std) => { const n = Number(String(wert(sel)).replace(",", ".")); return isNaN(n) ? std : n; };
+      const tage = (attr) => [...document.querySelectorAll(`[${attr}]`)].filter((x) => x.checked).map((x) => x.getAttribute(attr));
+      const ber = [0, 1, 2].map((i) => ({ tag: $(`[data-ber="${i}|tag"]`).value, von: $(`[data-ber="${i}|von"]`).value, bis: $(`[data-ber="${i}|bis"]`).value })).filter((b) => b.tag && b.von && b.bis && b.bis > b.von);
+      const stamm = zentrale() ? wert("#m-stamm") : p.stammfiliale;
+      const einsatz = [...document.querySelectorAll("[data-einsatz]")].filter((x) => x.checked).map((x) => x.dataset.einsatz).filter((x) => x !== stamm);
+      const springerInfo = {};
+      for (const x of document.querySelectorAll("[data-anreise]")) { const fid = x.dataset.anreise, m = $(`[data-minuten="${fid}"]`).value; if (x.value || m) springerInfo[fid] = { anreise: x.value || null, minuten: m === "" ? null : Math.max(0, Number(m) || 0) }; }
+      const quali = L.QUALI.filter((q) => $(`[data-quali="${q.id}"]`).checked || $(`[data-qbis="${q.id}"]`).value).map((q) => ({ art: q.id, bis: $(`[data-qbis="${q.id}"]`).value || null }));
+      const zeit = wert("#m-pzeit") || "flexibel";
+      if (zeit === "morgens" && !wert("#m-pbis")) return meldung("Bitte „bis Uhr“ angeben (nur morgens).");
+      if (zeit === "abends" && !wert("#m-pab")) return meldung("Bitte „ab Uhr“ angeben (nur abends).");
+      const vorher = JSON.stringify(p);
+      Object.assign(p, { vorname: wert("#m-vor") || p.vorname, nachname: wert("#m-nach"), rolle: $("#m-rolle").disabled ? p.rolle : wert("#m-rolle"), stammfiliale: stamm,
+        beschaeftigung: wert("#m-besch") || null, eintritt: wert("#m-eintritt") || null, befristetBis: wert("#m-befristet") || null, unter18: $("#m-u18").checked, ab16: $("#m-u18").checked && $("#m-ab16").checked,
+        wochenstunden: Math.max(0, zahl("#m-std", 0)), stundenEinheit: wert("#m-einheit"), ueberschreiten: { erlaubt: $("#m-ueber").checked, bisStd: Math.max(0, zahl("#m-ueberstd", 0)) },
+        profil: { zeit, bis: zeit === "morgens" ? wert("#m-pbis") : null, ab: zeit === "abends" ? wert("#m-pab") : null, tage: tage("data-ptag"), nichtTage: tage("data-pnicht"), nichtGrund: wert("#m-pgrund") || null, bereitschaft: ber },
+        urlaubsanspruch: Math.max(0, zahl("#m-urlaub", 0)), urlaubUebertrag: Math.max(0, zahl("#m-uebertrag", 0)), bildungsurlaub: Math.max(0, zahl("#m-bildung", 0)),
+        springer: $("#m-springer").checked, einsatzfilialen: einsatz, springerInfo, quali, aktiv: $("#m-aktiv").checked });
+      if (JSON.stringify(p) !== vorher) (S.protokoll = S.protokoll || []).push({ zeit: jetztIso(), von: ICH().id, was: "Mitarbeiter", id: p.id, name: name(p) });
+      speichern(); meldung("Gespeichert");
+      if (breit()) { arg = p.id; ansicht = "ma"; zeichnen(); } else gehe("ma");
+    },
+    "imp-vorlage": () => {
+      try {
+        const url = URL.createObjectURL(new Blob(["﻿" + IMPORT_VORLAGE], { type: "text/csv;charset=utf-8" }));
+        const a = document.createElement("a"); a.href = url; a.download = "mitarbeiter-vorlage.csv"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } catch (e) { importText = IMPORT_VORLAGE; zeichnen(); }
+    },
+    "imp-pruefen": () => { importText = $("#imp-text").value; importErgebnis = L.mitarbeiterImport(S, importText); zeichnen(); },
+    "imp-ok": () => {
+      const r = importErgebnis; if (!r) return;
+      let n = 0;
+      for (const z of r.zeilen) {
+        if (!z.person || z.doppelt || (!zentrale() && z.person.stammfiliale !== FIL().id)) continue;
+        S.personen.push({ id: neueId("p"), ...z.person, profil: { zeit: "flexibel" }, quali: [], ueberschreiten: { erlaubt: false, bisStd: 0 }, springerInfo: {}, urlaubUebertrag: 0, bildungsurlaub: 5, pin: "1234" }); n++;
+      }
+      (S.protokoll = S.protokoll || []).push({ zeit: jetztIso(), von: ICH().id, was: "Import", anzahl: n });
+      importText = ""; importErgebnis = null; speichern(); meldung(`${n} Mitarbeiter angelegt`); gehe("ma");
     },
     "regel-neu": () => { const r = { id: neueId("r"), titel: "Neue Regel", bereich: S.hygiene.bereiche[0].id, geraetetyp: null, intervall: { art: "oeffnung", versatz: 0 }, zustaendig: { art: "alle" }, pruefpunkte: [{ art: "haken", text: "Erledigt" }], massnahme: S.hygiene.massnahmen[0].id, standard: "alle", pflicht: false, toleranz: 60, aktiv: false, anleitung: "" }; S.hygiene.regeln.push(r); speichern(); gehe("regel-edit", r.id); },
     "regel-speichern": (el) => {
@@ -1377,6 +1550,7 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
     if (el.dataset.go) { gehe(el.dataset.go, el.dataset.arg); return; }
     const f = AKT[el.dataset.act]; if (f) f(el, ev);
   });
+  document.addEventListener("keydown", (ev) => { const tr = ev.target.closest && ev.target.closest("tr[data-go]"); if (tr && ev.target === tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); gehe(tr.dataset.go, tr.dataset.arg); } });
   document.addEventListener("change", (ev) => {
     const el = ev.target;
     if (el.dataset.pp != null && el.type === "checkbox") { entwurf.werte[el.dataset.pp] = el.checked; zeichnen(); }
@@ -1391,6 +1565,9 @@ const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in
         t.textContent = `${n} Arbeitstage · Rest danach ${k.rest - k.beantragt - n} Tage${k.rest - k.beantragt - n < 0 ? " (reicht nicht)" : ""}`; }
       else if (t) t.textContent = "";
     }
+    else if (el.dataset.mafilter) { maFilter[el.dataset.mafilter] = el.value; zeichnen(); }
+    else if (el.id === "imp-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { importText = String(r.result || ""); importErgebnis = L.mitarbeiterImport(S, importText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
+    else if (el.dataset.land) { filiale(el.dataset.land).bundesland = el.value || null; speichern(); meldung("Bundesland gespeichert"); zeichnen(); }
     else if (el.dataset.pakte) { const [pid, k] = el.dataset.pakte.split("|"); (S.buero.personal[pid] = S.buero.personal[pid] || {})[k] = el.value; speichern(); zeichnen(); }
     else if (el.dataset.freigabe) { const [o, rk] = el.dataset.freigabe.split("|"); (S.buero.rechte[o] = S.buero.rechte[o] || {})[rk] = el.checked; speichern(); meldung("Freigabe gespeichert"); }
     else if (el.id === "dk-frootie") { druckMerken(); zeichnen(); }

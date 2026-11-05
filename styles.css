@@ -277,6 +277,45 @@ table.dp-hyg tr.dp-auff td { background: #fbe5ea; }
 
 /* Drucken: nur das Druckblatt, A4 randlos */
 #druckbereich { display: none; }
+
+/* ---------- 0.8.0: PC-Ansicht und Mitarbeiter ---------- */
+.gitter3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ma-form h3 { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--red); }
+.ma-form select, .ma-form input[type="text"], .ma-form input[type="number"], .ma-form input[type="date"], .ma-form input[type="time"] { min-width: 0; }
+.tagwahl { position: relative; }
+.tagwahl input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.tagwahl span { display: inline-block; border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 6px 12px; font-size: .9rem; min-width: 44px; text-align: center; }
+.tagwahl input:checked + span { background: var(--green-soft); border-color: var(--green); color: var(--green); font-weight: 700; }
+.tagwahl input:focus-visible + span { outline: 3px solid var(--green); outline-offset: 2px; }
+.ber-zeile, .spr-zeile { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.spr-zeile { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+.spr-zeile .haken { padding: 4px 0; }
+.ueber-box { background: var(--amber-soft); border-radius: 12px; padding: 8px 12px; display: grid; gap: 6px; }
+.filterleiste { gap: 10px; align-items: end; }
+.filter { display: grid; gap: 2px; font-size: .8rem; color: var(--muted); }
+.filter select, .filter input { font-size: .92rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.zeile-hinweis { border: 0; text-align: left; width: 100%; cursor: pointer; }
+.btn.datei { cursor: pointer; display: inline-block; }
+.tab-karte { overflow-x: auto; }
+table.pc-tab { width: 100%; border-collapse: collapse; font-size: .86rem; }
+table.pc-tab th { text-align: left; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 8px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+table.pc-tab td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.pc-tab td small { display: block; color: var(--muted); font-size: .8rem; }
+table.pc-tab td.z { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.pc-tab tr[data-go] { cursor: pointer; } table.pc-tab tr[data-go]:hover td { background: var(--tint); }
+table.pc-tab tr.gewaehlt td { background: var(--green-soft); } table.pc-tab tr.inaktiv td { opacity: .55; }
+@media (max-width: 560px) { .gitter3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ber-zeile { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(0, 1fr); } .spr-zeile { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .spr-zeile > :last-child { grid-column: 1 / -1; } }
+/* PC: Seitenleiste links, Inhalt breit */
+.pc-rahmen { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+.pc-nav { position: sticky; top: 64px; max-height: calc(100vh - 64px); overflow-y: auto; background: var(--surface); border-right: 1px solid var(--line); padding: 12px 10px 24px; display: grid; gap: 2px; align-content: start; min-height: calc(100vh - 64px); }
+.pc-nav h3 { font-family: var(--f-body); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 12px 10px 4px; }
+.pc-nav button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 10px; font-size: .92rem; color: var(--ink); }
+.pc-nav button:hover { background: var(--tint); }
+.pc-nav button.an { background: var(--red-soft); color: var(--red); font-weight: 700; }
+.pc-nav .zahl { margin-left: auto; background: var(--red); color: var(--on-red); border-radius: 99px; min-width: 22px; padding: 0 6px; font-size: .75rem; font-weight: 700; text-align: center; }
+.pc-rahmen main { max-width: 1500px; margin: 0; width: 100%; padding: 20px 28px 48px; }
+.ma-pc { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(360px, 1fr); gap: 18px; align-items: start; }
+.ma-detail { position: sticky; top: 76px; max-height: calc(100vh - 90px); overflow-y: auto; display: grid; gap: 10px; padding-right: 4px; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

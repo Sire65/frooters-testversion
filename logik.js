@@ -139,7 +139,146 @@
     const ist = einheit === "monat" ? stundenImMonat(state, p.id, datum) : stundenInWoche(state, p.id, montag(datum));
     const neu = Math.round((ist + (zusatzMin || 0) / 60) * 10) / 10;
     const soll = p.wochenstunden || 0;
-    return { einheit, soll, ist: Math.round(ist * 10) / 10, neu, ueber: soll > 0 && neu > soll };
+    const ueber = soll > 0 && neu > soll;
+    // „darf Stunden überschreiten“: bis zur Grenze ohne Rückfrage. Gilt nie für Minijob und unter 18.
+    const erl = darfUeberschreiten(p);
+    const grenze = erl ? soll + erl : soll;
+    return { einheit, soll, ist: Math.round(ist * 10) / 10, neu, ueber, erlaubt: erl, grenze, ueberGrenze: soll > 0 && neu > grenze };
+  }
+
+  // ---------- Beschäftigungsart und Einsatzprofil ----------
+  const BESCHAEFTIGUNG = [
+    { id: "vollzeit", name: "Vollzeit", einheit: "woche" },
+    { id: "teilzeit", name: "Teilzeit", einheit: "woche" },
+    { id: "minijob", name: "Minijob (geringfügig)", einheit: "monat", hinweis: "Verdienstgrenze beachten" },
+    { id: "kurzfristig", name: "Kurzfristig beschäftigt", einheit: "monat", hinweis: "höchstens 70 Arbeitstage im Jahr" },
+    { id: "werkstudent", name: "Werkstudent/in", einheit: "woche", hinweis: "in der Vorlesungszeit höchstens 20 Std./Woche" },
+    { id: "azubi", name: "Auszubildende/r", einheit: "woche", hinweis: "Berufsschultage nicht verplanen" },
+    { id: "schueler", name: "Schüler/in, Ferienjob", einheit: "monat" },
+    { id: "praktikum", name: "Praktikum", einheit: "woche" },
+  ];
+  function beschaeftigung(id) { return BESCHAEFTIGUNG.find((b) => b.id === id) || null; }
+  const EINSATZ_ZEIT = [
+    { id: "flexibel", name: "total flexibel" }, { id: "frueh", name: "nur Frühdienst" }, { id: "spaet", name: "nur Spätdienst" },
+    { id: "morgens", name: "nur morgens (bis … Uhr)" }, { id: "abends", name: "nur abends (ab … Uhr)" },
+  ];
+  const QUALI = [
+    { id: "ifsg", name: "Belehrung § 43 IfSG" }, { id: "hygiene", name: "Hygieneschulung" }, { id: "allergene", name: "Allergenschulung" },
+    { id: "kasse", name: "Kasse" }, { id: "schluessel", name: "Schlüssel / Tresor" }, { id: "fuehrerschein", name: "Führerschein (Road Runner)" },
+  ];
+  // Grenzen aus den Einstellungen; die Werte sind vorläufig und werden vom Steuerberater bestätigt (bis dahin nur Warnung).
+  const GRENZEN_STANDARD = { minijobEuro: 603, kurzfristigTage: 70, jugendTagMin: 480, jugendWocheStd: 40, jugendBis: "20:00", jugendBis16: "22:00", werkstudentStd: 20 };
+  function grenzen(state) { return { ...GRENZEN_STANDARD, ...((state.parameter || {}).grenzen || {}) }; }
+  function istJugendlich(p) { return !!p.unter18; }
+  function darfUeberschreiten(p) {
+    const u = p.ueberschreiten;
+    if (!u || !u.erlaubt || p.beschaeftigung === "minijob" || istJugendlich(p)) return 0;
+    return Math.max(0, Number(u.bisStd) || 0);
+  }
+  // Passt eine Zeit zum festen Einsatzprofil? Liefert die Gründe, warum nicht (leer = passt).
+  function profilPruefen(p, datum, zeit, schichtId) {
+    const pr = p.profil || {}, r = [];
+    const tag = wochentag(datum);
+    if (pr.tage && pr.tage.length && !pr.tage.includes(tag)) r.push(`nur ${pr.tage.map((t) => TAG_NAME[t].slice(0, 2)).join(", ")}`);
+    if ((pr.nichtTage || []).includes(tag)) r.push(`nicht ${TAG_NAME[tag]}s${pr.nichtGrund ? " (" + pr.nichtGrund + ")" : ""}`);
+    const art = pr.zeit || "flexibel";
+    const sch = schichtId || (zeit && zeit.start < 13 * 60 ? "frueh" : "spaet");
+    if (art === "frueh" && sch !== "frueh") r.push("nur Frühdienst");
+    if (art === "spaet" && sch !== "spaet") r.push("nur Spätdienst");
+    if (art === "morgens" && zeit && pr.bis && zeit.ende > zeitZuMin(pr.bis)) r.push(`nur bis ${pr.bis} Uhr`);
+    if (art === "abends" && zeit && pr.ab && zeit.start < zeitZuMin(pr.ab)) r.push(`erst ab ${pr.ab} Uhr`);
+    return r;
+  }
+  function inBereitschaft(p, datum, zeit) {
+    const tag = wochentag(datum);
+    return ((p.profil || {}).bereitschaft || []).some((b) => b.tag === tag && (!zeit || (zeitZuMin(b.von) < zeit.ende && zeit.start < zeitZuMin(b.bis))));
+  }
+  function arbeitstageImJahr(state, personId, jahr) {
+    return new Set((state.plan || []).filter((s) => s.personId === personId && s.datum.slice(0, 4) === jahr).map((s) => s.datum)).size;
+  }
+  // Gesetzliche Hinweise (Jugendschutz, kurzfristige Beschäftigung, Werkstudent). Nur Warnungen, sie sperren nichts.
+  function gesetzHinweise(state, p, datum, zeit, ohneIds) {
+    const g = grenzen(state), h = [];
+    const ohne = ohneIds || [];
+    const amTag = schichtenAm(state, datum, (x) => x.personId === p.id && !ohne.includes(x.id));
+    if (istJugendlich(p) && zeit) {
+      const tagMin = amTag.reduce((n, x) => { const z = planZeit(state, x); return n + (z ? z.ende - z.start : 0); }, 0) + (zeit.ende - zeit.start);
+      if (tagMin > g.jugendTagMin) h.push(`Jugendschutz: über ${g.jugendTagMin / 60} Std. am Tag`);
+      const bis = p.ab16 ? g.jugendBis16 : g.jugendBis;
+      if (zeit.ende > zeitZuMin(bis)) h.push(`Jugendschutz: Arbeit nach ${bis} Uhr`);
+      const woche_ = stundenInWoche(state, p.id, montag(datum)) + (zeit.ende - zeit.start) / 60;
+      if (woche_ > g.jugendWocheStd) h.push(`Jugendschutz: über ${g.jugendWocheStd} Std. in der Woche`);
+      const tage = new Set(woche(montag(datum)).filter((t) => schichtenAm(state, t, (x) => x.personId === p.id).length)); tage.add(datum);
+      if (tage.size > 5) h.push("Jugendschutz: mehr als 5 Tage in der Woche");
+    }
+    if (p.beschaeftigung === "kurzfristig" && !amTag.length) {
+      const n = arbeitstageImJahr(state, p.id, datum.slice(0, 4)) + 1;
+      if (n > g.kurzfristigTage) h.push(`kurzfristig: ${n}. Arbeitstag im Jahr (Grenze ${g.kurzfristigTage})`);
+    }
+    if (p.beschaeftigung === "werkstudent" && zeit) {
+      const w = stundenInWoche(state, p.id, montag(datum)) + (zeit.ende - zeit.start) / 60;
+      if (w > g.werkstudentStd) h.push(`Werkstudent: ${Math.round(w * 10) / 10} Std. in der Woche (in der Vorlesungszeit höchstens ${g.werkstudentStd})`);
+    }
+    return h;
+  }
+  // Qualifikationen, die bis zum Stichtag (heute + tage) ablaufen oder schon abgelaufen sind
+  function qualiAblauf(state, datum, tage) {
+    const bis = plusTage(datum, tage == null ? 30 : tage), r = [];
+    for (const p of state.personen || []) {
+      if (p.aktiv === false) continue;
+      for (const q of p.quali || []) if (q.bis && q.bis <= bis) r.push({ person: p, art: q.art, name: (QUALI.find((x) => x.id === q.art) || { name: q.art }).name, bis: q.bis, abgelaufen: q.bis < datum });
+    }
+    return r.sort((a, b) => a.bis.localeCompare(b.bis));
+  }
+  // Mitarbeiter aus Excel (als CSV gespeichert, Trennzeichen ; oder , oder Tab) einlesen. Liefert je Zeile Person oder Fehler.
+  const IMPORT_SPALTEN = ["vorname", "nachname", "filiale", "rolle", "beschaeftigung", "stunden", "einheit", "urlaub"];
+  function csvZeilen(text) {
+    const t = String(text || "").replace(/^\uFEFF/, "");
+    const erste = t.split(/\r?\n/)[0] || "";
+    const trenn = (erste.match(/;/g) || []).length >= (erste.match(/,/g) || []).length ? (erste.includes("\t") && !erste.includes(";") ? "\t" : ";") : ",";
+    const zeilen = []; let feld = "", zeile = [], inQ = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (inQ) { if (c === '"' && t[i + 1] === '"') { feld += '"'; i++; } else if (c === '"') inQ = false; else feld += c; continue; }
+      if (c === '"') inQ = true;
+      else if (c === trenn) { zeile.push(feld.trim()); feld = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && t[i + 1] === "\n") i++; zeile.push(feld.trim()); zeilen.push(zeile); zeile = []; feld = ""; }
+      else feld += c;
+    }
+    if (feld || zeile.length) { zeile.push(feld.trim()); zeilen.push(zeile); }
+    return zeilen.filter((z) => z.some((x) => x));
+  }
+  function mitarbeiterImport(state, text) {
+    const zeilen = csvZeilen(text);
+    if (!zeilen.length) return { zeilen: [], fehlerGesamt: "Keine Daten gefunden." };
+    const norm = (x) => String(x || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    const kopf = zeilen[0].map(norm);
+    const hatKopf = kopf.includes("vorname");
+    const idx = {};
+    IMPORT_SPALTEN.forEach((k, i) => { idx[k] = hatKopf ? kopf.findIndex((x) => x === k || x.startsWith(k)) : i; });
+    if (hatKopf && idx.stunden < 0) idx.stunden = kopf.findIndex((x) => x.includes("stunden") || x === "std");
+    const daten = hatKopf ? zeilen.slice(1) : zeilen;
+    const filFinden = (w) => { const n = norm(w); return (state.filialen || []).find((f) => [f.id, f.kurz, f.name].some((x) => norm(x) === n) || (n && norm(f.name).startsWith(n))); };
+    const rolleFinden = (w) => { const n = norm(w); if (!n) return "mitarbeiter"; if (n.startsWith("stell") || n === "stv") return "stv"; if (n.startsWith("mitarbeiter")) return "mitarbeiter"; if (n.startsWith("shopleit") || n === "sl") return "shopleitung"; return Object.keys(ROLLEN).filter((k) => !UEBERGREIFEND.includes(k)).find((k) => norm(k) === n || norm(ROLLEN[k].name) === n || norm(ROLLEN[k].name).startsWith(n)) || null; };
+    const beschFinden = (w) => { const n = norm(w); if (!n) return null; return (BESCHAEFTIGUNG.find((b) => norm(b.id) === n || norm(b.name).startsWith(n) || (n.startsWith("geringf") && b.id === "minijob") || (n === "aushilfe" && b.id === "minijob")) || { id: undefined }).id; };
+    const vorhanden = new Set((state.personen || []).map((p) => norm(p.vorname + p.nachname)));
+    const r = daten.map((z, i) => {
+      const w = (k) => (idx[k] >= 0 ? z[idx[k]] || "" : "");
+      const fehler = [];
+      const vorname = w("vorname").trim(), nachname = w("nachname").trim();
+      if (!vorname) fehler.push("Vorname fehlt");
+      const f = filFinden(w("filiale")); if (!f) fehler.push(`Filiale „${w("filiale")}“ unbekannt`);
+      const rolle = rolleFinden(w("rolle")); if (!rolle) fehler.push(`Rolle „${w("rolle")}“ unbekannt`);
+      const bw = w("beschaeftigung"), besch = beschFinden(bw); if (bw && !besch) fehler.push(`Beschäftigung „${bw}“ unbekannt`);
+      const stdTxt = w("stunden").replace(",", "."), std = stdTxt === "" ? null : Number(stdTxt);
+      if (std != null && (isNaN(std) || std < 0 || std > 200)) fehler.push(`Stunden „${w("stunden")}“ ungültig`);
+      const ein = norm(w("einheit")), einheit = ein.startsWith("mon") ? "monat" : ein.startsWith("wo") ? "woche" : ((beschaeftigung(besch) || {}).einheit || "woche");
+      const urlTxt = w("urlaub"), url = urlTxt === "" ? null : Number(urlTxt.replace(",", "."));
+      if (url != null && (isNaN(url) || url < 0 || url > 40)) fehler.push(`Urlaub „${urlTxt}“ ungültig`);
+      const doppelt = vorname && vorhanden.has(norm(vorname + nachname));
+      return { nr: i + (hatKopf ? 2 : 1), fehler, doppelt, person: fehler.length ? null : { vorname, nachname, rolle, stammfiliale: f.id, beschaeftigung: besch || null, wochenstunden: std == null ? 0 : std, stundenEinheit: einheit, urlaubsanspruch: url == null ? 30 : url, springer: false, einsatzfilialen: [], aktiv: true } };
+    });
+    return { zeilen: r, hatKopf };
   }
 
   // ---------- Einsatzplanung ----------
@@ -197,10 +336,18 @@
       }
       const stand = stundenStand(state, p, datum, z ? z.ende - z.start : 0);
       const std = stundenInWoche(state, p.id, mo);
-      if (stand.soll && stand.ist >= stand.soll) { punkte -= 3; gruende.push(`Stunden voll: ${stand.ist} von ${stand.soll} Std. ${stand.einheit === "monat" ? "im Monat" : "in der Woche"}`); }
-      else if (stand.ueber) { punkte -= 2; gruende.push(`käme auf ${stand.neu} von ${stand.soll} Std. ${stand.einheit === "monat" ? "im Monat" : "in der Woche"}`); }
+      const je = stand.einheit === "monat" ? "im Monat" : "in der Woche";
+      if (stand.ueber && !stand.ueberGrenze) gruende.push(`über Umfang, erlaubt bis +${stand.erlaubt} Std. (${stand.neu} von ${stand.soll})`);
+      else if (stand.soll && stand.ist >= stand.grenze) { punkte -= 3; gruende.push(`Stunden voll: ${stand.ist} von ${stand.soll} Std. ${je}`); }
+      else if (stand.ueberGrenze) { punkte -= 2; gruende.push(`käme auf ${stand.neu} von ${stand.soll} Std. ${je}`); }
+      // Festes Einsatzprofil: Abweichungen nur mit Rückfrage, der Planvorschlag hält sich daran
+      const profil = profilPruefen(p, datum, z, schichtId);
+      if (profil.length) { punkte -= 5; gruende.push("Profil: " + profil.join(", ")); }
+      const gesetz = gesetzHinweise(state, p, datum, z);
+      if (gesetz.length) { punkte -= 3; gruende.push(...gesetz); }
+      if (inBereitschaft(p, datum, z)) { punkte += 2; gruende.push("in Bereitschaft"); }
       if (p.stammfiliale !== filialeId) { punkte -= 1; gruende.push("Springer"); }
-      return { person: p, moeglich, punkte, stunden: std, stand, gruende };
+      return { person: p, moeglich, punkte, stunden: std, stand, gruende, profil, gesetz };
     }).sort((a, b) => (b.moeglich - a.moeglich) || (b.punkte - a.punkte) || (a.stunden - b.stunden) || a.person.vorname.localeCompare(b.person.vorname));
   }
   function abdeckung(state, filialeId, datum, schichtId) {
@@ -226,7 +373,7 @@
           const z = schichtZeit(f, datum, sch.id);
           const gr = besetzungTag(arbeit, filialeId, datum).slots.filter((x) => z && x.m >= z.start && x.m < z.ende).flatMap((x) => x.gruende).join(" ");
           const brauchtLeitung = /Shopleitung|Leitung/.test(gr), brauchtFest = /feste Mitarbeiter/.test(gr) || /zu viele Aushilfen/.test(gr);
-          const ks = kandidaten(arbeit, filialeId, datum, sch.id).filter((x) => x.moeglich && x.punkte > -3 && !x.stand.ueber && (!nurStamm || x.person.stammfiliale === filialeId));
+          const ks = kandidaten(arbeit, filialeId, datum, sch.id).filter((x) => x.moeglich && x.punkte > -3 && !x.stand.ueberGrenze && !x.profil.length && !x.gesetz.length && (!nurStamm || x.person.stammfiliale === filialeId));
           const k = (brauchtLeitung && ks.find((x) => x.person.rolle === "shopleitung" || x.person.rolle === "stv")) || (brauchtFest && ks.find((x) => x.person.rolle !== "aushilfe")) || ks[0];
           if (!k) break;
           const s = { id: neueId(), filiale: filialeId, datum, schicht: sch.id, personId: k.person.id, quelle: "vorschlag" };
@@ -338,7 +485,10 @@
     const w = wunschAm(state, p.id, datum);
     if (w && w.art === "nicht") hinweise.push("hat für den Tag „kann nicht“ angegeben");
     const st = stundenStand(state, p, datum, zeit.ende - zeit.start);
-    if (st.ueber) hinweise.push(`käme auf ${st.neu} von ${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}`);
+    if (st.ueberGrenze) hinweise.push(`käme auf ${st.neu} von ${st.soll} Std. ${st.einheit === "monat" ? "im Monat" : "in der Woche"}`);
+    const pr = profilPruefen(p, datum, zeit);
+    if (pr.length) hinweise.push("Einsatzprofil: " + pr.join(", "));
+    hinweise.push(...gesetzHinweise(state, p, datum, zeit, ohneIds));
     return { gruende, hinweise };
   }
   function tauschPruefen(state, angebot, nehmerId, gegenId) {
@@ -712,6 +862,7 @@
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
     ABW_ARTEN, abwArt, abwGilt, urlaubsTage, urlaubskonto, stundenImMonat, stundenStand,
+    BESCHAEFTIGUNG, beschaeftigung, EINSATZ_ZEIT, QUALI, GRENZEN_STANDARD, grenzen, darfUeberschreiten, profilPruefen, inBereitschaft, arbeitstageImJahr, gesetzHinweise, qualiAblauf, IMPORT_SPALTEN, csvZeilen, mitarbeiterImport,
     planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
     matrixTyp, bedarfBloecke, slotPruefen, besetzungTag, besetzungsLuecken, passendeSchicht,
     PIN_STANDARD, pinEinstellungen, pinEmpfaenger, pinAktiv, pinSichtbar, pinStand, pinUngelesen, pinEigeneAktiv, pinErinnern,

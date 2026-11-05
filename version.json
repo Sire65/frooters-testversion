@@ -1,10 +1,12 @@
 {
-  "version": "0.7.0",
-  "datum": "2026-11-04",
+  "version": "0.8.0",
+  "datum": "2026-11-05",
   "stufe": "DEV",
   "neu": [
-    "Büro mit Ordnern je Rolle (Inhaber sieht mehr), Freigaben einstellbar",
-    "Grafik- & Druckstudio im frooters-Design: Preislisten, Schilder, Öffnungszeiten, Aktionen, Allergen-Aushang, Personalsuche",
-    "Shop-Ordner, Adressbuch, Hygienebericht zum Drucken, Personalakte, Briefe, Archiv"
+    "PC-Ansicht ab großem Bildschirm: Seitenleiste mit allen Bereichen, breite Tabellen",
+    "Mitarbeiter: Beschäftigungsart, Stundenumfang mit „darf überschreiten“, Einsatzprofil (nur Früh/Spät, nur morgens/abends, Tage), Bereitschaft, Springer mit Anreise, Qualifikationen mit Ablauf",
+    "Planung beachtet Einsatzprofil, Bereitschaft und Jugendschutz; Rückfrage beim Einteilen",
+    "Mitarbeiter aus Excel (CSV) einlesen mit Vorschau",
+    "Filialen mit Bundesland und Übersichtstabelle am PC"
   ]
 }
