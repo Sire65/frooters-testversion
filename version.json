@@ -1,10 +1,10 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "datum": "2026-11-04",
   "stufe": "DEV",
   "neu": [
-    "Stundenumfang je Mitarbeiter (Woche oder Monat), beim Einplanen über den Umfang kommt die Frage „Trotzdem einplanen?“",
-    "Abwesenheit statt Krank und Urlaub: Urlaub, Krankmeldung, Kind krank, Bildungsurlaub und mehr, mit Urlaubskonto",
-    "Urlaubsübersicht für die Leitung mit Filter nach Filialen und Art: Kalender, Urlaubskonten, Liste"
+    "Büro mit Ordnern je Rolle (Inhaber sieht mehr), Freigaben einstellbar",
+    "Grafik- & Druckstudio im frooters-Design: Preislisten, Schilder, Öffnungszeiten, Aktionen, Allergen-Aushang, Personalsuche",
+    "Shop-Ordner, Adressbuch, Hygienebericht zum Drucken, Personalakte, Briefe, Archiv"
   ]
 }

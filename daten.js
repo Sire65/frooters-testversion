@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v6";
+  const SCHLUESSEL = "frooters_demo_v7";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -139,7 +139,9 @@
     ];
 
     const state = {
-      version: 6, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 7, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
+      buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
       betreiber: [
         { id: "gm", name: "Genussmanufaktur (eigene Filialen)", art: "eigen", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: { antrag: true }, pruefung: {}, freigegeben: false },
@@ -195,6 +197,20 @@
     state.pinnwand.push(PZ(null, "Inhaber", "Willkommen in der neuen frooters Team-App (Testversion). Schaut euch alles in Ruhe an! 🍓", { farbe: 3, zeit: L.plusTage(heuteIso, -4) + "T08:00" }));
     state.pinnwand.push(PZ("och", "Tom", "Lena, kannst du am Samstag die Kühlgeräte-Reinigung übernehmen? Ich bin erst ab 12 da.", { farbe: 2, fuer: "personen", empfaenger: [pid("Lena")], zeit: heuteIso + "T10:05" }));
     state.pinnwand.push(PZ("och", "Sandra", "Inventur am Montag nach Ladenschluss. Bitte im Dienstplan eintragen, wer helfen kann.", { farbe: 4, fuer: "leitung", zeit: L.plusTage(heuteIso, -1) + "T16:30" }));
+    // Büro-Beispiele (keine echten Firmen, keine echten Nummern)
+    const A = (kategorie, firma, name, telefon, email, notiz, filiale) => state.buero.adressen.push({ id: id("ad"), kategorie, firma, name, telefon, email, notiz, filiale: filiale || null });
+    A("Techniker", "Kältetechnik (Beispiel)", "Notdienst", "0000 000000", "", "Kühlvitrinen und Tiefkühler", null);
+    A("Techniker", "Froyo-Maschinen-Service (Beispiel)", "", "0000 000001", "", "Wartung laut Hersteller", null);
+    A("Center", "Center-Management Designer Outlet (Beispiel)", "", "0000 000002", "", "Hausmeister, Öffnungszeiten Feiertage", "och");
+    A("Lieferant", "Obst und Gemüse (Beispiel)", "", "0000 000003", "", "Lieferung Mo, Mi, Fr", null);
+    A("Hygiene", "Hygieneberatung (Beispiel)", "", "0000 000004", "", "Externer Berater", null);
+    A("Steuerberater", "Steuerbüro (Beispiel)", "", "0000 000005", "", "Lohnabrechnung, Stundenliste monatlich", null);
+    state.buero.ablage.push({ id: id("bl"), ordner: "shop", filiale: "och", titel: "Froyo-Maschine: Reinigung", kategorie: "Anweisung", text: "Jeden Abend nach Ladenschluss nach Herstellervorgabe reinigen. Foto in der Hygiene-Liste nicht vergessen.", zeit: heuteIso + "T08:00", vonId: pid("Sandra") });
+    state.buero.ablage.push({ id: id("bl"), ordner: "zentrale", filiale: null, titel: "Pilot Ochtrup: Notizen", kategorie: "Notiz", text: "Rückmeldungen aus dem Pilot hier sammeln.", zeit: heuteIso + "T08:00", vonId: pid("Inhaber") });
+    for (const p of personen.filter((x) => !L.UEBERGREIFEND.includes(x.rolle))) {
+      const k = Number(p.id.slice(1));
+      state.buero.personal[p.id] = { vertrag: `${Number(jahr) - 1 - (k % 3)}-0${1 + (k % 9)}-01`, belehrung: `${Number(jahr) - 1 - (k % 2)}-${String(1 + (k % 12)).padStart(2, "0")}-15`, datenschutz: k % 4 ? `${jahr}-0${1 + (k % 8)}-10` : "", schulung: k % 3 ? `${Number(jahr) - (k % 2)}-0${1 + (k % 9)}-20` : "" };
+    }
     state.naechsteId = n + 1;
     return state;
   }

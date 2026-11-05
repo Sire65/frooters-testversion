@@ -215,3 +215,72 @@ table.ukal td { width: 22px; height: 24px; text-align: center; border-radius: 4p
 .u-bildungsurlaub, .u-schule { background: #d4e4f5 !important; } .u-antrag { background: #ffe3a3 !important; } .u-abw { background: #e2e3d6 !important; }
 .u-summe td { background: transparent; font-weight: 700; } .u-viel { color: var(--red); }
 .legende > span[class^="u-"] { border-radius: 99px; padding: 2px 10px; font-weight: 700; color: #1d1d1b; }
+
+/* Büro: Regal mit Ordnern (Ordnerrücken mit Loch und Schild) */
+.regal { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; padding: 14px; background: linear-gradient(var(--tint), var(--tint)) padding-box; border-radius: 16px; border-bottom: 10px solid #a3a983; }
+.ordner { border: 0; background: none; padding: 0; display: grid; gap: 6px; text-align: center; color: var(--ink); }
+.ruecken { position: relative; height: 170px; border-radius: 8px 8px 4px 4px; background: var(--o); box-shadow: inset -10px 0 0 rgba(0, 0, 0, .12), 0 4px 10px rgba(0, 0, 0, .15); display: grid; justify-items: center; align-content: start; padding-top: 16px; transition: transform .15s; }
+.ordner:hover .ruecken, .ordner:focus-visible .ruecken { transform: translateY(-4px); }
+.loch { width: 22px; height: 22px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .3); }
+.schild { margin-top: 14px; width: 78%; background: #fffdf5; color: #1d1d1b; border-radius: 4px; padding: 8px 4px; font-size: 1.4rem; display: grid; gap: 4px; }
+.schild b { font-family: var(--f-display); font-size: .82rem; line-height: 1.15; }
+.o-text { font-size: .8rem; color: var(--muted); line-height: 1.3; }
+
+/* Druckstudio: Formular links, Vorschau rechts (am Handy untereinander) */
+.studio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.studio-vorschau { position: sticky; top: 70px; }
+.vorschau-rahmen { container-type: inline-size; background: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); border-radius: 4px; overflow: hidden; }
+.farbpunkt { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; }
+.markierbar { user-select: all; }
+table.pakte input { padding: 4px 6px; font-size: .8rem; min-width: 130px; }
+table.pakte td { vertical-align: top; } table.pakte .marke-s { margin-top: 3px; }
+@media (max-width: 760px) { .studio { grid-template-columns: minmax(0, 1fr); } .studio-vorschau { position: static; order: -1; } }
+
+/* Druckblatt im frooters-Design: Maße in cqw, damit Vorschau und Druck gleich aussehen */
+.druckblatt { --dp: #c10230; --dp-hell: #fbe5ea; position: relative; width: 100%; aspect-ratio: 210 / 297; background: #fff; color: #1d1d1b; display: grid; grid-template-rows: auto 1fr auto; font-family: "Didact Gothic", "Segoe UI", Arial, sans-serif; overflow: hidden; }
+.druckblatt.quer { aspect-ratio: 297 / 210; }
+.dp-kopf { display: flex; align-items: center; justify-content: space-between; gap: 2cqw; padding: 3.5cqw 5cqw 2.5cqw; border-bottom: 1.2cqw solid #a3a983; }
+.dp-kopf img { height: 7cqw; } .druckblatt.quer .dp-kopf img { height: 5cqw; }
+.dp-kopf span { font-size: 2.2cqw; color: #5d604f; text-align: right; }
+.dp-rumpf { padding: 4cqw 6cqw; display: grid; align-content: start; gap: 2.4cqw; min-height: 0; overflow: hidden; }
+.dp-symbol { font-size: 12cqw; line-height: 1; text-align: center; }
+.druckblatt h1 { font-family: Arvo, Rockwell, Georgia, serif; font-size: 8cqw; line-height: 1.1; color: var(--dp); text-align: center; margin: 0; }
+.druckblatt.quer h1 { font-size: 5.5cqw; }
+.druckblatt h2 { font-family: Arvo, Rockwell, Georgia, serif; font-size: 3.6cqw; color: #5d604f; text-align: center; margin: 0; font-weight: 400; }
+.druckblatt h3 { font-family: Arvo, Georgia, serif; font-size: 2.6cqw; margin: 1.5cqw 0 0; color: var(--dp); }
+.dp-text { font-size: 4.4cqw; line-height: 1.45; text-align: center; }
+.druckblatt.quer .dp-text { font-size: 3cqw; }
+.dp-zeiten { font-size: 5cqw; font-variant-numeric: tabular-nums; background: var(--dp-hell); border-radius: 2cqw; padding: 3cqw; }
+.dp-preis { justify-self: center; color: #fff; font-family: Arvo, Georgia, serif; font-size: 11cqw; border-radius: 50%; width: 34cqw; height: 34cqw; display: grid; place-items: center; transform: rotate(-6deg); box-shadow: 0 1cqw 2cqw rgba(0, 0, 0, .2); }
+table.dp-preise { width: 100%; border-collapse: collapse; font-size: 3.6cqw; }
+table.dp-preise td { padding: .45em 1cqw; border-bottom: .3cqw dotted #a3a983; vertical-align: bottom; }
+table.dp-preise td.a small { display: block; font-size: .65em; color: #5d604f; }
+table.dp-preise td.p { text-align: right; white-space: nowrap; font-family: Arvo, Georgia, serif; font-weight: 700; color: var(--dp); }
+table.dp-allergene { width: 100%; border-collapse: collapse; font-size: 1.5cqw; }
+table.dp-allergene th { background: var(--dp-hell); padding: .6cqw; height: 7em; vertical-align: bottom; }
+table.dp-allergene th span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+table.dp-allergene th:first-child { text-align: left; vertical-align: middle; }
+table.dp-allergene td { border-bottom: .15cqw solid #e2e3d6; padding: .3em .5cqw; text-align: center; color: var(--dp); }
+table.dp-allergene td:first-child { text-align: left; color: #1d1d1b; }
+.dp-klein { font-size: 1.6cqw; color: #5d604f; margin: 0; }
+.dp-fuss { display: flex; justify-content: space-between; align-items: flex-end; gap: 2cqw; padding: 2cqw 5cqw 3cqw; background: var(--dp-hell); font-size: 2.4cqw; color: #5d604f; }
+.dp-fuss img { height: 11cqw; margin-bottom: -1cqw; } .druckblatt.quer .dp-fuss img { height: 7cqw; }
+.druckblatt.bericht .dp-rumpf { gap: 1cqw; } .druckblatt.bericht h1 { font-size: 5cqw; text-align: left; } .druckblatt.bericht h2 { text-align: left; font-size: 2.4cqw; }
+table.dp-hyg { width: 100%; border-collapse: collapse; font-size: 1.6cqw; }
+table.dp-hyg th { text-align: left; background: var(--dp-hell); padding: .5cqw .8cqw; } table.dp-hyg td { border-bottom: .15cqw solid #e2e3d6; padding: .5cqw .8cqw; vertical-align: top; }
+table.dp-hyg tr.dp-auff td { background: #fbe5ea; }
+.druckblatt.bericht { aspect-ratio: auto; min-height: 141cqw; overflow: visible; }
+.brief-rumpf { font-size: 2.3cqw; line-height: 1.5; gap: 0; padding-top: 3cqw; }
+.b-absz { font-size: 1.5cqw; color: #5d604f; text-decoration: underline; margin-bottom: 1cqw; }
+.b-an { min-height: 18cqw; } .b-datum { text-align: right; margin: 2cqw 0; } .b-betreff { font-weight: 700; margin-bottom: 3cqw; }
+.b-gruss { margin-top: 4cqw; }
+
+/* Drucken: nur das Druckblatt, A4 randlos */
+#druckbereich { display: none; }
+@media print {
+  body > *:not(#druckbereich) { display: none !important; }
+  #druckbereich { display: block; container-type: inline-size; width: 100%; }
+  #druckbereich .druckblatt { box-shadow: none; break-inside: avoid; }
+  #druckbereich .druckblatt:not(.bericht) { height: 100vh; aspect-ratio: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

@@ -1,15 +1,15 @@
-const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.7.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
-  const L = window.FRL, D = window.FRD;
+  const L = window.FRL, D = window.FRD, B = window.FRB;
   if (document.currentScript && document.currentScript.dataset.v !== APP_VERSION) {
     // Mischstand alter Seite und neuem Programm (KICC-Regel 16): einmal frisch laden
     try { if (sessionStorage.getItem("fr_mischstand") !== APP_VERSION) { sessionStorage.setItem("fr_mischstand", APP_VERSION); location.reload(); return; } } catch (e) { /* weiter */ }
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 6) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 7) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -65,6 +65,8 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
     dienst: "Hier siehst du deine Schichten, auch die in anderen Filialen, wenn du als Springer eingeteilt bist.",
     wuensche: "Tipp für jeden Tag an, ob du möchtest, kannst oder nicht kannst. Die Shopleitung sieht das beim Planen.",
     krank: "Gute Besserung! Melde dich hier krank, deine Shopleitung bekommt sofort Bescheid. Diagnosen gehören hier nicht hin.",
+    buero: "Das Büro: Jeder Ordner hat seine Aufgabe. Was du siehst, hängt von deiner Rolle ab. Der Inhaber legt unter „Freigaben“ fest, wer welchen Ordner sieht.",
+    studio: "Wähle eine Vorlage, trag deinen Text ein und drucke das Blatt im frooters-Design. Preise denkst du dir nicht aus: leere Preise stehen als „… €“ auf dem Blatt.",
     abwesenheit: "Hier meldest du dich krank oder beantragst Urlaub, Bildungsurlaub und mehr. Oben siehst du dein Urlaubskonto: Anspruch, genommen, geplant und Rest.",
     urlaubsuebersicht: "Wähle oben die Filialen: deine, alle oder nur bestimmte. Im Kalender siehst du, wer wann fehlt. Unter „Urlaubskonten“ steht der Rest jeder Person.",
     urlaub: "Stell deinen Urlaubsantrag hier. Du siehst sofort, ob er genehmigt ist.",
@@ -162,6 +164,7 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
         ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
+        ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · Grafik & Druck`, "buero")}
         ${kachel("👥", "Team", "Inklusive Springer", "team")}
       </div></div>`;
     }
@@ -172,6 +175,7 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${kachel("🏪", "Filialen", "Öffnungszeiten, Bedarf", "filialen")}
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
         ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+        ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · alles für die Zentrale`, "buero")}
         ${kachel("🛠️", "Admin", "Betreiber & Datenbanken", "admin", (S.betreiber || []).filter((b) => !b.freigegeben).length)}
       </div></div>`;
     }
@@ -179,8 +183,10 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
       k += `<div class="abschnitt"><h2>Qualität & Pflege</h2><div class="kacheln">
         ${kachel("📋", "Hygieneregeln", "Für alle Filialen", "regeln")}
         ${kachel("📝", "Rezepte pflegen", "Für alle Filialen", "rezeptpflege")}
+        ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner`, "buero")}
       </div></div>`;
     }
+    if (berater()) k += `<div class="abschnitt"><h2>Büro</h2><div class="kacheln">${kachel("🗂️", "Büro", "Hygiene-Dokumentation", "buero")}</div></div>`;
     k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
     const heuteKarte = uebergreifend() ? (berater() ? frootie(FROOTIE_TIPPS.berater) : "") : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
       ${krank ? `<p class="hinweis">${L.abwArt(krank.art).sym} Du bist bis ${L.datumKurz(krank.bis)} abwesend: ${esc(L.abwArt(krank.art).name)}.</p>` : ""}
@@ -799,6 +805,133 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
         ${st.freigabeMoeglich ? "" : '<p class="klein muted">Freigeben geht erst, wenn alle 7 Schritte erledigt sind.</p>'}`}`;
   };
 
+
+  // ---------- Büro: Regal mit Ordnern je Rolle, Grafik- & Druckstudio, Ablage ----------
+  const BILD = { logo: "logo.svg", frootie: "frootie.svg" };
+  const bueroOrdner = () => B.ORDNER.filter((o) => B.darfOrdner(S, rolle(), o.id));
+  const darfO = (id) => B.darfOrdner(S, rolle(), id);
+  const ablage = () => (S.buero = S.buero || { ablage: [], adressen: [], personal: {}, rechte: {} }).ablage;
+  let druckEntwurf = null, briefEntwurf = null;
+  // Verkleinert die Schrift von Tabellen und Texten, bis alles aufs Blatt passt (nichts wird abgeschnitten).
+  function einpassen(wurzel) {
+    for (const blatt of (wurzel || document).querySelectorAll(".druckblatt:not(.bericht)")) {
+      const rumpf = blatt.querySelector(".dp-rumpf"); if (!rumpf) continue;
+      const ziel = rumpf.querySelector("table") || rumpf.querySelector(".dp-text"); if (!ziel) continue;
+      const breite = blatt.getBoundingClientRect().width || 1;
+      let px = parseFloat(getComputedStyle(ziel).fontSize), n = 0;
+      while (rumpf.scrollHeight > rumpf.clientHeight + 1 && px > breite * 0.008 && n++ < 40) { px *= 0.92; ziel.style.fontSize = (px / breite * 100).toFixed(3) + "cqw"; }
+    }
+  }
+  function drucken(html, quer) {
+    let bereich = $("#druckbereich");
+    if (!bereich) { bereich = document.createElement("div"); bereich.id = "druckbereich"; document.body.appendChild(bereich); }
+    // Erst unsichtbar in A4-Breite messen und einpassen, dann in den Druckbereich legen.
+    const mess = document.createElement("div");
+    mess.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;container-type:inline-size;";
+    mess.innerHTML = html; document.body.appendChild(mess); einpassen(mess);
+    html = mess.innerHTML; mess.remove();
+    bereich.innerHTML = html;
+    let st = $("#druckseite"); if (!st) { st = document.createElement("style"); st.id = "druckseite"; document.head.appendChild(st); }
+    st.textContent = `@page { size: A4 ${quer ? "landscape" : "portrait"}; margin: 0; }`;
+    setTimeout(() => { try { window.print(); } catch (e) { meldung("Drucken ist hier nicht möglich"); } }, 80);
+  }
+  V.buero = () => {
+    const ord = bueroOrdner();
+    return `${titel("Büro")}${frootie(FROOTIE_TIPPS.buero)}
+      <div class="regal">${ord.map((o) => `<button class="ordner" data-go="${o.id === "studio" ? "studio" : "ordner"}" data-arg="${o.id}" style="--o:${o.farbe}"><span class="ruecken"><span class="loch"></span><span class="schild">${o.sym}<b>${esc(o.t)}</b></span></span><span class="o-text">${esc(o.u)}</span></button>`).join("")}</div>
+      <p class="klein muted">${zentrale() ? `Du siehst alle ${B.ORDNER.length} Ordner. Shopleitungen sehen ${B.ORDNER.filter((o) => B.darfOrdner(S, "shopleitung", o.id)).length}.` : `${ord.length} Ordner für dich freigegeben.`}</p>`;
+  };
+  V.studio = () => {
+    if (!darfO("studio")) return V.buero();
+    const f = FIL(), gesp = ablage().filter((x) => x.ordner === "studio" && !x.entfernt && (zentrale() || x.filiale === f.id || x.filiale === null)).sort((a, b) => b.zeit.localeCompare(a.zeit));
+    return `${titel("Grafik & Druck", "buero")}${frootie(FROOTIE_TIPPS.studio)}
+      <div class="abschnitt"><h2>Neues Blatt</h2><div class="kacheln">${B.VORLAGEN.map((v) => `<button class="kachel" data-act="druck-neu" data-v="${v.id}"><span class="sym">${v.sym}</span><b>${esc(v.t)}</b><span>${esc(v.u)}</span></button>`).join("")}</div></div>
+      <div class="abschnitt"><h2>Gespeicherte Blätter (${gesp.length})</h2><div class="liste">${gesp.map((x) => { const v = B.VORLAGEN.find((y) => y.id === x.daten.vorlage) || {};
+        return `<div class="zeile"><span style="font-size:1.4rem">${v.sym || "📄"}</span><span><b>${esc(x.titel)}</b><small>${esc(v.t || "")} · ${x.filiale ? esc(filiale(x.filiale).kurz) : "alle Filialen"} · ${L.datumKurz(x.zeit.slice(0, 10))} · ${esc(name(person(x.vonId)))}</small></span>
+          <span class="reihe"><button class="chip" data-act="druck-oeffnen" data-id="${x.id}">öffnen</button><button class="chip" data-act="druck-direkt" data-id="${x.id}">🖨️</button></span></div>`; }).join("") || '<p class="leer">Noch nichts gespeichert.</p>'}</div></div>`;
+  };
+  V["druck-edit"] = () => {
+    const d = druckEntwurf; if (!d) return V.studio();
+    const f = FIL(), v = B.VORLAGEN.find((x) => x.id === d.vorlage);
+    const feld = (k, t, art) => !v.felder.includes(k) ? "" : art === "area" ? `<div class="feld"><label for="dk-${k}">${t}</label><textarea id="dk-${k}" data-druck="${k}" rows="${k === "posten" ? 8 : 4}">${esc(d[k] || "")}</textarea></div>` : `<div class="feld"><label for="dk-${k}">${t}</label><input type="text" id="dk-${k}" data-druck="${k}" value="${esc(d[k] || "")}" maxlength="${k === "titel" ? 60 : 160}"></div>`;
+    return `${titel(v.sym + " " + esc(v.t), "studio")}
+      <div class="studio">
+        <div class="studio-form karte">
+          ${feld("titel", "Überschrift")}${feld("untertitel", "Unterzeile")}
+          ${feld("posten", "Artikel · eine Zeile je Artikel: Name | Größe | Preis (Preis leer = „… €“)", "area")}
+          ${feld("text", d.vorlage === "oeffnung" ? (f.art === "mobil" ? "Einsätze (aus der Filiale übernommen, änderbar)" : "Zeiten (aus der Filiale übernommen, änderbar)") : "Text", "area")}
+          ${feld("preis", "Preis (z. B. 3,90)")}${feld("fuss", "Fußzeile")}
+          <div class="feld"><span class="lbl">Format</span><div class="wahl"><button class="${d.format === "hoch" ? "an" : ""}" data-act="druck-opt" data-k="format" data-w="hoch">▯ Hochformat</button><button class="${d.format === "quer" ? "an" : ""}" data-act="druck-opt" data-k="format" data-w="quer">▭ Querformat</button></div></div>
+          <div class="feld"><span class="lbl">Farbe</span><div class="wahl">${Object.entries(B.FARBEN).map(([k, x]) => `<button class="${d.farbe === k ? "an" : ""}" data-act="druck-opt" data-k="farbe" data-w="${k}"><span class="farbpunkt" style="background:${x.haupt}"></span> ${esc(x.name)}</button>`).join("")}</div></div>
+          <div class="feld"><span class="lbl">Symbol</span><div class="wahl">${B.SYMBOLE.map((x) => `<button class="${d.symbol === x ? "an" : ""}" data-act="druck-opt" data-k="symbol" data-w="${x}">${x || "ohne"}</button>`).join("")}</div></div>
+          <label class="haken"><input type="checkbox" id="dk-frootie" ${d.frootie !== false ? "checked" : ""}><span>Frootie unten rechts</span></label>
+          <div class="reihe"><button class="btn" data-act="druck-drucken">🖨️ Drucken</button><button class="btn zwei" data-act="druck-speichern">💾 Speichern</button>${d.id ? `<button class="btn drei" data-act="druck-loeschen">Löschen</button>` : ""}</div>
+          <p class="klein muted">Drucken öffnet den Druckdialog. Dort kannst du auch „Als PDF speichern“ wählen und das Blatt per E-Mail schicken.</p>
+        </div>
+        <div class="studio-vorschau"><div class="vorschau-rahmen ${d.format}">${B.blattHtml(S, d, f, BILD)}</div></div>
+      </div>`;
+  };
+  V.ordner = () => {
+    const id = arg, o = B.ORDNER.find((x) => x.id === id);
+    if (!o || !darfO(id)) return V.buero();
+    const f = FIL(), kopf = `${titel(o.sym + " " + esc(o.t), "buero")}`;
+    if (id === "shop" || id === "zentrale") {
+      const docs = ablage().filter((x) => x.ordner === id && !x.entfernt && (id === "zentrale" || x.filiale === f.id)).sort((a, b) => b.zeit.localeCompare(a.zeit));
+      return `${kopf}<p class="muted">${id === "shop" ? `Unterlagen für ${esc(f.kurz)}: Arbeitsanweisungen, Geräte, Center, Sonstiges.` : "Unterlagen der Geschäftsführung. Nur der Inhaber sieht diesen Ordner."}</p>
+        <div class="karte"><div class="gitter2"><div class="feld"><label for="bd-titel">Titel</label><input type="text" id="bd-titel" maxlength="80"></div>
+          <div class="feld"><label for="bd-kat">Art</label><select id="bd-kat">${["Anweisung", "Gerät", "Center", "Lieferant", "Notiz", "Sonstiges"].map((k) => `<option>${k}</option>`).join("")}</select></div></div>
+          <div class="feld"><label for="bd-text">Inhalt</label><textarea id="bd-text" rows="3"></textarea></div>
+          <button class="btn zwei" data-act="bd-neu" data-o="${id}">+ Ablegen</button><p class="klein muted">Dateien und Fotos anhängen geht mit dem Server.</p></div>
+        <div class="liste">${docs.map((x) => `<div class="karte"><div class="reihe zw"><b>${esc(x.titel)}</b><span class="marke-s">${esc(x.kategorie || "")}</span></div><p>${esc(x.text || "").split("\n").join("<br>")}</p>
+          <div class="reihe zw"><span class="klein muted">${esc(name(person(x.vonId)))} · ${L.datumKurz(x.zeit.slice(0, 10))}</span><button class="chip" data-act="bd-weg" data-id="${x.id}">entfernen</button></div></div>`).join("") || '<p class="leer">Noch nichts abgelegt.</p>'}</div>`;
+    }
+    if (id === "adressen") {
+      const ad = S.buero.adressen.filter((a) => !a.entfernt && (!a.filiale || zentrale() || a.filiale === f.id)).sort((a, b) => a.kategorie.localeCompare(b.kategorie) || a.firma.localeCompare(b.firma));
+      return `${kopf}<p class="muted">Wichtige Kontakte. Nummern antippen zum Markieren und Kopieren.</p>
+        ${zentrale() || leitung() ? `<div class="karte"><div class="gitter2"><div class="feld"><label for="ad-firma">Firma</label><input type="text" id="ad-firma" maxlength="80"></div><div class="feld"><label for="ad-kat">Art</label><select id="ad-kat">${["Techniker", "Lieferant", "Center", "Hygiene", "Steuerberater", "Sonstige"].map((k) => `<option>${k}</option>`).join("")}</select></div></div>
+          <div class="gitter2"><div class="feld"><label for="ad-tel">Telefon</label><input type="text" id="ad-tel" maxlength="40"></div><div class="feld"><label for="ad-mail">E-Mail</label><input type="text" id="ad-mail" maxlength="80"></div></div>
+          <div class="feld"><label for="ad-notiz">Notiz</label><input type="text" id="ad-notiz" maxlength="120"></div>
+          <label class="haken"><input type="checkbox" id="ad-alle" ${zentrale() ? "checked" : ""} ${zentrale() ? "" : "disabled"}><span>für alle Filialen${zentrale() ? "" : " (nur Inhaber)"}</span></label><button class="btn zwei" data-act="ad-neu">+ Kontakt anlegen</button></div>` : ""}
+        <div class="liste">${ad.map((a) => `<div class="zeile"><span class="marke-s">${esc(a.kategorie)}</span><span><b>${esc(a.firma)}</b><small>${a.telefon ? `📞 <span class="markierbar">${esc(a.telefon)}</span>` : ""}${a.email ? ` · ✉️ <span class="markierbar">${esc(a.email)}</span>` : ""}${a.notiz ? " · " + esc(a.notiz) : ""}${a.filiale ? " · " + esc(filiale(a.filiale).kurz) : ""}</small></span>${zentrale() || (leitung() && a.filiale === f.id) ? `<button class="chip" data-act="ad-weg" data-id="${a.id}">✕</button>` : "<span></span>"}</div>`).join("")}</div>`;
+    }
+    if (id === "hygiene") return `${kopf}<p class="muted">Berichte für die Lebensmittelkontrolle und den Hygieneberater. Nicht erledigte Aufgaben sind markiert.</p>
+      <div class="karte"><div class="feld"><span class="lbl">Filiale</span><div class="wahl">${meineFilialen().map((x) => `<button class="${x.id === f.id ? "an" : ""}" data-act="filiale" data-id="${x.id}">${esc(x.kurz)}</button>`).join("")}</div></div>
+        <div class="reihe"><button class="btn" data-act="hyg-bericht" data-tage="7">🖨️ Bericht 7 Tage</button><button class="btn zwei" data-act="hyg-bericht" data-tage="30">🖨️ Bericht 30 Tage</button>${leitung() || rolle() === "qualitaet" || berater() ? '<button class="btn drei" data-go="hygkontrolle">🔍 Kontrolle ansehen</button>' : ""}</div></div>`;
+    if (id === "lohn") return V.export();
+    if (id === "auswertung") return V.auswertung();
+    if (id === "archiv") {
+      const alle = ablage().filter((x) => !x.entfernt && (zentrale() || x.ordner === "studio" || x.ordner === "shop") && (zentrale() || x.filiale === f.id || x.filiale === null)).sort((a, b) => b.zeit.localeCompare(a.zeit));
+      const jahre = [...new Set(alle.map((x) => x.zeit.slice(0, 4)))];
+      return `${kopf}${jahre.map((j) => `<div class="abschnitt"><h2>${j}</h2><div class="liste">${alle.filter((x) => x.zeit.startsWith(j)).map((x) => `<div class="zeile"><span style="font-size:1.3rem">${(B.ORDNER.find((o) => o.id === x.ordner) || {}).sym || "📄"}</span><span><b>${esc(x.titel)}</b><small>${esc((B.ORDNER.find((o) => o.id === x.ordner) || {}).t || "")} · ${L.datumKurz(x.zeit.slice(0, 10))} · ${x.filiale ? esc(filiale(x.filiale).kurz) : "alle"}</small></span>${x.ordner === "studio" || x.ordner === "briefe" ? `<button class="chip" data-act="druck-direkt" data-id="${x.id}">🖨️</button>` : "<span></span>"}</div>`).join("")}</div></div>`).join("") || '<p class="leer">Das Archiv ist leer.</p>'}`;
+    }
+    if (id === "personal") {
+      const heute2 = heute(), ampel = (datum, jahre) => !datum ? ["rot", "fehlt"] : L.plusTage(datum, 365 * jahre) < heute2 ? ["rot", "fällig"] : L.plusTage(datum, 365 * jahre - 60) < heute2 ? ["gelb", "bald fällig"] : ["gruen", "ok"];
+      const leute = S.personen.filter((p) => !L.UEBERGREIFEND.includes(p.rolle) && p.aktiv !== false).sort((a, b) => (a.stammfiliale || "").localeCompare(b.stammfiliale || "") || a.vorname.localeCompare(b.vorname));
+      const sp = [["vertrag", "Arbeitsvertrag", 0], ["belehrung", "Belehrung § 43 IfSG", 2], ["datenschutz", "Datenschutz-Info", 0], ["schulung", "Hygieneschulung", 1]];
+      return `${kopf}<p class="muted">Nur der Inhaber. Belehrung nach § 43 IfSG mindestens alle 2 Jahre, Hygieneschulung jährlich (Vorschlag).</p>
+        <div class="karte"><div class="matrix-scroll"><table class="zutaten pakte"><thead><tr><td><b>Name</b></td>${sp.map(([, t]) => `<td><b>${t}</b></td>`).join("")}</tr></thead><tbody>
+        ${leute.map((p) => { const a = S.buero.personal[p.id] || {}; return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc(filiale(p.stammfiliale).kurz)} · ${L.ROLLEN[p.rolle].name}</span></td>${sp.map(([k, , j]) => { const [farbe, txt] = j ? ampel(a[k], j) : (a[k] ? ["gruen", "ok"] : ["rot", "fehlt"]); return `<td><input type="date" data-pakte="${p.id}|${k}" value="${esc(a[k] || "")}" aria-label="${k} ${esc(p.vorname)}"><span class="marke-s ${farbe}">${txt}</span></td>`; }).join("")}</tr>`; }).join("")}</tbody></table></div></div>`;
+    }
+    if (id === "briefe") {
+      if (!briefEntwurf) briefEntwurf = { an: "", betreff: "", text: "", ort: f.kurz, datum: L.datumKurz(heute()).slice(3) + heute().slice(0, 4), unterschrift: name(ICH()) };
+      const b = briefEntwurf, gesp = ablage().filter((x) => x.ordner === "briefe" && !x.entfernt).sort((x, y) => y.zeit.localeCompare(x.zeit));
+      return `${kopf}<div class="studio"><div class="studio-form karte">
+        <div class="feld"><label for="br-an">Empfänger (Anschrift)</label><textarea id="br-an" data-brief="an" rows="4">${esc(b.an)}</textarea></div>
+        <div class="gitter2"><div class="feld"><label for="br-ort">Ort</label><input type="text" id="br-ort" data-brief="ort" value="${esc(b.ort)}"></div><div class="feld"><label for="br-datum">Datum</label><input type="text" id="br-datum" data-brief="datum" value="${esc(b.datum)}"></div></div>
+        <div class="feld"><label for="br-betreff">Betreff</label><input type="text" id="br-betreff" data-brief="betreff" value="${esc(b.betreff)}"></div>
+        <div class="feld"><label for="br-text">Text</label><textarea id="br-text" data-brief="text" rows="8">${esc(b.text)}</textarea></div>
+        <div class="feld"><label for="br-unt">Unterschrift</label><input type="text" id="br-unt" data-brief="unterschrift" value="${esc(b.unterschrift)}"></div>
+        <div class="reihe"><button class="btn" data-act="brief-drucken">🖨️ Drucken</button><button class="btn zwei" data-act="brief-speichern">💾 Speichern</button><button class="btn drei" data-act="brief-neu">Neuer Brief</button></div>
+        ${gesp.length ? `<div class="liste">${gesp.map((x) => `<div class="zeile"><span>✉️</span><span><b>${esc(x.titel)}</b><small>${L.datumKurz(x.zeit.slice(0, 10))}</small></span><button class="chip" data-act="brief-oeffnen" data-id="${x.id}">öffnen</button></div>`).join("")}</div>` : ""}</div>
+        <div class="studio-vorschau"><div class="vorschau-rahmen hoch">${B.briefHtml(b, "frooters · " + (f.name || ""), BILD)}</div></div></div>`;
+    }
+    if (id === "freigaben") return `${kopf}<p class="muted">Welche Rolle sieht welchen Ordner? Der Inhaber sieht immer alle.</p>
+      <div class="karte"><div class="matrix-scroll"><table class="zutaten"><thead><tr><td><b>Ordner</b></td>${B.FREIGABE_ROLLEN.map(([, t]) => `<td><b>${t}</b></td>`).join("")}</tr></thead><tbody>
+      ${B.ORDNER.filter((o) => !o.fest).map((o) => `<tr><td>${o.sym} ${esc(o.t)}</td>${B.FREIGABE_ROLLEN.map(([rk]) => `<td><input type="checkbox" data-freigabe="${o.id}|${rk}" ${B.darfOrdner(S, rk, o.id) ? "checked" : ""} aria-label="${esc(o.t)} für ${rk}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      <p class="klein muted">Personalakte, Briefe und Zentrale-Ablage enthalten vertrauliche Daten. Gib sie nur frei, wenn es wirklich nötig ist.</p></div>`;
+    return V.buero();
+  };
+
   V.rezeptpflege = () => `${titel("Rezepte pflegen")}${frootie(FROOTIE_TIPPS.rezeptpflege)}
     <button class="btn zwei" data-act="rezept-neu">+ Neues Rezept</button>
     ${S.rezepte.warengruppen.map((g) => { const rs = S.rezepte.rezepte.filter((r) => r.gruppe === g.id); const fil = S.filialen.filter((f) => !f.sortiment || f.sortiment.includes(g.id)).map((f) => f.kurz);
@@ -885,6 +1018,7 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
     const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
+    if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
     if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
     if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
@@ -894,6 +1028,7 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
     ansicht = rechte;
     const inhalt = (V[ansicht] || V.start)();
     $("#app").innerHTML = `${updateBand}${kopf()}<main>${inhalt}</main>${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
+    einpassen($("#app"));
   }
   function gehe(v, a) { ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0); try { history.replaceState(null, "", "#" + v); } catch (e) { /* egal */ } }
 
@@ -1129,6 +1264,31 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
     "betreiber-pruefen": () => meldung("Die Prüfung braucht den Server des Betreibers. In dieser Testversion ist noch keiner angeschlossen."),
     "betreiber-freigeben": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); if (!L.betreiberStand(b).freigabeMoeglich) return; b.freigegeben = true; speichern(); zeichnen(); },
     "betreiber-sperren": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); b.freigegeben = false; speichern(); meldung("Freigabe zurückgenommen. Einladungslinks dieses Betreibers gelten nicht mehr."); zeichnen(); },
+    "druck-neu": (el) => { druckEntwurf = B.neuerDruck(S, el.dataset.v, FIL()); gehe("druck-edit"); },
+    "druck-opt": (el) => { druckMerken(); druckEntwurf[el.dataset.k] = el.dataset.w; zeichnen(); },
+    "druck-drucken": () => { druckMerken(); drucken(B.blattHtml(S, druckEntwurf, FIL(), BILD), druckEntwurf.format === "quer"); },
+    "druck-speichern": () => {
+      druckMerken(); const d = druckEntwurf;
+      const alt = d.id && ablage().find((x) => x.id === d.id);
+      const daten = { ...d }; delete daten.id;
+      if (alt) Object.assign(alt, { titel: d.titel || "Ohne Titel", daten, zeit: jetztIso() });
+      else { const x = { id: neueId("bl"), ordner: "studio", filiale: FIL().id, titel: d.titel || "Ohne Titel", daten, zeit: jetztIso(), vonId: ICH().id }; ablage().push(x); d.id = x.id; }
+      speichern(); meldung("Gespeichert. Du findest das Blatt unter „Gespeicherte Blätter“ und im Archiv."); zeichnen();
+    },
+    "druck-oeffnen": (el) => { const x = ablage().find((y) => y.id === el.dataset.id); druckEntwurf = { ...x.daten, id: x.id }; gehe("druck-edit"); },
+    "druck-direkt": (el) => { const x = ablage().find((y) => y.id === el.dataset.id); if (x.ordner === "briefe") return drucken(B.briefHtml(x.daten, "frooters · " + FIL().name, BILD), false); drucken(B.blattHtml(S, x.daten, filiale(x.filiale) || FIL(), BILD), x.daten.format === "quer"); },
+    "druck-loeschen": () => { const x = ablage().find((y) => y.id === druckEntwurf.id); if (x) x.entfernt = jetztIso(); druckEntwurf = null; speichern(); meldung("Gelöscht"); gehe("studio"); },
+    "bd-neu": (el) => { const t = $("#bd-titel").value.trim(); if (!t) return meldung("Bitte einen Titel eingeben"); ablage().push({ id: neueId("bl"), ordner: el.dataset.o, filiale: el.dataset.o === "zentrale" ? null : FIL().id, titel: t, kategorie: $("#bd-kat").value, text: $("#bd-text").value.trim(), zeit: jetztIso(), vonId: ICH().id }); speichern(); zeichnen(); },
+    "bd-weg": (el) => { ablage().find((x) => x.id === el.dataset.id).entfernt = jetztIso(); speichern(); zeichnen(); },
+    "ad-neu": () => { const fi = $("#ad-firma").value.trim(); if (!fi) return meldung("Bitte die Firma eingeben"); S.buero.adressen.push({ id: neueId("ad"), kategorie: $("#ad-kat").value, firma: fi, name: "", telefon: $("#ad-tel").value.trim(), email: $("#ad-mail").value.trim(), notiz: $("#ad-notiz").value.trim(), filiale: $("#ad-alle").checked ? null : FIL().id }); speichern(); zeichnen(); },
+    "ad-weg": (el) => { S.buero.adressen.find((x) => x.id === el.dataset.id).entfernt = jetztIso(); speichern(); zeichnen(); },
+    "hyg-bericht": (el) => drucken(B.hygieneBerichtHtml(S, FIL(), heute(), Number(el.dataset.tage), { datum: heute(), min: jetztMin() }, BILD, (id) => name(person(id))), false),
+    "brief-drucken": () => { briefMerken(); drucken(B.briefHtml(briefEntwurf, "frooters · " + FIL().name, BILD), false); },
+    "brief-speichern": () => { briefMerken(); const b = briefEntwurf; const alt = b.id && ablage().find((x) => x.id === b.id); const daten = { ...b }; delete daten.id;
+      if (alt) Object.assign(alt, { titel: b.betreff || "Brief", daten, zeit: jetztIso() }); else { const x = { id: neueId("bl"), ordner: "briefe", filiale: null, titel: b.betreff || "Brief", daten, zeit: jetztIso(), vonId: ICH().id }; ablage().push(x); b.id = x.id; }
+      speichern(); meldung("Brief gespeichert"); zeichnen(); },
+    "brief-neu": () => { briefEntwurf = null; zeichnen(); },
+    "brief-oeffnen": (el) => { const x = ablage().find((y) => y.id === el.dataset.id); briefEntwurf = { ...x.daten, id: x.id }; zeichnen(); },
     "mx-typ": (el) => { matrixTyp = el.dataset.t; zeichnen(); },
     "mx-neu": () => { const f = FIL(); f.matrix = f.matrix || {}; const l = (f.matrix[matrixTyp] = f.matrix[matrixTyp] || []); const letzt = l[l.length - 1]; l.push({ von: letzt ? letzt.bis : "10:00", bis: "20:00", gesamt: 2, sl: 0, stv: 1, ma: 0, maxAus: 1 }); speichern(); zeichnen(); },
     "mx-weg": (el) => { FIL().matrix[matrixTyp].splice(Number(el.dataset.i), 1); speichern(); zeichnen(); },
@@ -1179,7 +1339,15 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
     "update-pruefen": () => updatePruefen(true),
     "update-jetzt": () => { if (wartend) wartend.postMessage("jetzt-aktivieren"); },
   };
+  function druckMerken() { if (!druckEntwurf) return; document.querySelectorAll("[data-druck]").forEach((x) => { druckEntwurf[x.dataset.druck] = x.value; }); const fr = $("#dk-frootie"); if (fr) druckEntwurf.frootie = fr.checked; }
+  function briefMerken() { if (!briefEntwurf) return; document.querySelectorAll("[data-brief]").forEach((x) => { briefEntwurf[x.dataset.brief] = x.value; }); }
   function pinFormMerken() { const t = $("#pw-text"); if (t) pinForm.text = t.value; const w = $("#pw-wichtig"); if (w) pinForm.wichtig = w.checked; const b = $("#pw-bis"); if (b) pinForm.bis = b.value; }
+  // Druckstudio und Briefe: Vorschau beim Tippen aktualisieren, ohne das Formular neu zu zeichnen
+  document.addEventListener("input", (ev) => {
+    const el = ev.target;
+    if (el.dataset && el.dataset.druck != null && druckEntwurf) { druckEntwurf[el.dataset.druck] = el.value; const v = document.querySelector(".vorschau-rahmen"); if (v) { v.innerHTML = B.blattHtml(S, druckEntwurf, FIL(), BILD); einpassen(v); } }
+    if (el.dataset && el.dataset.brief != null && briefEntwurf) { briefEntwurf[el.dataset.brief] = el.value; const v = document.querySelector(".vorschau-rahmen"); if (v) v.innerHTML = B.briefHtml(briefEntwurf, "frooters · " + FIL().name, BILD); }
+  });
   document.addEventListener("input", (ev) => { const z = ev.target.dataset && ev.target.dataset.zaehler; if (z) { const n = $("#" + z); if (n) n.textContent = `${ev.target.value.length} / ${ev.target.maxLength}`; } });
   function hygSpeichern(grund) {
     const a = aufgabeFinden(arg); if (!a || a.durchfuehrung || berater()) return;
@@ -1223,6 +1391,9 @@ const APP_VERSION = "0.6.0"; // gleich halten mit sw.js, version.json und ?v= in
         t.textContent = `${n} Arbeitstage · Rest danach ${k.rest - k.beantragt - n} Tage${k.rest - k.beantragt - n < 0 ? " (reicht nicht)" : ""}`; }
       else if (t) t.textContent = "";
     }
+    else if (el.dataset.pakte) { const [pid, k] = el.dataset.pakte.split("|"); (S.buero.personal[pid] = S.buero.personal[pid] || {})[k] = el.value; speichern(); zeichnen(); }
+    else if (el.dataset.freigabe) { const [o, rk] = el.dataset.freigabe.split("|"); (S.buero.rechte[o] = S.buero.rechte[o] || {})[rk] = el.checked; speichern(); meldung("Freigabe gespeichert"); }
+    else if (el.id === "dk-frootie") { druckMerken(); zeichnen(); }
     else if (el.dataset.mx) {
       const [i, k] = el.dataset.mx.split("|"), b = FIL().matrix[matrixTyp][Number(i)];
       if (k === "von" || k === "bis") { if (el.value) b[k] = el.value; }
