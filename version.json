@@ -1,11 +1,10 @@
 {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "datum": "2026-11-05",
   "stufe": "DEV",
   "neu": [
-    "Sortiment & Bestellung: Artikel mit Lieferant, Gebinde und Lagerort, Soll- und Mindestbestand je Filiale",
-    "Bestand aufnehmen am Handy nach Lagerort",
-    "Automatische Bestellliste: Soll minus Ist minus unterwegs, auf volle Gebinde gerundet, je Lieferant",
-    "Bestellung freigeben, drucken oder als PDF speichern, E-Mail vorbereiten; Wareneingang mit Abweichungen"
+    "Kassendaten einlesen: CSV aus Gastronovi oder einer anderen Kasse, Spalten werden erkannt oder von Hand zugeordnet",
+    "Umsatz & Personal: Ø Umsatz je Stunde (letzte 4 gleiche Wochentage) neben dem Personal laut Plan, Umsatz je Personalstunde",
+    "Monatsübersicht für den Steuerberater: Soll, gestempelt, geplant, Differenz, Abwesenheitstage je Person als CSV"
   ]
 }

@@ -590,6 +590,105 @@
     return [kopf.join(";"), ...zeilen.map((z) => z.map(f).join(";"))].join("\r\n");
   }
 
+  // ---------- Monatsübersicht für den Steuerberater ----------
+  // Je Person: Soll (aus dem Stundenumfang), gestempelt, geplant, Abwesenheitstage je Art. Woche → Monat mit 4,33 Wochen gerechnet.
+  const WOCHEN_JE_MONAT = 4.33;
+  function monatsuebersicht(state, monat, filialeId) {
+    const von = monat + "-01", bis = plusTage(iso(new Date(Number(monat.slice(0, 4)), Number(monat.slice(5, 7)), 1)), -1);
+    const leute = (state.personen || []).filter((p) => !UEBERGREIFEND.includes(p.rolle) && p.stammfiliale && (!filialeId || p.stammfiliale === filialeId));
+    return leute.map((p) => {
+      const stempelTage = stundenliste(state, monat).filter((z) => z.personId === p.id);
+      const ist = stempelTage.reduce((n, z) => n + z.arbeit, 0);
+      let plan = 0; for (const x of state.plan || []) if (x.personId === p.id && x.datum >= von && x.datum <= bis) { const z = planZeit(state, x); if (z) plan += z.ende - z.start; }
+      const soll = p.wochenstunden ? Math.round((p.stundenEinheit === "monat" ? p.wochenstunden : p.wochenstunden * WOCHEN_JE_MONAT) * 60) : 0;
+      const abw = {};
+      for (const a of state.abwesenheiten || []) {
+        if (a.personId !== p.id || !abwGilt(a) || a.bis < von || a.von > bis) continue;
+        const n = urlaubsTage(a.von < von ? von : a.von, a.bis > bis ? bis : a.bis, (state.parameter || {}).urlaubTage);
+        abw[a.art] = (abw[a.art] || 0) + n;
+      }
+      return { person: p, sollMin: soll, istMin: ist, planMin: plan, diffMin: ist - soll, tage: stempelTage.length, offen: stempelTage.filter((z) => z.offen).length, abw, aktiv: p.aktiv !== false };
+    }).filter((z) => z.aktiv || z.istMin || z.planMin);
+  }
+
+  // ---------- Kassendaten einlesen (CSV aus Gastronovi oder einer anderen Kasse) ----------
+  // Spalten werden über die Kopfzeile erkannt und lassen sich von Hand zuordnen. Unbekannte Formate werden nicht geraten.
+  const KASSE_FELDER = { datum: ["datum", "date", "tag", "belegdatum", "buchungsdatum"], zeit: ["uhrzeit", "zeit", "time", "stunde", "belegzeit"], umsatz: ["umsatz", "brutto", "betrag", "summe", "gesamt", "umsatzbrutto", "bruttoumsatz", "preis"], anzahl: ["anzahl", "menge", "stueck", "stuck", "qty", "verkauft"], artikel: ["artikel", "bezeichnung", "produkt", "artikelname", "name"] };
+  const kNorm = (x) => String(x || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, "");
+  function zahlDe(t) {
+    let x = String(t == null ? "" : t).trim().replace(/[€\s]/g, "");
+    if (!x) return null;
+    if (/,\d{1,2}$/.test(x)) x = x.replace(/\./g, "").replace(",", ".");
+    else if (/^\d{1,3}(\.\d{3})+$/.test(x)) x = x.replace(/\./g, "");
+    const n = Number(x); return isNaN(n) ? null : n;
+  }
+  function datumDe(t) {
+    const x = String(t || "").trim();
+    let m = x.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = x.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/); if (m) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return null;
+  }
+  function stundeDe(t) {
+    const x = String(t || "").trim(); let m = x.match(/(\d{1,2}):(\d{2})/); if (m) return Number(m[1]);
+    m = x.match(/^(\d{1,2})$/); return m && Number(m[1]) < 24 ? Number(m[1]) : null;
+  }
+  function kassenSpalten(kopf) {
+    const n = kopf.map(kNorm), z = {};
+    for (const [feld, namen] of Object.entries(KASSE_FELDER)) { const i = n.findIndex((x) => namen.includes(x)); z[feld] = i >= 0 ? i : (feld === "umsatz" ? n.findIndex((x) => x.includes("umsatz") || x.includes("brutto")) : -1); }
+    // Datum und Uhrzeit in einer Spalte („05.11.2026 14:35“)
+    if (z.zeit < 0 && z.datum >= 0) z.zeit = z.datum;
+    return z;
+  }
+  function kassenImport(text, zuordnung) {
+    const zeilen = csvZeilen(text);
+    if (zeilen.length < 2) return { spalten: zeilen[0] || [], zuordnung: {}, posten: [], fehler: ["Keine Daten gefunden (Kopfzeile und mindestens eine Zeile nötig)."] };
+    const kopf = zeilen[0], z = { ...kassenSpalten(kopf), ...(zuordnung || {}) };
+    const fehler = [];
+    if (z.datum < 0) fehler.push("Spalte für das Datum nicht erkannt. Bitte zuordnen.");
+    if (z.umsatz < 0) fehler.push("Spalte für den Umsatz nicht erkannt. Bitte zuordnen.");
+    if (fehler.length) return { spalten: kopf, zuordnung: z, posten: [], fehler };
+    const sum = new Map(); let ohneZeit = 0, kaputt = 0;
+    zeilen.slice(1).forEach((r) => {
+      const datum = datumDe(r[z.datum]), umsatz = zahlDe(r[z.umsatz]);
+      if (!datum || umsatz == null) { kaputt++; return; }
+      const stunde = z.zeit >= 0 ? stundeDe(String(r[z.zeit] || "").replace(/^\S+\s+/, (m) => (z.zeit === z.datum ? "" : m))) : null;
+      if (stunde == null) ohneZeit++;
+      const anzahl = z.anzahl >= 0 ? (zahlDe(r[z.anzahl]) || 0) : 0;
+      const k = `${datum}|${stunde == null ? "" : stunde}`;
+      const e = sum.get(k) || { datum, stunde, umsatz: 0, anzahl: 0, zeilen: 0 };
+      e.umsatz += umsatz; e.anzahl += anzahl; e.zeilen++; sum.set(k, e);
+    });
+    if (kaputt) fehler.push(`${kaputt} Zeile${kaputt > 1 ? "n" : ""} ohne gültiges Datum oder Umsatz übersprungen.`);
+    if (ohneZeit) fehler.push(`${ohneZeit} Zeile${ohneZeit > 1 ? "n" : ""} ohne Uhrzeit: zählen nur für den Tagesumsatz.`);
+    const posten = [...sum.values()].map((e) => ({ ...e, umsatz: Math.round(e.umsatz * 100) / 100 })).sort((a, b) => a.datum.localeCompare(b.datum) || (a.stunde ?? -1) - (b.stunde ?? -1));
+    return { spalten: kopf, zuordnung: z, posten, fehler };
+  }
+  // Übernehmen: vorhandene Daten derselben Filiale und Tage werden ersetzt (kein doppeltes Einlesen)
+  function kassenUebernehmen(state, filialeId, posten, quelle) {
+    const tage = new Set(posten.map((x) => x.datum));
+    state.verkauf = (state.verkauf || []).filter((v) => !(v.filiale === filialeId && tage.has(v.datum)));
+    for (const x of posten) state.verkauf.push({ filiale: filialeId, datum: x.datum, stunde: x.stunde, umsatz: x.umsatz, anzahl: x.anzahl, quelle });
+    return tage.size;
+  }
+  // Durchschnittlicher Umsatz je Stunde an diesem Wochentag (letzte n Wochen vor dem Datum, nur Tage mit Daten)
+  function umsatzJeStunde(state, filialeId, datum, wochen) {
+    const n = wochen || 4, tage = [];
+    for (let i = 1; i <= n; i++) tage.push(plusTage(datum, -7 * i));
+    const v = (state.verkauf || []).filter((x) => x.filiale === filialeId && tage.includes(x.datum));
+    const mitDaten = [...new Set(v.map((x) => x.datum))];
+    const proStunde = {};
+    for (const x of v) if (x.stunde != null) proStunde[x.stunde] = (proStunde[x.stunde] || 0) + x.umsatz;
+    for (const h of Object.keys(proStunde)) proStunde[h] = Math.round((proStunde[h] / mitDaten.length) * 100) / 100;
+    const tag = mitDaten.length ? Math.round(v.reduce((s, x) => s + x.umsatz, 0) / mitDaten.length * 100) / 100 : null;
+    return { tage: mitDaten.sort(), proStunde, tagesumsatz: tag, beispiel: v.some((x) => x.quelle === "beispiel") };
+  }
+  // Personen je Stunde laut Plan (Mittel aus den beiden halben Stunden)
+  function personalJeStunde(state, filialeId, datum) {
+    const t = besetzungTag(state, filialeId, datum), r = {};
+    for (const sl of t.slots) { const h = Math.floor(sl.m / 60); r[h] = (r[h] || 0) + sl.zahl.gesamt / 2; }
+    return r;
+  }
+
   // ---------- Pinnwand (wie Club-App: Zettel, Empfänger, wichtig, gelesen, abnehmen) ----------
   const PIN_STANDARD = { maxZettel: 4, zeichen: 200, erinnernTage: 3, pauseTage: 7 };
   function pinEinstellungen(state) { return { ...PIN_STANDARD, ...((state.parameter || {}).pinnwand || {}) }; }
@@ -1041,6 +1140,7 @@
     SCHRITTE, geheimErkannt, pruefeVerbindung, betreiberStand,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
+    WOCHEN_JE_MONAT, monatsuebersicht, KASSE_FELDER, zahlDe, datumDe, stundeDe, kassenSpalten, kassenImport, kassenUebernehmen, umsatzJeStunde, personalJeStunde,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
     LAGERORTE, BESTELL_STATUS, waren, letzteInventur, unterwegs, bestellVorschlag, bestellungenAnlegen, wareneingang, mengeText,
     allergeneVon, spurenVon, mengeFuer, quiz, zufall, mischen,

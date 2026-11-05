@@ -1,4 +1,4 @@
-const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 10) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 11) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -84,6 +84,7 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    umsatz: "Hier siehst du, wann viel verkauft wird, und daneben, wie viele Leute laut Plan da sind. So erkennst du Stunden mit zu wenig oder zu viel Personal.",
     bestellung: "Erst den Bestand zählen, dann schlage ich vor, was fehlt: Soll minus Ist, auf volle Kartons gerundet. Du prüfst und gibst frei, verschickt wird nichts automatisch.",
     artikel: "Hier legt die Zentrale Artikel mit Lieferant, Gebinde und Lagerort an. Das Soll je Filiale stellt die Shopleitung ein.",
     zutaten: "Hier stehen alle Zutaten mit ihren Allergenen. Trag sie vom Datenblatt des Lieferanten ein. Die Rezepte rechnen ihre Allergene daraus aus.",
@@ -122,7 +123,7 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", inventur: "bestellung", lagersoll: "bestellung", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -178,6 +179,7 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
         ${kachel("⚙️", "Regeln & Geräte", "Was gilt in diesem Shop", "hygregeln")}
         ${kachel("🕒", "Stempelzeiten", "Wer ist heute da", "stempelzeiten")}
+        ${kachel("💶", "Umsatz & Personal", "Umsatz je Stunde neben dem Plan", "umsatz")}
         ${kachel("📦", "Bestellung", "Bestand zählen, Bestellliste", "bestellung", bestellZaehler(f.id))}
         ${kachel("📤", "Stundenliste", "Export für den Steuerberater", "export")}
         ${kachel("🗂️", "Büro", `${bueroOrdner().length} Ordner · Grafik & Druck`, "buero")}
@@ -1254,6 +1256,61 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
       <div class="gitter2">${f("lf-tage", "Bestelltage / Annahmeschluss", l.bestelltage, "text", "z. B. Mo, Do bis 12 Uhr")}${f("lf-hinweis", "Hinweis", l.hinweis)}</div>
       <button class="btn gross" data-act="lieferant-speichern" data-id="${l.id}">Speichern</button></div>`;
   };
+  // ----- Umsatz & Personal · Kassendaten einlesen -----
+  let kasseText = "", kasseErgebnis = null, kasseZuordnung = null, kasseFiliale = null;
+  const euro = (n) => n == null ? "–" : `${(Math.round(n * 100) / 100).toFixed(2).replace(".", ",")} €`;
+  const euroRund = (n) => n == null ? "–" : `${Math.round(n).toLocaleString("de-DE")} €`;
+  V.umsatz = () => {
+    const f = FIL(), d = arg || heute();
+    const u = L.umsatzJeStunde(S, f.id, d, 4), pj = L.personalJeStunde(S, f.id, d), o = L.oeffnung(f, d);
+    const stunden = o ? Array.from({ length: Math.ceil(o.zu / 60) - Math.floor(o.auf / 60) }, (_, i) => Math.floor(o.auf / 60) + i) : [];
+    const max = Math.max(1, ...stunden.map((h) => u.proStunde[h] || 0));
+    const persStd = stunden.reduce((n, h) => n + (pj[h] || 0), 0);
+    const jePers = persStd ? (u.tagesumsatz || 0) / persStd : null;
+    const kopf = `${titel("Umsatz & Personal " + esc(f.kurz))}${breit() ? "" : frootie(FROOTIE_TIPPS.umsatz)}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="umsatz" data-arg="${L.plusTage(d, -1)}" aria-label="Tag zurück">‹</button><b>${datumLang(d)}</b><button class="chip" data-go="umsatz" data-arg="${L.plusTage(d, 1)}" aria-label="Tag vor">›</button></div>
+      <div class="reihe"><button class="btn drei" data-go="kasse-import">📥 Kassendaten einlesen</button>${d !== heute() ? `<button class="chip" data-go="umsatz" data-arg="${heute()}">heute</button>` : ""}</div></div>`;
+    if (!o) return `${kopf}<p class="leer">An diesem Tag ist ${esc(f.kurz)} geschlossen.</p>`;
+    if (!u.tage.length) return `${kopf}<p class="hinweis">Für ${L.TAG_NAME[L.wochentag(d)]}e in den letzten 4 Wochen gibt es keine Kassendaten. Lies den Tagesbericht aus der Kasse ein, dann siehst du hier den Umsatz je Stunde neben dem Personal.</p>`;
+    return `${kopf}
+      ${u.beispiel ? '<p class="hinweis">Beispielumsätze (erfunden), bis echte Kassendaten eingelesen sind.</p>' : ""}
+      <div class="karte"><h2>Ø Umsatz je Stunde · ${L.TAG_NAME[L.wochentag(d)]}</h2>
+        <p class="klein muted">Mittel aus ${u.tage.length} ${L.TAG_NAME[L.wochentag(d)]}${u.tage.length > 1 ? "en" : ""} (${u.tage.map((x) => L.datumKurz(x).slice(3)).join(", ")}) neben dem Personal laut Plan am ${L.datumKurz(d)}</p>
+        <div class="um-tab">${stunden.map((h) => { const um = u.proStunde[h] || 0, p = pj[h] || 0, jp = p ? um / p : null;
+          const knapp = jePers && p && jp > jePers * 1.35, ruhig = jePers && p > 1 && jp < jePers * 0.55, leer = um > 0 && !p;
+          return `<div class="um-zeile ${leer || knapp ? "knapp" : ruhig ? "ruhig" : ""}"><span class="um-h">${String(h).padStart(2, "0")}–${String(h + 1).padStart(2, "0")}</span>
+            <span class="um-bahn"><span class="um-balken" style="width:${Math.round((um / max) * 100)}%"></span><span class="um-wert">${euroRund(um)}</span></span>
+            <span class="um-p" title="Personen laut Plan">${p ? "👤".repeat(Math.min(6, Math.round(p))) : "–"}<small>${p ? String(Math.round(p * 10) / 10).replace(".", ",") : "0"}</small></span>
+            <span class="um-jp">${jp ? euroRund(jp) + "/Pers." : leer ? "niemand da" : ""}</span></div>`; }).join("")}</div>
+        <p class="klein muted">Rot = viel Umsatz für wenig Personal, grün = ruhig mit mehr Personal. Nur Hinweise: Vorbereitung, Reinigung und Einarbeitung zählen auch.</p></div>
+      <div class="karte"><div class="gitter3 kpi"><div><small>Ø Tagesumsatz</small><b>${euroRund(u.tagesumsatz)}</b></div><div><small>Personalstunden laut Plan</small><b>${String(Math.round(persStd * 10) / 10).replace(".", ",")}</b></div><div><small>Umsatz je Personalstunde</small><b>${jePers ? euroRund(jePers) : "–"}</b></div></div>
+        <button class="btn drei" data-go="plan" data-arg="${L.montag(d)}">📅 Zum Einsatzplan</button></div>`;
+  };
+  V["kasse-import"] = () => {
+    const r = kasseErgebnis, fid = kasseFiliale || FIL().id;
+    const felder = [["datum", "Datum *"], ["zeit", "Uhrzeit"], ["umsatz", "Umsatz *"], ["anzahl", "Anzahl"], ["artikel", "Artikel"]];
+    const tage = r ? [...new Set(r.posten.map((x) => x.datum))] : [];
+    const vorhanden = (S.verkauf || []).filter((v) => v.filiale === fid && tage.includes(v.datum));
+    return `${titel("Kassendaten einlesen", "umsatz")}
+      <div class="karte"><p>Den Tagesbericht oder die Verkäufe aus der Kasse (z. B. Gastronovi) als <b>CSV</b> speichern und hier auswählen, oder die Zeilen kopieren und einfügen.</p>
+        <p class="klein muted">Gebraucht werden Datum und Umsatz, für die Stunden-Auswertung auch die Uhrzeit. Die Spalten werden an der Kopfzeile erkannt; was nicht erkannt wird, ordnest du unten selbst zu. Welche Exporte Gastronovi bei euch anbietet, wissen wir noch nicht. Schickt uns gern einen Beispiel-Export.</p>
+        <div class="feld"><label for="ka-fil">Filiale</label><select id="ka-fil" data-kasse-fil>${(zentrale() ? S.filialen : [FIL()]).map((x) => `<option value="${x.id}" ${x.id === fid ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
+        <div class="reihe"><label class="btn drei datei">📄 CSV-Datei wählen<input type="file" id="ka-datei" accept=".csv,.txt,text/csv" hidden></label></div>
+        <div class="feld"><label for="ka-text">Daten</label><textarea id="ka-text" rows="6" placeholder="Datum;Uhrzeit;Artikel;Menge;Umsatz&#10;03.11.2026;10:15;Froyo M;2;9,80">${esc(kasseText)}</textarea></div>
+        <button class="btn zwei" data-act="ka-pruefen">Prüfen</button></div>
+      ${r ? `<div class="karte"><h2>Spalten</h2><div class="gitter3">${felder.map(([k, t]) => `<div class="feld"><label for="km-${k}">${t}</label><select id="km-${k}" data-kmap="${k}"><option value="-1">– keine –</option>${r.spalten.map((sp, i) => `<option value="${i}" ${r.zuordnung[k] === i ? "selected" : ""}>${esc(sp || "Spalte " + (i + 1))}</option>`).join("")}</select></div>`).join("")}</div>
+        ${r.fehler.map((x) => `<p class="hinweis">${esc(x)}</p>`).join("")}
+        ${r.posten.length ? `<h2>Vorschau</h2><div class="tab-karte"><table class="pc-tab"><thead><tr><th>Datum</th><th class="z">Umsatz</th><th class="z">Stunden mit Umsatz</th><th class="z">Zeilen</th></tr></thead><tbody>
+          ${tage.map((t) => { const xs = r.posten.filter((x) => x.datum === t); return `<tr><td>${datumLang(t)}</td><td class="z">${euro(xs.reduce((n, x) => n + x.umsatz, 0))}</td><td class="z">${xs.filter((x) => x.stunde != null).length}</td><td class="z">${xs.reduce((n, x) => n + x.zeilen, 0)}</td></tr>`; }).join("")}</tbody></table></div>
+          ${vorhanden.length ? `<p class="hinweis">Für ${new Set(vorhanden.map((v) => v.datum)).size} dieser Tage gibt es schon Daten${vorhanden.some((v) => v.quelle === "beispiel") ? " (Beispielumsätze)" : ""}. Sie werden ersetzt.</p>` : ""}
+          <button class="btn gross" data-act="ka-ok">${tage.length} Tag${tage.length > 1 ? "e" : ""} für ${esc(filiale(fid).kurz)} übernehmen</button>` : ""}</div>` : ""}`;
+  };
+  function monatsCsv(monat, alle) {
+    const z = L.monatsuebersicht(S, monat, alle ? null : FIL().id), arten = Object.keys(L.ABW_ARTEN);
+    const h = (m) => (m / 60).toFixed(2).replace(".", ",");
+    return L.csv(z.map((x) => [name(x.person), (filiale(x.person.stammfiliale) || {}).kurz || "", (L.beschaeftigung(x.person.beschaeftigung) || { name: "" }).name, h(x.sollMin), h(x.istMin), h(x.planMin), h(x.diffMin), x.tage, ...arten.map((a) => x.abw[a] || 0), x.offen ? `${x.offen} Tag(e) ohne Gehen` : ""]),
+      ["Name", "Stammfiliale", "Beschäftigung", "Soll (Std.)", "Gestempelt (Std.)", "Geplant (Std.)", "Differenz (Std.)", "Arbeitstage", ...arten.map((a) => L.ABW_ARTEN[a].name + " (Tage)"), "Hinweis"]);
+  }
   V.export = () => {
     const f = FIL(), monat = arg || heute().slice(0, 7);
     const vor = (() => { const [y, m] = monat.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
@@ -1269,8 +1326,25 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
         <div class="liste">${Object.entries(proPerson).map(([pid, m]) => `<div class="zeile"><span class="punkt gruen"></span><span><b>${esc(name(person(pid)))}</b><small>${z.filter((x) => x.personId === pid).length} Tage</small></span><span><b>${hm(m)} Std.</b></span></div>`).join("") || '<p class="leer">Keine Stempelzeiten in diesem Monat.</p>'}</div>
         ${z.length ? `<div class="reihe"><button class="btn" data-act="export-csv" data-monat="${monat}">📤 CSV herunterladen</button><button class="btn drei" data-act="export-text" data-monat="${monat}">Als Text anzeigen</button></div>` : ""}
         <textarea id="export-text" rows="8" readonly hidden aria-label="Stundenliste als Text"></textarea>
-        <p class="klein muted">Spalten: Name; Datum; Filiale; Kommen; Gehen; Pause (Min.); Arbeit (Std.); Hinweis. Trennzeichen Semikolon, passt für Excel und den Steuerberater.</p></div>`;
+        <p class="klein muted">Spalten: Name; Datum; Filiale; Kommen; Gehen; Pause (Min.); Arbeit (Std.); Hinweis. Trennzeichen Semikolon, passt für Excel und den Steuerberater.</p></div>
+      ${monatsKarte(monat)}`;
   };
+  function monatsKarte(monat) {
+    const z = L.monatsuebersicht(S, monat, FIL().id), h = (m) => (m / 60).toFixed(1).replace(".", ",");
+    const abwTxt = (a) => Object.entries(a).map(([k, n]) => `${L.ABW_ARTEN[k] ? L.ABW_ARTEN[k].sym : ""} ${n}`).join(" ") || "–";
+    return `<div class="karte"><h2>Monatsübersicht für den Steuerberater</h2>
+      <p class="klein muted">Je Person: Soll laut Stundenumfang (bei Wochenstunden × ${String(L.WOCHEN_JE_MONAT).replace(".", ",")}), gestempelt (alle Filialen), geplant, Differenz und Abwesenheitstage (Mo–Fr). Welches Format euer Steuerberater braucht (CSV, Excel, DATEV), klären wir noch; bis dahin passt diese CSV-Datei für Excel.${monat === heute().slice(0, 7) ? " <b>Laufender Monat: Die Differenz ist erst am Monatsende aussagekräftig.</b>" : ""}</p>
+      <div class="tab-karte"><table class="pc-tab"><thead><tr><th>Name</th><th>Beschäftigung</th><th class="z">Soll</th><th class="z">gestempelt</th><th class="z">geplant</th><th class="z">Differenz</th><th>Abwesenheit</th></tr></thead><tbody>
+      ${z.map((x) => `<tr><td><b>${esc(name(x.person))}</b>${x.offen ? ' <span class="marke-s rot">Gehen fehlt</span>' : ""}</td><td>${esc((L.beschaeftigung(x.person.beschaeftigung) || { name: "–" }).name)}</td><td class="z">${h(x.sollMin)}</td><td class="z">${h(x.istMin)}</td><td class="z">${h(x.planMin)}</td><td class="z ${x.diffMin < 0 ? "minus" : "plus"}">${x.diffMin > 0 ? "+" : ""}${h(x.diffMin)}</td><td>${abwTxt(x.abw)}</td></tr>`).join("") || '<tr><td colspan="7" class="leer">Keine Mitarbeiter.</td></tr>'}</tbody></table></div>
+      <div class="reihe"><button class="btn" data-act="export-monat" data-monat="${monat}">📤 Monatsübersicht CSV</button>${zentrale() ? `<button class="btn drei" data-act="export-monat" data-monat="${monat}" data-alle="1">📤 Alle Filialen</button>` : ""}</div></div>`;
+  }
+  function dateiSpeichern(dateiname, text) {
+    try {
+      const url = URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a"); a.href = url; a.download = dateiname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      meldung("Datei wird gespeichert.");
+    } catch (e) { const t = $("#export-text"); if (t) { t.hidden = false; t.value = text; t.select(); } }
+  }
   function exportCsv(monat) {
     const f = FIL();
     const z = L.stundenliste(S, monat, f.id);
@@ -1318,7 +1392,7 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
-    const nurLeitung = ["bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
+    const nurLeitung = ["umsatz", "kasse-import", "bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit"];
     if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
@@ -1766,6 +1840,12 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
       Object.assign(l, { name: w("#lf-name"), kontakt: w("#lf-kontakt"), email: mail, telefon: w("#lf-tel"), bestelltage: w("#lf-tage"), hinweis: w("#lf-hinweis") });
       speichern(); meldung("Lieferant gespeichert"); gehe("lieferanten");
     },
+    "export-monat": (el) => dateiSpeichern(`monatsuebersicht-${el.dataset.alle ? "alle" : FIL().kurz.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${el.dataset.monat}.csv`, monatsCsv(el.dataset.monat, !!el.dataset.alle)),
+    "ka-pruefen": () => { kasseText = $("#ka-text").value; kasseZuordnung = null; kasseErgebnis = L.kassenImport(kasseText); zeichnen(); },
+    "ka-ok": () => {
+      const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
+      kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
+    },
     "export-csv": (el) => {
       const text = exportCsv(el.dataset.monat);
       try {
@@ -1832,6 +1912,9 @@ const APP_VERSION = "0.10.0"; // gleich halten mit sw.js, version.json und ?v= i
         t.textContent = `${n} Arbeitstage · Rest danach ${k.rest - k.beantragt - n} Tage${k.rest - k.beantragt - n < 0 ? " (reicht nicht)" : ""}`; }
       else if (t) t.textContent = "";
     }
+    else if (el.dataset.kmap) { kasseZuordnung = { ...(kasseErgebnis ? kasseErgebnis.zuordnung : {}), [el.dataset.kmap]: Number(el.value) }; kasseErgebnis = L.kassenImport(kasseText, kasseZuordnung); zeichnen(); }
+    else if (el.dataset.kasseFil != null) { const t = $("#ka-text"); if (t) kasseText = t.value; kasseFiliale = el.value; zeichnen(); }
+    else if (el.id === "ka-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { kasseText = String(r.result || ""); kasseZuordnung = null; kasseErgebnis = L.kassenImport(kasseText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
     else if (el.dataset.mafilter) { maFilter[el.dataset.mafilter] = el.value; zeichnen(); }
     else if (el.id === "imp-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { importText = String(r.result || ""); importErgebnis = L.mitarbeiterImport(S, importText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
     else if (el.dataset.land) { filiale(el.dataset.land).bundesland = el.value || null; speichern(); meldung("Bundesland gespeichert"); zeichnen(); }

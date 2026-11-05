@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v10";
+  const SCHLUESSEL = "frooters_demo_v11";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -224,8 +224,24 @@
       posten: { [art("Froyo-Basis Natur")]: 5, [art("Joghurt")]: 6, [art("Milch")]: 10, [art("Magerquark")]: 4, [art("Erdbeeren")]: 3, [art("Banane")]: 6, [art("Mango gewürfelt")]: 1, [art("Beerenmischung")]: 4, [art("Apfelsaft")]: 12, [art("Granola")]: 2.5, [art("Mandelblättchen")]: 1, [art("Waffelteig")]: 8, [art("Becher S")]: 800, [art("Becher M")]: 1200, [art("Becher L")]: 200, [art("Löffel Holz")]: 1500, [art("Servietten")]: 2500 } }];
     const bestellungen = [{ id: id("bs"), filiale: "obh", lieferant: "lf1", status: "geschickt", erstellt: L.plusTage(heuteIso, -1) + "T10:15", von: anna, geschickt: { am: L.plusTage(heuteIso, -1) + "T10:20" }, posten: [{ artikel: art("Froyo-Basis Natur"), menge: 3 }, { artikel: art("Milch"), menge: 1 }] }];
 
+    // Beispielumsätze je Stunde der letzten 4 Wochen (erfunden, nur damit „Umsatz & Personal“ etwas zeigt)
+    const rnd = L.zufall(4711), verkauf = [];
+    const BASIS = { och: 60, obh: 75, sin: 55, osn: 40 };
+    for (const f of filialen) {
+      if (!BASIS[f.id]) continue;
+      for (let i = 1; i <= 28; i++) {
+        const d = L.plusTage(heuteIso, -i), o = L.oeffnung(f, d); if (!o) continue;
+        const tf = { sa: 1.6, so: 1.3, fr: 1.15 }[L.wochentag(d)] || 1;
+        for (let h = Math.floor(o.auf / 60); h < Math.ceil(o.zu / 60); h++) {
+          const kurve = 0.45 + Math.exp(-Math.pow((h - 14.5) / 2.6, 2));
+          const u = Math.round(BASIS[f.id] * tf * kurve * (0.8 + rnd() * 0.4) * 100) / 100;
+          verkauf.push({ filiale: f.id, datum: d, stunde: h, umsatz: u, anzahl: Math.round(u / 4.8), quelle: "beispiel" });
+        }
+      }
+    }
+
     const state = {
-      version: 10, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 11, verkauf, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       waren: { lieferanten, artikel, sortiment: sortimentWaren, inventuren, bestellungen },

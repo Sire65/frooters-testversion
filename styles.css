@@ -352,6 +352,20 @@ table.dp-bestell td { padding: 1.2cqw 1cqw; border-bottom: .2cqw solid #e2e3d6; 
 table.dp-bestell td small { display: block; color: #5d604f; font-size: 1.8cqw; }
 table.dp-bestell .z { text-align: right; white-space: nowrap; }
 .bestellblatt h1 { text-align: left; }
+
+/* ---------- 0.11.0: Umsatz & Personal ---------- */
+.um-tab { display: grid; gap: 4px; }
+.um-zeile { display: grid; grid-template-columns: 62px minmax(0, 1fr) 92px 92px; gap: 10px; align-items: center; padding: 4px 6px; border-radius: 8px; font-size: .9rem; }
+.um-zeile.knapp { background: var(--red-soft); } .um-zeile.ruhig { background: var(--green-soft); }
+.um-h { font-variant-numeric: tabular-nums; color: var(--muted); }
+.um-bahn { position: relative; height: 24px; background: var(--tint); border-radius: 6px; overflow: hidden; }
+.um-balken { position: absolute; inset: 0 auto 0 0; background: var(--sage); border-radius: 6px; }
+.um-wert { position: relative; padding-left: 8px; line-height: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.um-p { white-space: nowrap; font-size: .8rem; letter-spacing: -2px; } .um-p small { letter-spacing: 0; margin-left: 6px; color: var(--muted); font-size: .8rem; }
+.um-jp { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; }
+.kpi small { display: block; color: var(--muted); font-size: .8rem; } .kpi b { font-family: var(--f-display); font-size: 1.4rem; }
+table.pc-tab td.minus { color: var(--red); } table.pc-tab td.plus { color: var(--green); }
+@media (max-width: 560px) { .um-zeile { grid-template-columns: 46px minmax(0, 1fr) 62px; } .um-jp { display: none; } .um-p { letter-spacing: 0; } .um-p { font-size: 0; } .um-p small { font-size: .8rem; margin: 0; } .um-p::before { content: "👤"; font-size: .8rem; } }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }
