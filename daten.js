@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v4";
+  const SCHLUESSEL = "frooters_demo_v5";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -30,6 +30,16 @@
           { datum: L.plusTage(mo0, 19), ort: "Firmenfeier (Beispiel)", von: "14:00", bis: "20:00" },
         ] },
     ];
+    // Besetzungsmatrix je Filiale (Beispiel, mit frooters abstimmen): Personen je Zeitblock und Vorgabe je Rolle
+    const B = (von, bis, gesamt, stv, ma, maxAus, sl) => ({ von, bis, gesamt, sl: sl || 0, stv: stv || 0, ma: ma || 0, maxAus });
+    const MATRIX = {
+      och: { werktag: [B("10:00", "12:00", 2, 1, 0, 1), B("12:00", "18:00", 2, 1, 1, 1), B("18:00", "20:00", 2, 1, 0, 1)], sa: [B("10:00", "12:00", 2, 1, 0, 1), B("12:00", "18:00", 3, 1, 1, 1, 1), B("18:00", "20:00", 2, 1, 0, 1)] },
+      obh: { werktag: [B("10:00", "20:00", 2, 1, 0, 1)], sa: [B("10:00", "12:00", 2, 1, 0, 1), B("12:00", "18:00", 3, 1, 1, 1), B("18:00", "20:00", 2, 1, 0, 1)] },
+      sin: { werktag: [B("11:00", "21:00", 2, 1, 0, 1)], sa: [B("11:00", "21:00", 3, 1, 1, 1)], so: [B("11:00", "21:00", 3, 1, 1, 1)] },
+      osn: { werktag: [B("10:00", "19:00", 2, 1, 0, 1)], sa: [B("10:00", "19:00", 2, 1, 0, 1)] },
+      rr: { einsatz: [B("00:00", "23:59", 2, 0, 1, 1)] },
+    };
+    for (const f of filialen) f.matrix = MATRIX[f.id];
     const P = (vorname, nachname, rolle, stamm, extra) => Object.assign({ id: id("p"), vorname, nachname, rolle, stammfiliale: stamm, springer: false, einsatzfilialen: [], wochenstunden: 30, pin: "1234", aktiv: true }, extra || {});
     // Bezirksleitung macht laut Fragebogen der Inhaber selbst. Eine feste Person pflegt Rezepte und Hygiene, ein externer Berater liest mit.
     const personen = [
@@ -129,13 +139,13 @@
     ];
 
     const state = {
-      version: 4, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 5, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Betreiber mit eigener Datenbank (Admin-Einstellungen). Nur öffentliche Verbindungsdaten, nie Geheimnisse.
       betreiber: [
         { id: "gm", name: "Genussmanufaktur (eigene Filialen)", art: "eigen", kontakt: "", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: { antrag: true }, pruefung: {}, freigegeben: false },
         { id: "fr1", name: "Beispiel-Franchise GmbH", art: "franchise", kontakt: "Beispiel", email: "", avvDatum: "", supabase: { url: "", key: "", region: "eu-central-1" }, neon: { projekt: "", region: "aws-eu-central-1" }, schritte: {}, pruefung: {}, freigegeben: false },
       ],
-      veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600 },
+      veroeffentlicht: {}, parameter: { pause6: 30, pause9: 45, max: 600, pinnwand: { maxZettel: 4, zeichen: 200, erinnernTage: 3, pauseTage: 7 } },
       hygiene: { bereiche, geraetetypen, geraete, regeln, massnahmen, zuteilung: {}, durchfuehrungen: [], nachkontrollen: [], abweichungen: [] },
       rezepte: { warengruppen, rezepte, allergene: ALLERGENE },
     };
@@ -171,8 +181,12 @@
     if (tomS) { const fremdOk = (p) => !L.schichtenAm(state, tomS.datum, (x) => x.personId === p).length && !L.abwesenheitAm(state, p, tomS.datum);
       const nehmer = ["Leonie", "Jonas", "Mia"].map(pid).find(fremdOk);
       if (nehmer) state.tausch.push({ id: id("x"), schichtId: tomS.id, vonId: pid("Tom"), teil: null, notiz: "Familienfeier", status: "angefragt", nehmerId: nehmer, gegenId: null, zeit: heuteIso + "T07:45", anfrage: heuteIso + "T09:15" }); }
-    state.pinnwand.push({ id: id("n"), filiale: "och", vonId: pid("Sandra"), text: "Neue Mango-Sauce ist da. Bitte zuerst die alte aufbrauchen.", zeit: heuteIso + "T09:00", wichtig: true });
-    state.pinnwand.push({ id: id("n"), filiale: null, vonId: pid("Inhaber"), text: "Willkommen in der neuen frooters Team-App (Testversion).", zeit: heuteIso + "T08:00", wichtig: false });
+    // Pinnwand: Zettel mit Empfängern, Farbe, wichtig und Lesebestätigung (wer hat wann gelesen)
+    const PZ = (filiale, von, text, extra) => Object.assign({ id: id("n"), filiale, vonId: pid(von), text, zeit: heuteIso + "T09:00", wichtig: false, farbe: 1, fuer: "alle", empfaenger: [], gelesen: {}, abgenommen: {}, bis: null }, extra || {});
+    state.pinnwand.push(PZ("och", "Sandra", "Neue Mango-Sauce ist da. Bitte zuerst die alte aufbrauchen.", { wichtig: true, gelesen: { [pid("Tom")]: heuteIso + "T09:20" } }));
+    state.pinnwand.push(PZ(null, "Inhaber", "Willkommen in der neuen frooters Team-App (Testversion). Schaut euch alles in Ruhe an! 🍓", { farbe: 3, zeit: L.plusTage(heuteIso, -4) + "T08:00" }));
+    state.pinnwand.push(PZ("och", "Tom", "Lena, kannst du am Samstag die Kühlgeräte-Reinigung übernehmen? Ich bin erst ab 12 da.", { farbe: 2, fuer: "personen", empfaenger: [pid("Lena")], zeit: heuteIso + "T10:05" }));
+    state.pinnwand.push(PZ("och", "Sandra", "Inventur am Montag nach Ladenschluss. Bitte im Dienstplan eintragen, wer helfen kann.", { farbe: 4, fuer: "leitung", zeit: L.plusTage(heuteIso, -1) + "T16:30" }));
     state.naechsteId = n + 1;
     return state;
   }

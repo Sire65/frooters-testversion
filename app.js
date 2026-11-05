@@ -1,4 +1,4 @@
-const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.5.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 4) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 5) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -71,7 +71,9 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     aufgabe: "Trag den Wert ein. Wenn etwas nicht stimmt, zeige ich dir sofort, was zu tun ist.",
     rezepte: "Alle Rezepte nach Warengruppen. Im Rezept kannst du die Größe wechseln, die Mengen rechnen mit.",
     quiz: "Kennst du unsere Rezepte? 10 Fragen, los geht's!",
-    pinnwand: "Kurze Infos für den Shop. Wichtige Zettel stehen oben.",
+    pinnwand: "Zettel für den Shop: für alle, für die Leitung oder für bestimmte Kollegen. Tipp auf „✓ Gelesen“, dann weiß der Verfasser Bescheid. Bei ❗ wichtigen Zetteln bestätigst du „gelesen und verstanden“.",
+    besetzung: "Grün: richtig besetzt. Gelb: genug Leute, aber eine Vorgabe fehlt, zum Beispiel keine Leitung oder zu viele Aushilfen. Rot: es fehlen Personen. Unten stehen alle Lücken, mit + teilst du direkt jemanden ein.",
+    matrix: "Lege je Zeitblock fest, wie viele Personen da sein müssen und welche Rollen dabei sein sollen. Die Übersicht und der Planvorschlag richten sich danach.",
     plan: "Tipp auf + um jemanden einzuteilen. Springer aus anderen Filialen siehst du mit grauem Rand.",
     antraege: "Urlaubsanträge und Schichttausch deines Teams. Genehmigter Urlaub wird im Plan frei, ein bestätigter Tausch ändert den Plan sofort.",
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
@@ -126,7 +128,8 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     const hl = L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() });
     const hs = L.tagesSumme(hl);
     const meineAufg = hl.filter((a) => (a.status === "faellig" || a.status === "ueberfaellig") && a.zustaendig.ids.includes(p.id)).length;
-    const pin = S.pinnwand.filter((n) => n.filiale === f.id || n.filiale === null).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit))[0];
+    const pin = L.pinUngelesen(S, p, d).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit))[0];
+    const pinErinnern = L.pinErinnern(S, p, d);
     const krank = L.abwesenheitAm(S, p.id, d);
     let k = "";
     if (!uebergreifend()) {
@@ -143,13 +146,14 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
       ${kachel("🧼", "Hygiene heute", hs.gesamt ? `${hs.erledigt + hs.abweichung} von ${hs.gesamt} erledigt` : (f.art === "mobil" ? "Heute kein Einsatz" : "Heute geschlossen"), "hygiene", berater() ? 0 : hs.faellig + hs.ueberfaellig)}
       ${kachel("📖", "Rezepte", "Mit Allergenen", "rezepte")}
       ${berater() ? "" : kachel("🎯", "Rezept-Quiz", "Wie gut kennst du sie?", "quiz")}
-      ${berater() ? "" : kachel("📌", "Pinnwand", "Infos für den Shop", "pinnwand")}
+      ${berater() ? "" : kachel("📌", "Pinnwand", (() => { const u = L.pinUngelesen(S, p, d).length; return u ? `${u} ungelesen` : "Zettel für den Shop"; })(), "pinnwand", L.pinUngelesen(S, p, d).length)}
       ${(berater() || rolle() === "qualitaet") ? kachel("🔍", "Hygiene-Kontrolle", "Letzte 7 Tage", "hygkontrolle", hl.filter((a) => a.status === "abweichung").length) : ""}
     </div></div>`;
     if (leitung()) {
       const offen = offeneSchichten(f.id, d, 7).length;
       k += `<div class="abschnitt"><h2>Shopleitung ${esc(f.kurz)}</h2><div class="kacheln">
         ${kachel("📅", "Einsatzplan", "Woche planen", "plan")}
+        ${kachel("📊", "Besetzung", "Übersicht und Lücken", "besetzung", L.woche(L.montag(d)).filter((t) => t >= d).flatMap((t) => L.besetzungsLuecken(S, f.id, t)).length)}
         ${kachel("✅", "Anträge", "Urlaub und Tausch", "antraege", offeneAntraege(f.id).length + tauschAnfragen(f.id).length)}
         ${kachel("🚨", "Krank & offen", "Schichten besetzen", "offen", offen + leitungsMeldungen(f.id).length)}
         ${kachel("🔍", "Hygiene-Kontrolle", `Heute ${hs.quote == null ? "–" : hs.quote + " %"}`, "hygkontrolle", hl.filter((a) => a.status === "abweichung").length)}
@@ -182,7 +186,8 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
       ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
     </div>`;
-    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${heuteKarte}${k}`;
+    const erinnernKarte = pinErinnern.length ? `<div class="hinweis">📌 Dein Zettel „${esc(pinErinnern[0].text.slice(0, 50))}${pinErinnern[0].text.length > 50 ? "…" : ""}“ hängt seit ${Math.round((L.ausIso(d) - L.ausIso(pinErinnern[0].zeit.slice(0, 10))) / 864e5)} Tagen. <button class="chip" data-act="pin-abnehmen" data-id="${pinErinnern[0].id}">abnehmen</button> <button class="chip" data-act="pin-haengen" data-id="${pinErinnern[0].id}">hängen lassen</button></div>` : "";
+    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${pin.wichtig ? "❗ " : ""}${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${erinnernKarte}${heuteKarte}${k}`;
   };
 
   // ----- Mitarbeiter -----
@@ -394,16 +399,68 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
           <button class="btn" data-act="quiz-weiter">Weiter</button>` : ""}</div>`;
   };
 
+  // ---------- Pinnwand wie in der Club-App: Zettel in 4 Farben, Empfänger, wichtig, gelesen bestätigen, antworten, abnehmen ----------
+  const PIN_FARBEN = { 1: "gelb", 2: "rose", 3: "gruen", 4: "blau" };
+  const pinDreh = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) | 0; return ((Math.abs(h) % 7) - 3) * 0.6; };
+  const pinFuerTxt = (z) => z.fuer === "ich" ? "nur für mich" : z.fuer === "leitung" ? "für die Leitung" : z.fuer === "personen" ? "für " + (z.empfaenger || []).map((id) => (person(id) || {}).vorname).filter(Boolean).join(", ") : z.filiale ? "für alle im Shop" : "für alle Filialen";
+  const darfVerwalten = (z) => z.vonId === sitzung.ich || zentrale() || (z.filiale && leitung() && FIL().id === z.filiale);
+  let pinFilter = "alle", pinForm = { offen: false, farbe: 1, fuer: "alle", wichtig: false, personen: [], antwortAuf: null };
+  function pinZettel(z) {
+    const ich = ICH(), stand = L.pinStand(S, z), binEmpf = stand.empf.includes(ich.id), gelesen = (z.gelesen || {})[ich.id];
+    const wann = L.datumKurz(z.zeit.slice(0, 10)) + " " + z.zeit.slice(11, 16);
+    return `<div class="zettel f-${PIN_FARBEN[z.farbe] || "gelb"}${z.wichtig ? " wichtig" : ""}" style="--dreh:${pinDreh(z.id)}deg">
+      ${z.wichtig ? '<span class="zwichtig">❗ WICHTIG</span>' : ""}
+      <div class="zkopf">von <b>${esc(name(person(z.vonId)))}</b> · ${wann}${z.filiale ? "" : " · 🌍"}</div>
+      <div class="ztext">${esc(z.text)}</div>
+      <div class="zfuss">${esc(pinFuerTxt(z))}${z.bis ? ` · hängt bis ${L.datumKurz(z.bis)}` : ""}</div>
+      <div class="zknoepfe">
+        ${binEmpf && !gelesen ? `<button class="btn klein-btn" data-act="pin-gelesen" data-id="${z.id}">✓ ${z.wichtig ? "Gelesen und verstanden" : "Gelesen"}</button>` : ""}
+        ${binEmpf && gelesen ? `<span class="marke-s gruen">✓ gelesen ${gelesen.slice(11, 16)}</span>` : ""}
+        ${binEmpf && z.vonId !== ich.id ? `<button class="chip" data-act="pin-antworten" data-id="${z.id}">↩︎ Antworten</button>` : ""}
+        ${darfVerwalten(z) && z.fuer !== "ich" ? `<button class="chip" data-act="pin-stand" data-id="${z.id}">👁️ ${stand.gelesen.length}/${stand.empf.length} gelesen</button>` : ""}
+        ${darfVerwalten(z) ? `<button class="chip" data-act="pin-mehr" data-id="${z.id}">⋯</button>` : ""}
+      </div></div>`;
+  }
   V.pinnwand = () => {
-    const f = FIL();
-    const z = S.pinnwand.filter((n) => n.filiale === f.id || n.filiale === null).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit));
+    const f = FIL(), p = ICH(), d = heute(), e = L.pinEinstellungen(S);
+    let z = S.pinnwand.filter((n) => (n.filiale === f.id || n.filiale === null) && L.pinSichtbar(S, n, p, d));
+    const ungelesen = L.pinUngelesen(S, p, d);
+    if (pinFilter === "fuermich") z = z.filter((n) => L.pinEmpfaenger(S, n).includes(p.id));
+    if (pinFilter === "ungelesen") z = z.filter((n) => ungelesen.includes(n));
+    if (pinFilter === "wichtig") z = z.filter((n) => n.wichtig);
+    if (pinFilter === "meine") z = z.filter((n) => n.vonId === p.id);
+    z.sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit));
+    const eigene = L.pinEigeneAktiv(S, p, d).length, grenze = !leitung() && eigene >= e.maxZettel;
+    const kollegen = S.personen.filter((x) => x.id !== p.id && L.darfInFiliale(x, f.id));
+    const F = pinForm;
     return `${titel("Pinnwand " + esc(f.kurz))}${frootie(FROOTIE_TIPPS.pinnwand)}
-      <div class="karte"><div class="feld"><label for="pw-text">Neuer Zettel</label><textarea id="pw-text" rows="2" maxlength="300"></textarea></div>
-        <div class="reihe">${leitung() ? '<label class="haken"><input type="checkbox" id="pw-wichtig"><span>wichtig</span></label>' : ""}<button class="btn" data-act="pinnwand">📌 Anheften</button></div></div>
-      <div class="liste">${z.map((n) => `<div class="karte" ${n.wichtig ? 'style="border-color:var(--red)"' : ""}><p>${n.wichtig ? "❗ " : ""}${esc(n.text)}</p>
-        <div class="reihe zw"><span class="klein muted">${esc(name(person(n.vonId)))} · ${n.filiale ? esc(f.kurz) : "alle Filialen"} · ${L.datumKurz(n.zeit.slice(0, 10))}</span>
-        ${leitung() || n.vonId === sitzung.ich ? `<button class="chip" data-act="pin-weg" data-id="${n.id}">entfernen</button>` : ""}</div></div>`).join("") || '<p class="leer">Noch keine Zettel.</p>'}</div>`;
+      ${F.offen ? `<div class="karte">
+        <div class="reihe zw"><h2>${F.antwortAuf ? "Antwort-Zettel" : "Neuer Zettel"}</h2><button class="chip" data-act="pin-form-zu">✕</button></div>
+        <div class="feld"><label for="pw-text">Text (höchstens ${e.zeichen} Zeichen)</label><textarea id="pw-text" rows="3" maxlength="${e.zeichen}" data-zaehler="pw-zahl">${esc(F.text || "")}</textarea><span class="klein muted" id="pw-zahl">${(F.text || "").length} / ${e.zeichen}</span></div>
+        <div class="feld"><span class="lbl">Farbe</span><div class="wahl">${[1, 2, 3, 4].map((n) => `<button class="farbwahl f-${PIN_FARBEN[n]} ${F.farbe === n ? "an" : ""}" data-act="pin-farbe" data-f="${n}" aria-label="Farbe ${PIN_FARBEN[n]}">${F.farbe === n ? "✓" : ""}</button>`).join("")}</div></div>
+        <div class="feld"><span class="lbl">Für wen</span><div class="wahl">${[["alle", "alle im Shop"], ["leitung", "Leitung"], ["personen", "bestimmte Personen"], ["ich", "nur für mich"]].concat(zentrale() ? [["global", "alle Filialen"]] : []).map(([w, t]) => `<button class="${F.fuer === w ? "an" : ""}" data-act="pin-fuer" data-w="${w}">${t}</button>`).join("")}</div>
+          ${F.fuer === "personen" ? `<div class="wahl">${kollegen.map((x) => `<button class="${F.personen.includes(x.id) ? "an" : ""}" data-act="pin-person" data-id="${x.id}">${esc(x.vorname)}</button>`).join("")}</div>` : ""}</div>
+        <div class="gitter2"><label class="haken"><input type="checkbox" id="pw-wichtig" ${F.wichtig ? "checked" : ""}><span>❗ wichtig (mit Lesebestätigung)</span></label>
+          <div class="feld"><label for="pw-bis">Hängt bis (freiwillig)</label><input type="date" id="pw-bis" value="${esc(F.bis || "")}"></div></div>
+        <button class="btn gross" data-act="pin-anheften">📌 Anheften</button></div>`
+      : `<button class="btn" data-act="pin-form" ${grenze ? "disabled" : ""}>＋ Neuer Zettel</button>${grenze ? `<p class="klein muted">Du hast schon ${eigene} Zettel hängen (höchstens ${e.maxZettel}). Nimm erst einen ab.</p>` : ""}`}
+      <div class="wahl">${[["alle", "Alle"], ["ungelesen", `Ungelesen${ungelesen.length ? " (" + ungelesen.length + ")" : ""}`], ["fuermich", "Für mich"], ["wichtig", "❗ Wichtig"], ["meine", "Von mir"]].map(([w, t]) => `<button class="${pinFilter === w ? "an" : ""}" data-act="pin-filter" data-w="${w}">${t}</button>`).join("")}</div>
+      <div class="wand">${z.map(pinZettel).join("") || '<p class="leer">Keine Zettel in dieser Auswahl.</p>'}</div>`;
   };
+  function pinNeuFenster() {
+    const p = ICH(); if (!p || fenster) return;
+    sitzung.pinGezeigt = sitzung.pinGezeigt || [];
+    const neu = L.pinUngelesen(S, p, heute()).filter((z) => !sitzung.pinGezeigt.includes(z.id)).sort((a, b) => (b.wichtig - a.wichtig) || b.zeit.localeCompare(a.zeit));
+    if (!neu.length) return;
+    sitzung.pinGezeigt.push(...neu.map((z) => z.id)); merke();
+    const liste = neu.slice(0, 4);
+    fenster = `<h2>📌 ${neu.length === 1 ? "Neuer Zettel für dich" : `${neu.length} neue Zettel für dich`}</h2>
+      <div class="wand">${liste.map((z) => `<div class="zettel f-${PIN_FARBEN[z.farbe] || "gelb"}${z.wichtig ? " wichtig" : ""}" style="--dreh:${pinDreh(z.id)}deg">${z.wichtig ? '<span class="zwichtig">❗ WICHTIG</span>' : ""}<div class="zkopf">von <b>${esc(name(person(z.vonId)))}</b></div><div class="ztext">${esc(z.text)}</div></div>`).join("")}</div>
+      ${neu.length > liste.length ? `<p class="hinweis">… und ${neu.length - liste.length} weitere an der Pinnwand</p>` : ""}
+      <button class="btn gross" data-act="pin-alle-gelesen" data-ids="${liste.map((z) => z.id).join(",")}">✓ ${liste.some((z) => z.wichtig) ? "Gelesen und verstanden" : "Gelesen"}</button>
+      <button class="btn drei" data-act="pin-zur-wand">📌 Zur Pinnwand</button>`;
+  }
+
 
   // ----- Shopleitung -----
   V.plan = () => {
@@ -425,7 +482,8 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
       <div class="karte"><div class="reihe zw"><button class="chip" data-go="plan" data-arg="${L.plusTage(mo, -7)}">‹</button><b>Woche ab ${L.datumKurz(mo)}</b><button class="chip" data-go="plan" data-arg="${L.plusTage(mo, 7)}">›</button></div>
         <div class="reihe"><span class="marke-s ${pub ? "gruen" : "gelb"}">${pub ? "veröffentlicht" : "Entwurf"}</span>
         <button class="btn zwei" data-act="vorschlag" data-mo="${mo}">✨ Vorschlag erstellen</button>${pub ? "" : `<button class="btn" data-act="veroeffentlichen" data-mo="${mo}">📣 Veröffentlichen</button>`}</div>
-        <p class="klein muted">Der Vorschlag füllt nur leere Plätze: erst mit dem eigenen Team, dann mit Springern. Wünsche und Urlaub werden beachtet.</p></div>
+        <p class="klein muted">Der Vorschlag füllt nur leere Plätze: erst mit dem eigenen Team, dann mit Springern. Wünsche, Urlaub und die Besetzungsmatrix (Leitung, Aushilfen) werden beachtet.</p>
+        <div class="reihe"><button class="chip" data-go="besetzung" data-arg="${mo}">📊 Grafische Übersicht</button><button class="chip" data-go="matrix">⚙️ Besetzungsmatrix</button></div></div>
       <div class="plan">${tage}</div>`;
   };
   function kandidatenFenster(d, schId) {
@@ -437,6 +495,69 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
         <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc(filiale(k.person.stammfiliale).kurz)}</span>` : ""}
         <small>${L.ROLLEN[k.person.rolle].name} · ${k.stunden} Std. diese Woche${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? "+" : ""}</span></button>`).join("")}</div>`;
   }
+
+  // ---------- Besetzung: grafische Übersicht, Lückenliste, Tagesansicht, Matrix ----------
+  const BES_FARBE = { gruen: "b-gruen", gelb: "b-gelb", rot: "b-rot", ueber: "b-ueber", ohne: "b-ohne", leer: "b-leer" };
+  const RANG = { rot: 5, gelb: 4, ueber: 2, gruen: 1, ohne: 0, leer: 0 };
+  const blockTxt = (b) => `${b.gesamt} Person${b.gesamt > 1 ? "en" : ""}${b.sl ? `, davon ${b.sl} Shopleitung` : ""}${b.stv ? `${b.sl ? " und" : ", davon"} ${b.stv} ${b.sl ? "weitere " : ""}Leitung` : ""}${b.ma ? `, ${b.ma} feste Mitarbeiter` : ""}${b.maxAus != null ? `, höchstens ${b.maxAus} Aushilfe${b.maxAus === 1 ? "" : "n"}` : ""}`;
+  V.besetzung = () => {
+    const f = FIL(), mo = arg && arg.length === 10 ? L.montag(arg) : L.montag(heute());
+    const tage = L.woche(mo).map((d) => ({ d, t: L.besetzungTag(S, f.id, d) }));
+    const offen = tage.filter((x) => x.t.offen);
+    if (!f.matrix) return `${titel("Besetzung " + esc(f.kurz), "plan")}<p class="hinweis">Für diese Filiale ist noch keine Besetzungsmatrix angelegt.</p><button class="btn" data-go="matrix">⚙️ Besetzungsmatrix anlegen</button>`;
+    const von = offen.length ? Math.floor(Math.min(...offen.map((x) => x.t.auf)) / 60) : 10, bis = offen.length ? Math.ceil(Math.max(...offen.map((x) => x.t.zu)) / 60) : 20;
+    const stunden = Array.from({ length: Math.max(0, bis - von) }, (_, i) => von + i);
+    const zelle = (t, h) => {
+      const sl = t.slots.filter((x) => x.m >= h * 60 && x.m < h * 60 + 60);
+      if (!sl.length) return '<td class="b-zu"></td>';
+      const w = sl.reduce((a, b) => (RANG[b.status] > RANG[a.status] ? b : a));
+      return `<td class="${BES_FARBE[w.status]}" title="${esc(w.gruende.join(", ") || (w.bedarf ? "passt" : "keine Vorgabe"))}">${w.bedarf ? `${w.zahl.gesamt}/${w.bedarf.gesamt}` : w.zahl.gesamt || ""}${w.status === "gelb" ? "<i>!</i>" : ""}</td>`;
+    };
+    const luecken = tage.flatMap((x) => L.besetzungsLuecken(S, f.id, x.d));
+    return `${titel("Besetzung " + esc(f.kurz), "plan")}${frootie(FROOTIE_TIPPS.besetzung)}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="besetzung" data-arg="${L.plusTage(mo, -7)}">‹</button><b>Woche ab ${L.datumKurz(mo)}</b><button class="chip" data-go="besetzung" data-arg="${L.plusTage(mo, 7)}">›</button></div>
+        <div class="matrix-scroll"><table class="bes"><thead><tr><th></th>${stunden.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
+        ${tage.map((x) => `<tr><th><button class="tagknopf" data-go="besetzung-tag" data-arg="${x.d}">${L.datumKurz(x.d)}</button></th>${x.t.offen ? stunden.map((h) => zelle(x.t, h)).join("") : `<td class="b-zu" colspan="${stunden.length}">${f.art === "mobil" ? "kein Einsatz" : "geschlossen"}</td>`}</tr>`).join("")}
+        </tbody></table></div>
+        <div class="legende"><span class="b-gruen">richtig</span><span class="b-gelb">Vorgabe fehlt</span><span class="b-rot">zu wenig</span><span class="b-ueber">mehr als nötig</span><span class="klein muted">Zahl = da / nötig · Tag antippen für Einzelheiten</span></div></div>
+      <div class="abschnitt"><h2>Nicht richtig besetzt (${luecken.length})</h2><div class="liste">${luecken.length ? luecken.map((l) => { const sch = L.passendeSchicht(f, l.datum, l.von, l.bis);
+        return `<div class="zeile st-${l.status === "rot" ? "ueberfaellig" : "faellig"}"><span class="punkt"></span><span><b>${datumLang(l.datum)} · ${L.minZuZeit(l.von)}–${L.minZuZeit(l.bis)}</b><small>${l.ist} von ${l.soll} Personen · ${l.gruende.map(esc).join(" · ")}</small></span>
+          ${sch && l.datum >= heute() ? `<button class="chip" data-act="plan-plus" data-datum="${l.datum}" data-schicht="${sch}">+ einteilen</button>` : '<span class="marke-s">vorbei</span>'}</div>`; }).join("") : '<p class="leer">Alles richtig besetzt. 🎉</p>'}</div></div>`;
+  };
+  V["besetzung-tag"] = () => {
+    const f = FIL(), d = arg || heute(), t = L.besetzungTag(S, f.id, d);
+    if (!t.offen) return `${titel(datumLang(d), "besetzung")}<p class="leer">${f.art === "mobil" ? "An diesem Tag kein Einsatz." : "An diesem Tag geschlossen."}</p>`;
+    const dauer = t.zu - t.auf, pos = (m) => ((m - t.auf) / dauer) * 100;
+    const stunden = []; for (let h = Math.ceil(t.auf / 60); h * 60 <= t.zu; h++) stunden.push(h);
+    const bl = L.bedarfBloecke(f, d);
+    const personen = t.personen.slice().sort((a, b) => a.von - b.von);
+    return `${titel(datumLang(d) + " · " + esc(f.kurz), "besetzung")}
+      <div class="karte"><div class="reihe zw"><button class="chip" data-go="besetzung-tag" data-arg="${L.plusTage(d, -1)}">‹</button><b>${L.minZuZeit(t.auf)}–${L.minZuZeit(t.zu)}${t.ort ? " · 📍 " + esc(t.ort) : ""}</b><button class="chip" data-go="besetzung-tag" data-arg="${L.plusTage(d, 1)}">›</button></div>
+        <div class="gantt">
+          <div class="g-zeile g-kopf"><span></span><div class="g-bahn">${stunden.map((h) => `<i style="left:${pos(h * 60)}%">${h}</i>`).join("")}</div></div>
+          ${personen.map((x) => { const p = person(x.id); return `<div class="g-zeile"><span><b>${esc(p.vorname)}</b><small>${L.ROLLEN[p.rolle].name}${x.springer ? " · Springer" : ""}</small></span><div class="g-bahn"><span class="g-balken r-${p.rolle}${x.abwesend ? " fehlt" : ""}" style="left:${pos(x.von)}%;width:${pos(x.bis) - pos(x.von)}%">${L.minZuZeit(x.von)}–${L.minZuZeit(x.bis)}${x.abwesend ? " 🤒" : ""}</span></div></div>`; }).join("") || '<p class="leer">Niemand eingeteilt.</p>'}
+          <div class="g-zeile g-summe"><span><b>Da / nötig</b></span><div class="g-bahn g-slots">${t.slots.map((x) => `<span class="${BES_FARBE[x.status]}" style="left:${pos(x.m)}%;width:${pos(x.m + 30) - pos(x.m)}%" title="${esc(x.gruende.join(", ") || (x.bedarf ? `${x.zahl.gesamt} von ${x.bedarf.gesamt}` : ""))}">${x.bedarf && x.status !== "gruen" && x.m % 60 === 0 ? `${x.zahl.gesamt}/${x.bedarf.gesamt}` : ""}</span>`).join("")}</div></div>
+        </div>
+        <div class="legende"><span class="r-shopleitung">Shopleitung</span><span class="r-stv">Stellvertretung</span><span class="r-mitarbeiter">Mitarbeiter</span><span class="r-aushilfe">Aushilfe</span></div></div>
+      <div class="karte"><h2>Vorgabe an diesem Tag</h2>${bl.map((b) => `<p><b>${L.minZuZeit(b.von)}–${L.minZuZeit(b.bis)}</b>: ${blockTxt(b)}</p>`).join("") || '<p class="muted">Keine Vorgabe.</p>'}</div>
+      <div class="abschnitt"><h2>Lücken</h2><div class="liste">${L.besetzungsLuecken(S, f.id, d).map((l) => { const sch = L.passendeSchicht(f, d, l.von, l.bis); return `<div class="zeile st-${l.status === "rot" ? "ueberfaellig" : "faellig"}"><span class="punkt"></span><span><b>${L.minZuZeit(l.von)}–${L.minZuZeit(l.bis)}</b><small>${l.gruende.map(esc).join(" · ")}</small></span>${sch && d >= heute() ? `<button class="chip" data-act="plan-plus" data-datum="${d}" data-schicht="${sch}">+ einteilen</button>` : ""}</div>`; }).join("") || '<p class="leer">Keine Lücken.</p>'}</div></div>`;
+  };
+  let matrixTyp = null;
+  V.matrix = () => {
+    const f = FIL();
+    const typen = f.art === "mobil" ? [["einsatz", "Einsatz"]] : [["werktag", "Mo–Fr"], ["sa", "Samstag"], ["so", "Sonntag"]];
+    if (!matrixTyp || !typen.some(([k]) => k === matrixTyp)) matrixTyp = typen[0][0];
+    const bloecke = (f.matrix && f.matrix[matrixTyp]) || [];
+    const feld = (i, k, w, typ) => `<input type="${typ || "number"}" min="0" max="9" data-mx="${i}|${k}" value="${w == null ? "" : esc(w)}" aria-label="${k}">`;
+    return `${titel("Besetzungsmatrix " + esc(f.kurz), "plan")}${frootie(FROOTIE_TIPPS.matrix)}
+      <div class="wahl">${typen.map(([k, t]) => `<button class="${k === matrixTyp ? "an" : ""}" data-act="mx-typ" data-t="${k}">${t}</button>`).join("")}</div>
+      <div class="karte"><div class="matrix-scroll"><table class="mx"><thead><tr><th>von</th><th>bis</th><th>Personen</th><th>Shop­leitung</th><th>Leitung (Stv.)</th><th>feste Mitarb.</th><th>max. Aushilfen</th><th></th></tr></thead><tbody>
+        ${bloecke.map((b, i) => `<tr><td>${feld(i, "von", b.von, "time")}</td><td>${feld(i, "bis", b.bis, "time")}</td><td>${feld(i, "gesamt", b.gesamt)}</td><td>${feld(i, "sl", b.sl)}</td><td>${feld(i, "stv", b.stv)}</td><td>${feld(i, "ma", b.ma)}</td><td>${feld(i, "maxAus", b.maxAus)}</td><td><button class="chip" data-act="mx-weg" data-i="${i}" aria-label="Block entfernen">✕</button></td></tr>`).join("")}
+      </tbody></table></div>
+      ${bloecke.length ? bloecke.map((b) => `<p class="klein muted">${esc(b.von)}–${esc(b.bis)}: ${blockTxt(b)}</p>`).join("") : '<p class="leer">Noch keine Zeitblöcke.</p>'}
+      <div class="reihe"><button class="btn zwei" data-act="mx-neu">+ Zeitblock</button>${typen.length > 1 ? `<button class="btn drei" data-act="mx-kopie">Mo–Fr auf alle Tage übernehmen</button>` : ""}</div>
+      <p class="klein muted">„Leitung (Stv.)“ zählt Shopleitung oder Stellvertretung. „feste Mitarb.“ zählt alle außer Aushilfen. Leeres Feld bei Aushilfen = keine Grenze.</p></div>`;
+  };
   V.antraege = () => {
     const f = FIL(), a = offeneAntraege(f.id);
     const erledigt = S.abwesenheiten.filter((x) => x.art === "urlaub" && x.status !== "beantragt" && (person(x.personId) || {}).stammfiliale === f.id).slice(-5).reverse();
@@ -573,12 +694,21 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
   V.admin = () => {
     const B = S.betreiber || [];
     return `${titel("Admin: Betreiber & Datenbanken")}${frootie(FROOTIE_TIPPS.admin)}
+      <button class="zeile" data-go="admin-pinnwand"><span style="font-size:1.4rem">📌</span><span><b>Pinnwand-Einstellungen</b><small>Zettel je Person, Zeichen, Erinnerungen</small></span><span>›</span></button>
       <p class="hinweis">Jeder Franchisenehmer arbeitet mit seiner <b>eigenen Datenbank</b>. Hier stehen nur die öffentlichen Verbindungsdaten. Geheime Schlüssel trägt der Betreiber selbst in sein Supabase-Projekt ein.</p>
       <button class="btn zwei" data-act="betreiber-neu">+ Franchisenehmer anlegen</button>
       <div class="liste">${B.map((b) => { const st = L.betreiberStand(b), [t, f] = STAND_TXT(b, st), fil = S.filialen.filter((x) => x.betreiber === b.id);
         return `<button class="zeile" data-go="admin-edit" data-arg="${b.id}"><span class="punkt ${f}"></span><span><b>${esc(b.name)}</b> <span class="marke-s">${b.art === "eigen" ? "eigene Filialen" : "Franchise"}</span>
           <small>${fil.length ? fil.map((x) => esc(x.kurz)).join(", ") : "noch keine Filialen"} · ${st.anzahl} von ${st.gesamt} Schritten · ${st.verbindung.ref ? "Projekt " + esc(st.verbindung.ref) : "keine Datenbank eingetragen"}</small></span><span class="marke-s ${f}">${t}</span></button>`; }).join("")}</div>`;
   };
+  V["admin-pinnwand"] = () => { const e = L.pinEinstellungen(S);
+    return `${titel("Pinnwand-Einstellungen", "admin")}<div class="karte">
+      <div class="gitter2"><div class="feld"><label for="pe-max">Zettel je Person gleichzeitig</label><input type="number" id="pe-max" min="1" max="20" value="${e.maxZettel}"></div>
+        <div class="feld"><label for="pe-zeichen">Zeichen je Zettel</label><input type="number" id="pe-zeichen" min="50" max="500" value="${e.zeichen}"></div></div>
+      <div class="gitter2"><div class="feld"><label for="pe-erinnern">Verfasser erinnern nach (Tagen)</label><input type="number" id="pe-erinnern" min="1" max="60" value="${e.erinnernTage}"></div>
+        <div class="feld"><label for="pe-pause">„Hängen lassen“ fragt wieder nach (Tagen)</label><input type="number" id="pe-pause" min="1" max="60" value="${e.pauseTage}"></div></div>
+      <p class="klein muted">Shopleitung und Stellvertretung haben keine Grenze bei der Zahl der Zettel. Sie und der Inhaber dürfen jeden Zettel ihrer Filiale verwalten.</p>
+      <button class="btn gross" data-act="pin-einst">Speichern</button></div>`; };
   V["admin-edit"] = () => {
     const b = (S.betreiber || []).find((x) => x.id === arg);
     if (!b) return `${titel("Betreiber", "admin")}<p class="leer">Nicht gefunden.</p>`;
@@ -696,8 +826,8 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
   function zeichnen() {
     if (!ICH()) ansicht = "login";
     let rechte = ansicht;
-    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export"];
-    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit"];
+    const nurLeitung = ["plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix"];
+    const nurZentrale = ["auswertung", "ma", "ma-edit", "filialen", "admin", "admin-edit", "admin-pinnwand"];
     const nurQualitaet = ["regeln", "regel-edit", "rezeptpflege", "rezept-edit"];
     if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
     if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
@@ -713,7 +843,7 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
 
   // ---------- Aktionen ----------
   const AKT = {
-    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); },
+    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); pinNeuFenster(); if (fenster) zeichnen(); },
     reset: () => { A.zuruecksetzen(); S = D.demoDaten(heute()); A.speichern(S); meldung("Beispieldaten neu geladen"); gehe("login"); },
     "filiale-wahl": () => { fenster = `<h2>Filiale wählen</h2><div class="liste">${meineFilialen().map((f) => `<button class="zeile" data-act="filiale" data-id="${f.id}"><span class="punkt ${f.id === FIL().id ? "gruen" : ""}"></span><span>${esc(f.name)}${ICH().stammfiliale && f.id !== ICH().stammfiliale ? "<small>als Springer</small>" : ""}</span><span>›</span></button>`).join("")}</div>`; zeichnen(); },
     filiale: (el) => { sitzung.filiale = el.dataset.id; merke(); fenster = null; zeichnen(); },
@@ -755,8 +885,56 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     "quiz-antwort": (el) => { const q = quizStand; q.gewaehlt = Number(el.dataset.i); if (q.fragen[q.nr].antworten[q.gewaehlt] === q.fragen[q.nr].richtig) q.punkte++; zeichnen(); },
     "quiz-weiter": () => { quizStand.nr++; quizStand.gewaehlt = null; zeichnen(); },
     "quiz-neu": () => { quizStand = null; zeichnen(); },
-    pinnwand: () => { const t = $("#pw-text").value.trim(); if (!t) return; S.pinnwand.push({ id: neueId("n"), filiale: FIL().id, vonId: ICH().id, text: t, zeit: jetztIso(), wichtig: !!($("#pw-wichtig") || {}).checked }); speichern(); zeichnen(); },
-    "pin-weg": (el) => { S.pinnwand = S.pinnwand.filter((n) => n.id !== el.dataset.id); speichern(); zeichnen(); },
+    "pin-form": () => { pinForm = { offen: true, farbe: 1, fuer: "alle", wichtig: false, personen: [], antwortAuf: null }; zeichnen(); },
+    "pin-form-zu": () => { pinForm.offen = false; zeichnen(); },
+    "pin-farbe": (el) => { pinFormMerken(); pinForm.farbe = Number(el.dataset.f); zeichnen(); },
+    "pin-fuer": (el) => { pinFormMerken(); pinForm.fuer = el.dataset.w; zeichnen(); },
+    "pin-person": (el) => { pinFormMerken(); const id = el.dataset.id; pinForm.personen = pinForm.personen.includes(id) ? pinForm.personen.filter((x) => x !== id) : [...pinForm.personen, id]; zeichnen(); },
+    "pin-filter": (el) => { pinFilter = el.dataset.w; zeichnen(); },
+    "pin-anheften": () => {
+      pinFormMerken();
+      const F = pinForm, e = L.pinEinstellungen(S), t = (F.text || "").trim();
+      if (!t) return meldung("Bitte einen Text schreiben");
+      if (F.fuer === "personen" && !F.personen.length) return meldung("Bitte mindestens eine Person wählen");
+      if (!leitung() && L.pinEigeneAktiv(S, ICH(), heute()).length >= e.maxZettel && F.fuer !== "ich") return meldung(`Höchstens ${e.maxZettel} Zettel gleichzeitig`);
+      const z = { id: neueId("n"), filiale: F.fuer === "global" ? null : FIL().id, vonId: ICH().id, text: t.slice(0, e.zeichen), zeit: jetztIso(), wichtig: !!F.wichtig, farbe: F.farbe,
+        fuer: F.fuer === "global" ? "alle" : F.fuer, empfaenger: F.fuer === "personen" ? F.personen : [], gelesen: {}, abgenommen: {}, bis: F.bis || null, antwortAuf: F.antwortAuf };
+      S.pinnwand.push(z);
+      if (z.wichtig && z.fuer !== "ich") { S.meldungen = S.meldungen || []; S.meldungen.push({ id: neueId("m"), filiale: z.filiale || FIL().id, text: `📌❗ Wichtiger Zettel von ${name(ICH())}: ${t.slice(0, 60)}`, zeit: jetztIso(), erledigt: true }); }
+      pinForm = { offen: false, farbe: 1, fuer: "alle", wichtig: false, personen: [], antwortAuf: null };
+      speichern(); meldung(`Angeheftet · ${L.pinEmpfaenger(S, z).length} Empfänger`); zeichnen();
+    },
+    "pin-gelesen": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); (z.gelesen = z.gelesen || {})[ICH().id] = jetztIso(); speichern(); meldung(z.wichtig ? "Bestätigt: gelesen und verstanden" : "Als gelesen markiert"); zeichnen(); },
+    "pin-alle-gelesen": (el) => { const t = jetztIso(); el.dataset.ids.split(",").forEach((id) => { const z = S.pinnwand.find((x) => x.id === id); if (z) (z.gelesen = z.gelesen || {})[ICH().id] = t; }); speichern(); fenster = null; meldung("Bestätigt"); zeichnen(); },
+    "pin-zur-wand": () => { fenster = null; gehe("pinnwand"); },
+    "pin-antworten": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); (z.gelesen = z.gelesen || {})[ICH().id] = z.gelesen[ICH().id] || jetztIso(); speichern();
+      pinForm = { offen: true, farbe: z.farbe === 1 ? 2 : 1, fuer: "personen", personen: [z.vonId], wichtig: false, antwortAuf: z.id, text: `@${(person(z.vonId) || {}).vorname}: ` }; gehe("pinnwand"); },
+    "pin-stand": (el) => {
+      const z = S.pinnwand.find((x) => x.id === el.dataset.id), st = L.pinStand(S, z);
+      fenster = `<div class="reihe zw"><h2>👁️ Wer hat gelesen?</h2><button class="chip" data-act="zu">✕</button></div><p class="muted">„${esc(z.text.slice(0, 80))}“</p>
+        <div class="abschnitt"><h2>Gelesen (${st.gelesen.length})</h2><div class="liste">${st.gelesen.map((id) => `<div class="zeile"><span class="punkt gruen"></span><span>${esc(name(person(id)))}</span><span class="klein">${L.datumKurz(z.gelesen[id].slice(0, 10))} ${z.gelesen[id].slice(11, 16)}</span></div>`).join("") || '<p class="leer">Noch niemand.</p>'}</div></div>
+        <div class="abschnitt"><h2>Noch nicht gelesen (${st.offen.length})</h2><div class="liste">${st.offen.map((id) => `<div class="zeile"><span class="punkt rot"></span><span>${esc(name(person(id)))}</span><span></span></div>`).join("") || '<p class="leer">Alle haben gelesen. 🎉</p>'}</div></div>
+        ${st.offen.length ? `<button class="btn zwei" data-act="pin-erinnern" data-id="${z.id}">🔔 Noch nicht Gelesene erinnern${z.erinnert ? ` (zuletzt ${z.erinnert.slice(11, 16)})` : ""}</button>` : ""}`;
+      zeichnen();
+    },
+    "pin-erinnern": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); const n = L.pinStand(S, z).offen.length; z.erinnert = jetztIso(); speichern(); fenster = null; meldung(`${n} ${n === 1 ? "Person wird" : "Personen werden"} erinnert (in der echten App per Push)`); zeichnen(); },
+    "pin-mehr": (el) => {
+      const z = S.pinnwand.find((x) => x.id === el.dataset.id), st = L.pinStand(S, z);
+      fenster = `<div class="reihe zw"><h2>Zettel verwalten</h2><button class="chip" data-act="zu">✕</button></div><p class="muted">„${esc(z.text.slice(0, 80))}“</p>
+        <button class="btn zwei" data-act="pin-wichtig" data-id="${z.id}">${z.wichtig ? "Nicht mehr wichtig" : "❗ Als wichtig markieren"}</button>
+        ${st.gelesen.length && st.offen.length ? `<button class="btn drei" data-act="pin-teil-ab" data-id="${z.id}">🧹 Nur bei denen abnehmen, die gelesen haben (${st.gelesen.length})</button><p class="klein muted">Bei ${st.offen.length} hängt er weiter, bis sie ihn gelesen haben.</p>` : ""}
+        <button class="btn" data-act="pin-abnehmen" data-id="${z.id}">Ganz abnehmen</button>`;
+      zeichnen();
+    },
+    "pin-wichtig": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); z.wichtig = !z.wichtig; if (z.wichtig) { z.gelesen = {}; } speichern(); fenster = null; meldung(z.wichtig ? "❗ Wichtig: alle müssen neu bestätigen" : "Nicht mehr wichtig"); zeichnen(); },
+    "pin-teil-ab": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); z.abgenommen = z.abgenommen || {}; for (const id of L.pinStand(S, z).gelesen) z.abgenommen[id] = jetztIso(); speichern(); fenster = null; meldung("Bei den Lesern abgenommen"); zeichnen(); },
+    "pin-abnehmen": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); z.entfernt = jetztIso(); z.entferntVon = ICH().id; speichern(); fenster = null; meldung("Zettel abgenommen"); zeichnen(); },
+    "pin-haengen": (el) => { const z = S.pinnwand.find((x) => x.id === el.dataset.id); z.pauseBis = L.plusTage(heute(), L.pinEinstellungen(S).pauseTage); speichern(); meldung("Bleibt hängen. Ich erinnere dich später wieder."); zeichnen(); },
+    "pin-einst": () => {
+      const n = (id, min, max) => Math.max(min, Math.min(max, Number($(id).value) || min));
+      S.parameter.pinnwand = { maxZettel: n("#pe-max", 1, 20), zeichen: n("#pe-zeichen", 50, 500), erinnernTage: n("#pe-erinnern", 1, 60), pauseTage: n("#pe-pause", 1, 60) };
+      speichern(); meldung("Pinnwand-Einstellungen gespeichert"); zeichnen();
+    },
     "plan-plus": (el) => { kandidatenFenster(el.dataset.datum, el.dataset.schicht); zeichnen(); },
     einteilen: (el) => {
       S.plan.push({ id: neueId("s"), filiale: FIL().id, datum: el.dataset.datum, schicht: el.dataset.schicht, personId: el.dataset.id, quelle: "hand" });
@@ -881,6 +1059,10 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     "betreiber-pruefen": () => meldung("Die Prüfung braucht den Server des Betreibers. In dieser Testversion ist noch keiner angeschlossen."),
     "betreiber-freigeben": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); if (!L.betreiberStand(b).freigabeMoeglich) return; b.freigegeben = true; speichern(); zeichnen(); },
     "betreiber-sperren": (el) => { const b = S.betreiber.find((x) => x.id === el.dataset.id); b.freigegeben = false; speichern(); meldung("Freigabe zurückgenommen. Einladungslinks dieses Betreibers gelten nicht mehr."); zeichnen(); },
+    "mx-typ": (el) => { matrixTyp = el.dataset.t; zeichnen(); },
+    "mx-neu": () => { const f = FIL(); f.matrix = f.matrix || {}; const l = (f.matrix[matrixTyp] = f.matrix[matrixTyp] || []); const letzt = l[l.length - 1]; l.push({ von: letzt ? letzt.bis : "10:00", bis: "20:00", gesamt: 2, sl: 0, stv: 1, ma: 0, maxAus: 1 }); speichern(); zeichnen(); },
+    "mx-weg": (el) => { FIL().matrix[matrixTyp].splice(Number(el.dataset.i), 1); speichern(); zeichnen(); },
+    "mx-kopie": () => { const f = FIL(); const w = JSON.parse(JSON.stringify(f.matrix.werktag || [])); f.matrix.sa = w; f.matrix.so = JSON.parse(JSON.stringify(w)); speichern(); meldung("Für Samstag und Sonntag übernommen"); zeichnen(); },
     "einsatz-neu": (el) => {
       const fid = el.dataset.f, f = filiale(fid), d = $(`#e-${fid}-d`).value, o = $(`#e-${fid}-o`).value.trim(), v = $(`#e-${fid}-v`).value, b = $(`#e-${fid}-b`).value;
       if (!d || !o || !v || !b || b <= v) return meldung("Bitte Datum, Ort und Zeiten prüfen");
@@ -927,6 +1109,8 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     "update-pruefen": () => updatePruefen(true),
     "update-jetzt": () => { if (wartend) wartend.postMessage("jetzt-aktivieren"); },
   };
+  function pinFormMerken() { const t = $("#pw-text"); if (t) pinForm.text = t.value; const w = $("#pw-wichtig"); if (w) pinForm.wichtig = w.checked; const b = $("#pw-bis"); if (b) pinForm.bis = b.value; }
+  document.addEventListener("input", (ev) => { const z = ev.target.dataset && ev.target.dataset.zaehler; if (z) { const n = $("#" + z); if (n) n.textContent = `${ev.target.value.length} / ${ev.target.maxLength}`; } });
   function hygSpeichern(grund) {
     const a = aufgabeFinden(arg); if (!a || a.durchfuehrung || berater()) return;
     const r = a.regel, m = S.hygiene.massnahmen.find((x) => x.id === r.massnahme);
@@ -963,6 +1147,14 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
     else if (el.dataset.act === "geraet-status") { S.hygiene.geraete.find((g) => g.id === el.dataset.id).status = el.value; speichern(); zeichnen(); }
     else if (el.dataset.act === "uhrzeit") { const k = `${el.dataset.r}|${FIL().id}`; S.hygiene.zuteilung[k] = { ...(S.hygiene.zuteilung[k] || { status: "aktiv" }), uhrzeit: el.value || null }; speichern(); meldung("Uhrzeit gespeichert"); }
     else if (el.dataset.oz) { const [fid, t, i] = el.dataset.oz.split("|"); const f = filiale(fid); const z = f.oeffnung[t] ? [...f.oeffnung[t]] : ["10:00", "19:00"]; z[i] = el.value; f.oeffnung[t] = z[0] && z[1] ? z : null; speichern(); zeichnen(); }
+    else if (el.dataset.mx) {
+      const [i, k] = el.dataset.mx.split("|"), b = FIL().matrix[matrixTyp][Number(i)];
+      if (k === "von" || k === "bis") { if (el.value) b[k] = el.value; }
+      else if (k === "maxAus") b[k] = el.value === "" ? null : Math.max(0, Number(el.value) || 0);
+      else b[k] = Math.max(0, Number(el.value) || 0);
+      if (b.gesamt < (b.sl || 0) + (b.stv || 0) + (b.ma || 0)) { b.gesamt = (b.sl || 0) + (b.stv || 0) + (b.ma || 0); meldung("Personen an die Vorgaben angepasst"); }
+      speichern(); zeichnen();
+    }
     else if (el.dataset.bedarf) { const [fid, sch] = el.dataset.bedarf.split("|"); filiale(fid).bedarf.standard[sch] = Number(el.value) || 0; speichern(); }
   });
 
@@ -972,6 +1164,7 @@ const APP_VERSION = "0.4.1"; // gleich halten mit sw.js, version.json und ?v= in
   if (start && V[start]) ansicht = start;
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (V[h] && h !== ansicht) { ansicht = h; arg = null; fenster = null; zeichnen(); } });
   zeichnen();
+  if (ansicht === "start") { pinNeuFenster(); if (fenster) zeichnen(); }
 
   // ---------- Update wie in der Club-App: komplett oder gar nicht ----------
   function swDa() { try { return "serviceWorker" in navigator && !!navigator.serviceWorker && location.protocol !== "file:"; } catch (e) { return false; } }

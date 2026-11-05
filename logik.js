@@ -131,6 +131,10 @@
         else if (z && z2 && z2.start < z.ende && z.start < z2.ende) { moeglich = false; gruende.push(`schon ${f2.kurz || f2.name}`); }
         else if (s.filiale !== filialeId) gruende.push(`am Tag auch in ${f2.kurz || f2.name}`);
       }
+      // Arbeitszeitgesetz: höchstens 10 Std. am Tag (Wert aus den Parametern)
+      const maxTag = ((state.parameter || {}).max) || 600;
+      const tagMin = schon.reduce((n, x) => { const zz = planZeit(state, x); return n + (zz ? zz.ende - zz.start : 0); }, 0) + (z ? z.ende - z.start : 0);
+      if (z && tagMin > maxTag) { moeglich = false; gruende.push(`über ${maxTag / 60} Std. am Tag`); }
       const w = wunschAm(state, p.id, datum);
       let punkte = 0;
       if (w) {
@@ -165,7 +169,12 @@
         let { soll, ist } = abdeckung(arbeit, filialeId, datum, sch.id);
         if (!oeffnung(f, datum)) continue;
         while (ist < soll) {
-          const k = kandidaten(arbeit, filialeId, datum, sch.id).find((x) => x.moeglich && x.punkte > -3 && (!nurStamm || x.person.stammfiliale === filialeId));
+          // Vorgaben der Besetzungsmatrix beachten: fehlt in dieser Schicht eine Leitung, zuerst Leitung; zu viele Aushilfen, keine weiteren Aushilfen
+          const z = schichtZeit(f, datum, sch.id);
+          const gr = besetzungTag(arbeit, filialeId, datum).slots.filter((x) => z && x.m >= z.start && x.m < z.ende).flatMap((x) => x.gruende).join(" ");
+          const brauchtLeitung = /Shopleitung|Leitung/.test(gr), brauchtFest = /feste Mitarbeiter/.test(gr) || /zu viele Aushilfen/.test(gr);
+          const ks = kandidaten(arbeit, filialeId, datum, sch.id).filter((x) => x.moeglich && x.punkte > -3 && (!nurStamm || x.person.stammfiliale === filialeId));
+          const k = (brauchtLeitung && ks.find((x) => x.person.rolle === "shopleitung" || x.person.rolle === "stv")) || (brauchtFest && ks.find((x) => x.person.rolle !== "aushilfe")) || ks[0];
           if (!k) break;
           const s = { id: neueId(), filiale: filialeId, datum, schicht: sch.id, personId: k.person.id, quelle: "vorschlag" };
           arbeit.plan.push(s); neu.push(s); ist++;
@@ -174,6 +183,82 @@
     }
     return neu;
   }
+  // ---------- Besetzungsmatrix ----------
+  // Je Filiale und Tagesart (Werktag, Samstag, Sonntag, Einsatz) Zeitblöcke mit Vorgabe:
+  // gesamt = Personen, sl = mind. Shopleitung, stv = mind. weitere Leitung (Stv. oder höher), ma = mind. feste Mitarbeiter (oder höher), maxAus = höchstens Aushilfen.
+  const ROLLEN_GRUPPE = { shopleitung: "sl", stv: "stv", mitarbeiter: "ma", aushilfe: "aus" };
+  function matrixTyp(filiale, datum) {
+    if (filiale.art === "mobil") return "einsatz";
+    const t = wochentag(datum);
+    return t === "sa" ? "sa" : t === "so" ? "so" : "werktag";
+  }
+  function bedarfBloecke(filiale, datum) {
+    const o = oeffnung(filiale, datum);
+    if (!o) return [];
+    const m = filiale.matrix && filiale.matrix[matrixTyp(filiale, datum)];
+    if (!m) return [];
+    return m.map((b) => ({ ...b, von: Math.max(zeitZuMin(b.von), o.auf), bis: Math.min(zeitZuMin(b.bis), o.zu) })).filter((b) => b.bis > b.von);
+  }
+  function slotPruefen(b, leute) {
+    const z = { gesamt: leute.length, sl: 0, lead: 0, fest: 0, aus: 0 };
+    for (const p of leute) {
+      const g = ROLLEN_GRUPPE[p.rolle] || "ma";
+      if (g === "sl") z.sl++;
+      if (g === "sl" || g === "stv") z.lead++;
+      if (g !== "aus") z.fest++; else z.aus++;
+    }
+    if (!b) return { zahl: z, status: leute.length ? "ohne" : "leer", gruende: [] };
+    const gruende = [];
+    const sl = b.sl || 0, stv = b.stv || 0, ma = b.ma || 0;
+    if (z.gesamt < b.gesamt) gruende.push(`${b.gesamt - z.gesamt} Person${b.gesamt - z.gesamt > 1 ? "en" : ""} fehl${b.gesamt - z.gesamt > 1 ? "en" : "t"}`);
+    if (z.sl < sl) gruende.push("keine Shopleitung");
+    else if (z.lead < sl + stv) gruende.push("keine Leitung (Shopleitung oder Stellvertretung)");
+    if (z.fest < sl + stv + ma && z.gesamt >= b.gesamt) gruende.push("zu wenig feste Mitarbeiter (zu viele Aushilfen)");
+    if (b.maxAus != null && z.aus > b.maxAus) gruende.push(`zu viele Aushilfen (${z.aus} statt höchstens ${b.maxAus})`);
+    const status = z.gesamt < b.gesamt ? "rot" : gruende.length ? "gelb" : z.gesamt > b.gesamt ? "ueber" : "gruen";
+    return { zahl: z, status, gruende };
+  }
+  // Besetzung eines Tages in halben Stunden: wer ist laut Plan da (ohne Abwesende), was ist gefordert, Ampel und Gründe.
+  function besetzungTag(state, filialeId, datum) {
+    const f = state.filialen.find((x) => x.id === filialeId);
+    const o = f && oeffnung(f, datum);
+    if (!o) return { offen: false, slots: [], personen: [] };
+    const bloecke = bedarfBloecke(f, datum);
+    const eintraege = schichtenAm(state, datum, (s) => s.filiale === filialeId && s.personId).map((s) => ({ s, z: planZeit(state, s), p: state.personen.find((x) => x.id === s.personId) }))
+      .filter((x) => x.z && x.p);
+    const personen = eintraege.map((x) => ({ id: x.p.id, rolle: x.p.rolle, von: x.z.start, bis: x.z.ende, schicht: x.s.schicht, abwesend: !!abwesenheitAm(state, x.p.id, datum), springer: x.p.stammfiliale !== filialeId }));
+    const slots = [];
+    for (let m = o.auf; m < o.zu; m += 30) {
+      const b = bloecke.find((x) => m >= x.von && m < x.bis) || null;
+      const leute = eintraege.filter((x) => x.z.start <= m && x.z.ende >= m + 30 && !abwesenheitAm(state, x.p.id, datum)).map((x) => x.p);
+      slots.push({ m, bedarf: b, leute: leute.map((p) => p.id), ...slotPruefen(b, leute) });
+    }
+    return { offen: true, auf: o.auf, zu: o.zu, ort: o.ort, slots, personen };
+  }
+  // Nicht richtig besetzte Zeiten eines Tages, zusammengefasst zu Zeiträumen mit gleichem Grund.
+  function besetzungsLuecken(state, filialeId, datum) {
+    const t = besetzungTag(state, filialeId, datum);
+    const r = [];
+    for (const sl of t.slots) {
+      if (sl.status !== "rot" && sl.status !== "gelb") continue;
+      const schluessel = sl.status + "|" + sl.gruende.join("|");
+      const letzt = r[r.length - 1];
+      if (letzt && letzt.bis === sl.m && letzt.schluessel === schluessel) { letzt.bis = sl.m + 30; continue; }
+      r.push({ datum, filiale: filialeId, von: sl.m, bis: sl.m + 30, status: sl.status, gruende: sl.gruende, soll: sl.bedarf.gesamt, ist: sl.zahl.gesamt, schluessel });
+    }
+    return r;
+  }
+  // Welche Schicht deckt einen Zeitraum am besten ab (für „+ einteilen“ aus der Lückenliste)?
+  function passendeSchicht(filiale, datum, von, bis) {
+    let best = null, bestMin = -1;
+    for (const sch of SCHICHTEN) {
+      const z = schichtZeit(filiale, datum, sch.id); if (!z) continue;
+      const ueber = Math.min(z.ende, bis) - Math.max(z.start, von);
+      if (ueber > bestMin) { bestMin = ueber; best = sch.id; }
+    }
+    return best;
+  }
+
   // ---------- Tauschbörse ----------
   // Ein Angebot gibt eine ganze Schicht oder einen Teil davon (Stunden am Anfang oder Ende) ab.
   // Ein Kollege übernimmt sie, oder tauscht sie gegen eine eigene ganze Schicht. Die Shopleitung bestätigt.
@@ -194,6 +279,9 @@
       const z2 = planZeit(state, s);
       if (z2 && zeit && z2.start < zeit.ende && zeit.start < z2.ende) gruende.push("hat zu der Zeit schon Dienst");
     }
+    const maxTag = ((state.parameter || {}).max) || 600;
+    const tagMin = schichtenAm(state, datum, (x) => x.personId === p.id && !ohneIds.includes(x.id)).reduce((n, x) => { const zz = planZeit(state, x); return n + (zz ? zz.ende - zz.start : 0); }, 0) + (zeit ? zeit.ende - zeit.start : 0);
+    if (tagMin > maxTag) gruende.push(`käme über ${maxTag / 60} Std. am Tag`);
     const w = wunschAm(state, p.id, datum);
     if (w && w.art === "nicht") hinweise.push("hat für den Tag „kann nicht“ angegeben");
     const soll = p.wochenstunden || 0, std = stundenInWoche(state, p.id, montag(datum));
@@ -297,6 +385,40 @@
   function csv(zeilen, kopf) {
     const f = (v) => { const t = String(v == null ? "" : v); return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     return [kopf.join(";"), ...zeilen.map((z) => z.map(f).join(";"))].join("\r\n");
+  }
+
+  // ---------- Pinnwand (wie Club-App: Zettel, Empfänger, wichtig, gelesen, abnehmen) ----------
+  const PIN_STANDARD = { maxZettel: 4, zeichen: 200, erinnernTage: 3, pauseTage: 7 };
+  function pinEinstellungen(state) { return { ...PIN_STANDARD, ...((state.parameter || {}).pinnwand || {}) }; }
+  function pinEmpfaenger(state, z) {
+    const aktiv = (state.personen || []).filter((p) => p.aktiv !== false && p.rolle !== "berater");
+    if (z.fuer === "ich") return [z.vonId];
+    if (z.fuer === "personen") return (z.empfaenger || []).filter((id) => id !== z.vonId);
+    const inFiliale = (p) => z.filiale == null || darfInFiliale(p, z.filiale);
+    if (z.fuer === "leitung") return aktiv.filter((p) => (p.rolle === "shopleitung" || p.rolle === "stv") && (z.filiale == null || p.stammfiliale === z.filiale) && p.id !== z.vonId).map((p) => p.id);
+    return aktiv.filter((p) => p.id !== z.vonId && !UEBERGREIFEND.includes(p.rolle) && inFiliale(p)).map((p) => p.id);
+  }
+  function pinAktiv(z, heute) { return !z.entfernt && (!z.bis || z.bis >= heute); }
+  // Sichtbar für: Empfänger (solange nicht bei ihm abgenommen), Verfasser, Leitung der Filiale, Zentrale
+  function pinSichtbar(state, z, p, heute) {
+    if (!p || !pinAktiv(z, heute)) return false;
+    if (z.vonId === p.id || p.rolle === "zentrale") return true;
+    if (z.filiale && istLeitung(p, z.filiale)) return true;
+    return pinEmpfaenger(state, z).includes(p.id) && !(z.abgenommen || {})[p.id];
+  }
+  function pinStand(state, z) {
+    const empf = pinEmpfaenger(state, z).filter((id) => id !== z.vonId);
+    const gelesen = empf.filter((id) => (z.gelesen || {})[id]);
+    return { empf, gelesen, offen: empf.filter((id) => !(z.gelesen || {})[id]) };
+  }
+  function pinUngelesen(state, p, heute) {
+    return (state.pinnwand || []).filter((z) => z.vonId !== p.id && pinAktiv(z, heute) && pinEmpfaenger(state, z).includes(p.id) && !(z.gelesen || {})[p.id] && !(z.abgenommen || {})[p.id]);
+  }
+  function pinEigeneAktiv(state, p, heute) { return (state.pinnwand || []).filter((z) => z.vonId === p.id && pinAktiv(z, heute) && z.fuer !== "ich"); }
+  // Eigene Zettel, die schon lange hängen (Erinnerung an den Verfasser, mit Pause)
+  function pinErinnern(state, p, heute) {
+    const e = pinEinstellungen(state);
+    return pinEigeneAktiv(state, p, heute).filter((z) => plusTage(z.zeit.slice(0, 10), e.erinnernTage) <= heute && (!z.pauseBis || z.pauseBis <= heute));
   }
 
   // ---------- Admin: Betreiber und Datenbanken ----------
@@ -537,6 +659,8 @@
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
     planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
+    matrixTyp, bedarfBloecke, slotPruefen, besetzungTag, besetzungsLuecken, passendeSchicht,
+    PIN_STANDARD, pinEinstellungen, pinEmpfaenger, pinAktiv, pinSichtbar, pinStand, pinUngelesen, pinEigeneAktiv, pinErinnern,
     SCHRITTE, geheimErkannt, pruefeVerbindung, betreiberStand,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
