@@ -689,6 +689,94 @@
     return r;
   }
 
+  // ---------- Nachrichten (wie die Chats der Club-App, mit Lesebestätigung ✓✓) ----------
+  // Feste Chats: je Filiale (Team inkl. Springer), Leitungsrunde (Shopleitung, Stellvertretung, Zentrale, Qualität); dazu Direktnachrichten.
+  function chatsSicherstellen(state) {
+    state.chats = state.chats || []; state.nachrichten = state.nachrichten || [];
+    for (const f of state.filialen || []) if (!state.chats.some((c) => c.art === "filiale" && c.filiale === f.id)) state.chats.push({ id: "ch-" + f.id, art: "filiale", filiale: f.id, titel: "Team " + (f.kurz || f.name) });
+    if (!state.chats.some((c) => c.art === "leitung")) state.chats.push({ id: "ch-leitung", art: "leitung", titel: "Leitungsrunde" });
+    return state.chats;
+  }
+  function chatMitglieder(state, c) {
+    const aktiv = (state.personen || []).filter((p) => p.aktiv !== false && p.rolle !== "berater");
+    if (c.art === "direkt") return (c.mitglieder || []).filter((id) => aktiv.some((p) => p.id === id));
+    if (c.art === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "zentrale", "qualitaet"].includes(p.rolle)).map((p) => p.id);
+    if (c.art === "filiale") return aktiv.filter((p) => p.rolle === "zentrale" || p.stammfiliale === c.filiale || (p.springer && (p.einsatzfilialen || []).includes(c.filiale))).map((p) => p.id);
+    return [];
+  }
+  function chatsFuer(state, personId) {
+    chatsSicherstellen(state);
+    return state.chats.filter((c) => chatMitglieder(state, c).includes(personId));
+  }
+  function chatNachrichten(state, chatId) { return (state.nachrichten || []).filter((n) => n.chatId === chatId).sort((a, b) => a.zeit.localeCompare(b.zeit)); }
+  function chatUngelesen(state, chatId, personId) { return chatNachrichten(state, chatId).filter((n) => n.vonId !== personId && !(n.gelesen || {})[personId]).length; }
+  function nachrichtSenden(state, chatId, vonId, text, zeit, neueId) {
+    const t = String(text || "").trim().slice(0, 2000);
+    const c = (state.chats || []).find((x) => x.id === chatId);
+    if (!t || !c || !chatMitglieder(state, c).includes(vonId)) return null;
+    const n = { id: neueId(), chatId, vonId, text: t, zeit, gelesen: {} };
+    state.nachrichten.push(n); return n;
+  }
+  function chatGelesen(state, chatId, personId, zeit) {
+    let n = 0; for (const x of chatNachrichten(state, chatId)) if (x.vonId !== personId && !(x.gelesen = x.gelesen || {})[personId]) { x.gelesen[personId] = zeit; n++; }
+    return n;
+  }
+  // Lesestand einer eigenen Nachricht: ✓ gesendet, ✓✓ von allen gelesen
+  function lesestand(state, n) {
+    const c = (state.chats || []).find((x) => x.id === n.chatId); if (!c) return { gelesen: [], offen: [], alle: false };
+    const andere = chatMitglieder(state, c).filter((id) => id !== n.vonId);
+    const gelesen = andere.filter((id) => (n.gelesen || {})[id]);
+    return { gelesen, offen: andere.filter((id) => !(n.gelesen || {})[id]), alle: andere.length > 0 && gelesen.length === andere.length };
+  }
+  function direktChat(state, a, b, neueId) {
+    chatsSicherstellen(state);
+    let c = state.chats.find((x) => x.art === "direkt" && x.mitglieder.length === 2 && x.mitglieder.includes(a) && x.mitglieder.includes(b));
+    if (!c) { c = { id: neueId(), art: "direkt", mitglieder: [a, b] }; state.chats.push(c); }
+    return c;
+  }
+
+  // ---------- Termine (Zusage / Absage / Vielleicht, wie in der Club-App) ----------
+  const TERMIN_ARTEN = { teamsitzung: { name: "Teamsitzung", sym: "👥" }, schulung: { name: "Schulung", sym: "🎓" }, inventur: { name: "Inventur", sym: "📋" }, hygiene: { name: "Hygiene-Besuch", sym: "🧼" }, sonstiges: { name: "Termin", sym: "📅" } };
+  function terminEingeladen(state, t) {
+    const aktiv = (state.personen || []).filter((p) => p.aktiv !== false);
+    const inFiliale = (p) => !t.filiale || p.rolle === "zentrale" || p.stammfiliale === t.filiale || (p.springer && (p.einsatzfilialen || []).includes(t.filiale));
+    if (t.fuer === "personen") return (t.personen || []).filter((id) => aktiv.some((p) => p.id === id));
+    if (t.fuer === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "zentrale", "qualitaet"].includes(p.rolle) && inFiliale(p)).map((p) => p.id);
+    return aktiv.filter((p) => p.rolle !== "berater" && inFiliale(p)).map((p) => p.id);
+  }
+  function termineFuer(state, personId, abDatum) {
+    const p = (state.personen || []).find((x) => x.id === personId);
+    return (state.termine || []).filter((t) => (!abDatum || t.datum >= abDatum) && (t.vonId === personId || terminEingeladen(state, t).includes(personId) || (p && p.rolle === "zentrale")))
+      .sort((a, b) => (a.datum + a.von).localeCompare(b.datum + b.von));
+  }
+  function terminAntwort(state, terminId, personId, antwort, zeit) {
+    const t = (state.termine || []).find((x) => x.id === terminId);
+    if (!t || t.abgesagt || !["ja", "nein", "vielleicht"].includes(antwort) || !terminEingeladen(state, t).includes(personId)) return false;
+    (t.antworten = t.antworten || {})[personId] = { a: antwort, zeit }; return true;
+  }
+  function terminStand(state, t) {
+    const ein = terminEingeladen(state, t), a = t.antworten || {};
+    const r = { ja: [], nein: [], vielleicht: [], offen: [] };
+    for (const id of ein) (r[(a[id] || {}).a] || r.offen).push(id);
+    return r;
+  }
+  // Kalender-Datei (ICS) mit Erinnerung, z. B. für Dienste und Termine im Handy-Kalender
+  function ics(eintraege, erinnerungMin) {
+    const e = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/[,;]/g, (m) => "\\" + m).replace(/\r?\n/g, "\\n");
+    const dt = (d, z) => d.replace(/-/g, "") + "T" + z.replace(":", "") + "00";
+    const jetzt = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const zeilen = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//frooters//Team-App//DE", "CALSCALE:GREGORIAN"];
+    for (const x of eintraege) {
+      zeilen.push("BEGIN:VEVENT", `UID:${x.uid}@frooters-team-app`, `DTSTAMP:${jetzt}`, `DTSTART:${dt(x.datum, x.von)}`, `DTEND:${dt(x.datum, x.bis)}`, `SUMMARY:${e(x.titel)}`);
+      if (x.ort) zeilen.push(`LOCATION:${e(x.ort)}`);
+      if (x.notiz) zeilen.push(`DESCRIPTION:${e(x.notiz)}`);
+      if (erinnerungMin) zeilen.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${e(x.titel)}`, `TRIGGER:-PT${erinnerungMin}M`, "END:VALARM");
+      zeilen.push("END:VEVENT");
+    }
+    zeilen.push("END:VCALENDAR");
+    return zeilen.join("\r\n") + "\r\n";
+  }
+
   // ---------- Pinnwand (wie Club-App: Zettel, Empfänger, wichtig, gelesen, abnehmen) ----------
   const PIN_STANDARD = { maxZettel: 4, zeichen: 200, erinnernTage: 3, pauseTage: 7 };
   function pinEinstellungen(state) { return { ...PIN_STANDARD, ...((state.parameter || {}).pinnwand || {}) }; }
@@ -1140,6 +1228,8 @@
     SCHRITTE, geheimErkannt, pruefeVerbindung, betreiberStand,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
+    chatsSicherstellen, chatMitglieder, chatsFuer, chatNachrichten, chatUngelesen, nachrichtSenden, chatGelesen, lesestand, direktChat,
+    TERMIN_ARTEN, terminEingeladen, termineFuer, terminAntwort, terminStand, ics,
     WOCHEN_JE_MONAT, monatsuebersicht, KASSE_FELDER, zahlDe, datumDe, stundeDe, kassenSpalten, kassenImport, kassenUebernehmen, umsatzJeStunde, personalJeStunde,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
     LAGERORTE, BESTELL_STATUS, waren, letzteInventur, unterwegs, bestellVorschlag, bestellungenAnlegen, wareneingang, mengeText,

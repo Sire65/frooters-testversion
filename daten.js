@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v11";
+  const SCHLUESSEL = "frooters_demo_v12";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -240,8 +240,23 @@
       }
     }
 
+    // Termine (Beispiele)
+    const pidT = (v) => personen.find((p) => p.vorname === v).id;
+    const naechsterTag = (tag) => { let d = L.plusTage(heuteIso, 1); while (L.wochentag(d) !== tag) d = L.plusTage(d, 1); return d; };
+    const termine = [
+      { id: id("tm"), titel: "Teamsitzung Ochtrup", art: "teamsitzung", datum: naechsterTag("di"), von: "18:30", bis: "19:30", ort: "Ochtrup, Pausenraum", filiale: "och", fuer: "alle", personen: [], pflicht: true, notiz: "Themen: Wintersortiment, neue Hygiene-Liste, Dienstwünsche Dezember.", vonId: pidT("Sandra"), antworten: { [pidT("Tom")]: { a: "ja", zeit: heuteIso + "T09:00" }, [pidT("Leonie")]: { a: "vielleicht", zeit: heuteIso + "T09:30" } } },
+      { id: id("tm"), titel: "Hygieneschulung (jährlich)", art: "schulung", datum: L.plusTage(naechsterTag("mo"), 7), von: "09:00", bis: "11:00", ort: "Oberhausen, Centro (Beispiel)", filiale: null, fuer: "alle", personen: [], pflicht: true, notiz: "Mit dem Hygieneberater. Bitte Belehrung § 43 IfSG mitbringen.", vonId: pidT("Inhaber"), antworten: {} },
+      { id: id("tm"), titel: "Inventur zum Monatsende", art: "inventur", datum: L.iso(new Date(Number(heuteIso.slice(0, 4)), Number(heuteIso.slice(5, 7)), 0)), von: "20:00", bis: "21:30", ort: "jede Filiale", filiale: null, fuer: "leitung", personen: [], pflicht: true, notiz: "Bestand in der App zählen (Bestellung → Bestand aufnehmen).", vonId: pidT("Inhaber"), antworten: {} },
+    ];
+    // Nachrichten (Beispiele): Team Ochtrup und Leitungsrunde
+    const nachrichten = [
+      { id: id("nc"), chatId: "ch-och", vonId: pidT("Sandra"), text: "Guten Morgen zusammen! Die neue Mango-Sauce ist da, bitte erst die alte aufbrauchen. 🥭", zeit: L.plusTage(heuteIso, -1) + "T08:05", gelesen: { [pidT("Tom")]: L.plusTage(heuteIso, -1) + "T08:20" } },
+      { id: id("nc"), chatId: "ch-och", vonId: pidT("Tom"), text: "Alles klar, steht schon vorne links im Kühlschrank.", zeit: L.plusTage(heuteIso, -1) + "T08:21", gelesen: { [pidT("Sandra")]: L.plusTage(heuteIso, -1) + "T08:30" } },
+      { id: id("nc"), chatId: "ch-leitung", vonId: pidT("Inhaber"), text: "Bitte bis Freitag die Dienstwünsche für Dezember einsammeln. Danke!", zeit: L.plusTage(heuteIso, -2) + "T17:40", gelesen: { [pidT("Anna")]: L.plusTage(heuteIso, -2) + "T18:00" } },
+    ];
+
     const state = {
-      version: 11, verkauf, erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 12, verkauf, termine, nachrichten, chats: [], erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       waren: { lieferanten, artikel, sortiment: sortimentWaren, inventuren, bestellungen },
@@ -315,6 +330,7 @@
       state.buero.personal[p.id] = { vertrag: `${Number(jahr) - 1 - (k % 3)}-0${1 + (k % 9)}-01`, belehrung: `${Number(jahr) - 1 - (k % 2)}-${String(1 + (k % 12)).padStart(2, "0")}-15`, datenschutz: k % 4 ? `${jahr}-0${1 + (k % 8)}-10` : "", schulung: k % 3 ? `${Number(jahr) - (k % 2)}-0${1 + (k % 9)}-20` : "" };
     }
     state.naechsteId = n + 1;
+    L.chatsSicherstellen(state);
     return state;
   }
 

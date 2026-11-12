@@ -374,6 +374,21 @@ html.kachel-klein .kacheln { grid-template-columns: repeat(auto-fill, minmax(118
 html.kachel-klein .kachel { min-height: 82px; padding: 10px; } html.kachel-klein .kachel > span:not(.sym):not(.zahl) { display: none; } html.kachel-klein .kachel .sym { font-size: 1.4rem; }
 .blase-knoepfe { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .zeile.aus { opacity: .55; }
+
+/* ---------- 0.13.0: Nachrichten und Termine ---------- */
+.chat-rechts { display: grid; justify-items: end; gap: 2px; } .chat-rechts small { color: var(--muted); font-size: .75rem; white-space: nowrap; }
+.zahl-s { background: var(--red); color: var(--on-red); border-radius: 99px; min-width: 22px; padding: 0 7px; font-size: .78rem; font-weight: 700; text-align: center; }
+.chat-liste { display: grid; gap: 6px; padding-bottom: 90px; }
+.chat-tag { justify-self: center; font-size: .78rem; color: var(--muted); background: var(--tint); border-radius: 99px; padding: 2px 10px; margin: 6px 0; }
+.blase-chat { max-width: 82%; justify-self: start; background: var(--surface); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; padding: 7px 11px; display: grid; gap: 2px; }
+.blase-chat.eigen { justify-self: end; background: var(--green-soft); border-color: transparent; border-radius: 14px 14px 4px 14px; }
+.blase-chat b { font-size: .8rem; color: var(--red); } .blase-chat small { justify-self: end; font-size: .72rem; color: var(--muted); }
+.blase-chat .lese { border: 0; background: none; padding: 0 0 0 4px; color: var(--muted); font-size: .75rem; cursor: pointer; } .blase-chat .lese.alle { color: var(--green); font-weight: 700; }
+.chat-eingabe { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: flex-end; background: var(--bg); padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.chat-eingabe textarea { flex: 1; min-width: 0; resize: vertical; border: 1px solid var(--line); border-radius: 14px; padding: 9px 12px; background: var(--surface); color: var(--ink); }
+.chat-eingabe .btn { padding: 11px 16px; }
+.t-datum { display: grid; justify-items: center; min-width: 42px; background: var(--red-soft); color: var(--red); border-radius: 10px; padding: 3px 6px; line-height: 1.1; } .t-datum b { font-size: 1.15rem; } .t-datum small { font-size: .72rem; }
+.wahl-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 12px; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

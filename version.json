@@ -1,13 +1,10 @@
 {
-  "version": "0.12.0",
+  "version": "0.13.0",
   "datum": "2026-11-12",
   "stufe": "DEV",
   "neu": [
-    "Bedienkonzept wie in der Club-App: „Meine App“ mit einfacher oder erweiterter Ansicht, großer Schrift, Hell/Dunkel, Kachelgröße",
-    "Kacheln sortieren und ausblenden",
-    "Zurück-Taste des Handys schließt zuerst das Fenster",
-    "Frootie erklärt jeden Bereich beim ersten Öffnen („👍 Verstanden“), Vorlesen 🔊",
-    "Frag Frootie mit Fragen und „👉 Zeig es mir“, Suche 🔍 über Bereiche, Personen, Rezepte, Zettel",
-    "„Was ist neu“ nach einem Update, höchstens ein Info-Fenster pro Öffnen"
+    "Nachrichten wie in der Club-App: Chat je Filiale, Leitungsrunde, Direktnachrichten; Lesebestätigung ✓✓ und wer gelesen hat",
+    "Termine: Teamsitzung, Schulung, Inventur, Hygiene-Besuch; Zusage, Absage, Vielleicht; Stand der Antworten; Ankündigung und Erinnerung im Chat",
+    "Termine und eigene Dienste als Kalender-Datei mit Erinnerung in den Handy-Kalender"
   ]
 }

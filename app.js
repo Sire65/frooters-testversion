@@ -1,4 +1,4 @@
-const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 11) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 12) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -84,6 +84,9 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    nachrichten: "Hier schreibst du mit deinem Team, der Leitungsrunde oder direkt mit einer Person. ✓✓ heißt: alle haben gelesen. Tipp auf ✓, dann siehst du, wer schon gelesen hat.",
+    chat: "Schreib unten deine Nachricht und tipp auf ➤. Bei deinen Nachrichten zeigt ✓✓, dass alle gelesen haben.",
+    termine: "Hier stehen Teamsitzungen, Schulungen und Inventuren. Sag mit einem Tipp zu, ab oder vielleicht. Über „In meinen Kalender“ erinnert dich dein Handy.",
     einstellungen: "Hier stellst du die App für dich ein: einfache oder erweiterte Ansicht, große Schrift, Farben und die Reihenfolge deiner Kacheln. Das gilt nur auf diesem Gerät.",
     umsatz: "Hier siehst du, wann viel verkauft wird, und daneben, wie viele Leute laut Plan da sind. So erkennst du Stunden mit zu wenig oder zu viel Personal.",
     bestellung: "Erst den Bestand zählen, dann schlage ich vor, was fehlt: Soll minus Ist, auf volle Kartons gerundet. Du prüfst und gibst frei, verschickt wird nichts automatisch.",
@@ -151,6 +154,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     if (["regeln", "regel-edit"].includes(r) && !qualitaet()) r = "start";
     if (["rezeptpflege", "rezept-edit", "zutaten", "zutat-edit", "freigaben"].includes(r) && !rezeptRecht()) r = "start";
     if (berater() && ["quiz", "pinnwand", "nachrichten", "chat"].includes(r)) r = "start";
+    if (r === "termin-edit" && !(leitung() || zentrale())) r = "termine";
     if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(r)) r = "start";
     return r;
   }
@@ -162,7 +166,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu wie in der Club-App: Einstellungen „Meine App“ (große Schrift, einfache Ansicht, Kacheln sortieren), Suche 🔍 und „Frag Frootie“.", go: "einstellungen" };
+  const WAS_NEU = { text: "Neu: 💬 Nachrichten mit Lesebestätigung und 📅 Termine zum Zusagen, dazu Dienste und Termine im Handy-Kalender.", go: "nachrichten" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -313,7 +317,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -356,6 +360,8 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
       ${kachel("📖", "Rezepte", "Mit Allergenen", "rezepte")}
       ${berater() ? "" : kachel("🎯", "Rezept-Quiz", "Wie gut kennst du sie?", "quiz")}
       ${berater() ? "" : kachel("📌", "Pinnwand", (() => { const u = L.pinUngelesen(S, p, d).length; return u ? `${u} ungelesen` : "Zettel für den Shop"; })(), "pinnwand", L.pinUngelesen(S, p, d).length)}
+      ${berater() ? "" : kachel("💬", "Nachrichten", (() => { const u = chatUngelesenGesamt(); return u ? `${u} ungelesen` : "Team, Leitung, direkt"; })(), "nachrichten", chatUngelesenGesamt())}
+      ${kachel("📅", "Termine", (() => { const t = termineSichtbar().find((x) => !x.abgesagt); return t ? `${L.datumKurz(t.datum)} ${esc(t.titel)}` : "Teamsitzung, Schulung"; })(), "termine", terminOffen())}
       ${(berater() || rolle() === "qualitaet") ? kachel("🔍", "Hygiene-Kontrolle", "Letzte 7 Tage", "hygkontrolle", hl.filter((a) => a.status === "abweichung").length) : ""}
     </div></div>`;
     if (leitung()) {
@@ -403,6 +409,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
       ${krank ? `<p class="hinweis">${L.abwArt(krank.art).sym} Du bist bis ${L.datumKurz(krank.bis)} abwesend: ${esc(L.abwArt(krank.art).name)}.</p>` : ""}
       ${meine.length ? meine.map((s) => `<p>🗓️ <b>${planTxt(s)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
       ${meine.length ? `<button class="btn ${st === "aus" ? "" : "zwei"}" data-go="stechuhr">${st === "aus" ? "⏱️ Jetzt einstempeln" : st === "pause" ? "▶️ Pause beenden" : "⏱️ Eingestempelt · öffnen"}</button>` : ""}
+      ${termineSichtbar().filter((t) => t.datum === d && !t.abgesagt).map((t) => `<p>📅 <b>${t.von} ${esc(t.titel)}</b>${t.ort ? " · " + esc(t.ort) : ""}</p>`).join("")}
       ${meineAufg ? `<p class="hinweis">🧼 ${meineAufg} Hygiene-Aufgabe${meineAufg > 1 ? "n" : ""} für dich jetzt fällig.</p>` : ""}
     </div>`;
     const erinnernKarte = pinErinnern.length ? `<div class="hinweis">📌 Dein Zettel „${esc(pinErinnern[0].text.slice(0, 50))}${pinErinnern[0].text.length > 50 ? "…" : ""}“ hängt seit ${Math.round((L.ausIso(d) - L.ausIso(pinErinnern[0].zeit.slice(0, 10))) / 864e5)} Tagen. <button class="chip" data-act="pin-abnehmen" data-id="${pinErinnern[0].id}">abnehmen</button> <button class="chip" data-act="pin-haengen" data-id="${pinErinnern[0].id}">hängen lassen</button></div>` : "";
@@ -425,7 +432,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     }).join("");
     const std = L.stundenInWoche(S, p.id, mo);
     return `${titel("Mein Dienstplan")}${frootie(FROOTIE_TIPPS.dienst)}
-      <div class="karte"><p>Diese Woche: <b>${std} Std.</b> geplant${p.wochenstunden ? ` von ${p.wochenstunden} Std. laut Vertrag` : ""}.</p></div>
+      <div class="karte"><p>Diese Woche: <b>${std} Std.</b> geplant${p.wochenstunden ? ` von ${p.wochenstunden} Std. laut Vertrag` : ""}.</p><button class="btn drei" data-act="dienst-ics">📅 Meine Dienste in den Handy-Kalender</button></div>
       <div class="liste">${rows}</div>`;
   };
 
@@ -1501,6 +1508,102 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     return L.csv(z.map((x) => [name(x.person), (filiale(x.person.stammfiliale) || {}).kurz || "", (L.beschaeftigung(x.person.beschaeftigung) || { name: "" }).name, h(x.sollMin), h(x.istMin), h(x.planMin), h(x.diffMin), x.tage, ...arten.map((a) => x.abw[a] || 0), x.offen ? `${x.offen} Tag(e) ohne Gehen` : ""]),
       ["Name", "Stammfiliale", "Beschäftigung", "Soll (Std.)", "Gestempelt (Std.)", "Geplant (Std.)", "Differenz (Std.)", "Arbeitstage", ...arten.map((a) => L.ABW_ARTEN[a].name + " (Tage)"), "Hinweis"]);
   }
+  // ----- Nachrichten (Chats wie in der Club-App, mit Lesebestätigung ✓✓) -----
+  function chatUngelesenGesamt() { if (!ICH() || berater()) return 0; return L.chatsFuer(S, ICH().id).reduce((n, c) => n + L.chatUngelesen(S, c.id, ICH().id), 0); }
+  const chatTitel = (c) => c.art === "direkt" ? name(person(c.mitglieder.find((x) => x !== ICH().id))) : c.titel;
+  const chatSym = (c) => ({ filiale: "🏪", leitung: "👔", direkt: "👤" }[c.art] || "💬");
+  const uhrzeit = (iso) => iso ? (iso.slice(0, 10) === heute() ? iso.slice(11, 16) : `${L.datumKurz(iso.slice(0, 10))} ${iso.slice(11, 16)}`) : "";
+  V.nachrichten = () => {
+    const ich = ICH().id;
+    const cs = L.chatsFuer(S, ich).map((c) => ({ c, letzte: L.chatNachrichten(S, c.id).slice(-1)[0] })).sort((a, b) => ((b.letzte || {}).zeit || "").localeCompare((a.letzte || {}).zeit || ""));
+    return `${titel("Nachrichten")}${frootie(FROOTIE_TIPPS.nachrichten)}
+      <button class="btn zwei" data-act="dm-neu">✉️ Neue Direktnachricht</button>
+      <div class="liste">${cs.map(({ c, letzte }) => { const u = L.chatUngelesen(S, c.id, ich); return `<button class="zeile" data-go="chat" data-arg="${c.id}"><span style="font-size:1.5rem">${chatSym(c)}</span><span><b>${esc(chatTitel(c))}</b><small>${letzte ? `${letzte.vonId === ich ? "Du" : esc((person(letzte.vonId) || {}).vorname || "?")}: ${esc(letzte.text.slice(0, 70))}${letzte.text.length > 70 ? "…" : ""}` : "Noch keine Nachrichten"}</small></span><span class="chat-rechts">${letzte ? `<small>${uhrzeit(letzte.zeit)}</small>` : ""}${u ? `<span class="zahl-s">${u}</span>` : "›"}</span></button>`; }).join("")}</div>
+      <p class="klein muted">Testversion: Nachrichten bleiben in diesem Browser. Mit dem Server kommen sie bei allen an, mit Benachrichtigung.</p>`;
+  };
+  V.chat = () => {
+    const ich = ICH().id, c = (S.chats || []).find((x) => x.id === arg);
+    if (!c || !L.chatMitglieder(S, c).includes(ich)) return `${titel("Nachrichten", "nachrichten")}<p class="leer">Diesen Chat gibt es nicht oder du gehörst nicht dazu.</p>`;
+    if (L.chatGelesen(S, c.id, ich, jetztIso())) speichern();
+    const ns = L.chatNachrichten(S, c.id), mitgl = L.chatMitglieder(S, c);
+    let tagVorher = "";
+    return `${titel(`${chatSym(c)} ${esc(chatTitel(c))}`, "nachrichten")}<p class="klein muted">${mitgl.length} ${mitgl.length === 1 ? "Person" : "Personen"}: ${mitgl.slice(0, 8).map((id) => esc((person(id) || {}).vorname || "")).join(", ")}${mitgl.length > 8 ? " …" : ""}</p>
+      <div class="chat-liste">${ns.map((n) => { const eigen = n.vonId === ich, ls = eigen ? L.lesestand(S, n) : null, tag = n.zeit.slice(0, 10);
+        const trenner = tag !== tagVorher ? `<div class="chat-tag">${tag === heute() ? "Heute" : datumLang(tag)}</div>` : ""; tagVorher = tag;
+        return `${trenner}<div class="blase-chat ${eigen ? "eigen" : ""}">${eigen ? "" : `<b>${esc((person(n.vonId) || {}).vorname || "?")}</b>`}<span>${esc(n.text).replace(/\n/g, "<br>")}</span>
+          <small>${n.zeit.slice(11, 16)}${eigen ? ` <button class="lese ${ls.alle ? "alle" : ""}" data-act="chat-lese" data-id="${n.id}" aria-label="Wer hat gelesen?">${ls.alle ? "✓✓" : ls.gelesen.length ? `✓ ${ls.gelesen.length}/${ls.gelesen.length + ls.offen.length}` : "✓"}</button>` : ""}</small></div>`; }).join("") || '<p class="leer">Noch keine Nachrichten. Schreib die erste!</p>'}</div>
+      <div class="chat-eingabe"><textarea id="ch-text" rows="2" maxlength="2000" placeholder="Nachricht schreiben …" aria-label="Nachricht"></textarea><button class="btn" data-act="chat-senden" data-id="${c.id}" aria-label="Senden">➤</button></div>`;
+  };
+
+  // ----- Termine (Zusage / Absage / Vielleicht, Erinnerung im Handy-Kalender) -----
+  const termineSichtbar = () => ICH() ? L.termineFuer(S, ICH().id, heute()) : [];
+  const termin = (id) => (S.termine || []).find((t) => t.id === id);
+  const darfTerminAendern = (t) => zentrale() || t.vonId === ICH().id || (t.filiale && L.istLeitung(ICH(), t.filiale));
+  const terminOffen = () => termineSichtbar().filter((t) => !t.abgesagt && L.terminEingeladen(S, t).includes(ICH().id) && !(t.antworten || {})[ICH().id]).length;
+  const ANTW = { ja: ["✅", "Zusage"], vielleicht: ["🤔", "Vielleicht"], nein: ["❌", "Absage"] };
+  function terminZeile(t) {
+    const a = (t.antworten || {})[ICH().id], art = L.TERMIN_ARTEN[t.art] || L.TERMIN_ARTEN.sonstiges;
+    return `<button class="zeile ${t.abgesagt ? "aus" : ""}" data-go="termin" data-arg="${t.id}"><span class="t-datum"><b>${t.datum.slice(8, 10)}</b><small>${L.TAG_NAME[L.wochentag(t.datum)].slice(0, 2)}</small></span><span><b>${art.sym} ${esc(t.titel)}</b><small>${t.von}–${t.bis}${t.ort ? " · " + esc(t.ort) : ""}${t.abgesagt ? " · <b>abgesagt</b>" : ""}</small></span><span>${a ? ANTW[a.a][0] : L.terminEingeladen(S, t).includes(ICH().id) && !t.abgesagt ? '<span class="marke-s gelb">offen</span>' : "›"}</span></button>`;
+  }
+  V.termine = () => {
+    const kommend = termineSichtbar(), alt = L.termineFuer(S, ICH().id).filter((t) => t.datum < heute()).slice(-5).reverse();
+    const proMonat = {}; for (const t of kommend) (proMonat[t.datum.slice(0, 7)] = proMonat[t.datum.slice(0, 7)] || []).push(t);
+    return `${titel("Termine")}${frootie(FROOTIE_TIPPS.termine)}
+      ${leitung() || zentrale() ? '<button class="btn zwei" data-act="termin-neu">+ Neuer Termin</button>' : ""}
+      ${Object.entries(proMonat).map(([m, ts]) => `<div class="abschnitt"><h2>${new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</h2><div class="liste">${ts.map(terminZeile).join("")}</div></div>`).join("") || '<p class="leer">Keine anstehenden Termine.</p>'}
+      ${alt.length ? `<details class="abschnitt"><summary class="klein">Vergangene Termine</summary><div class="liste">${alt.map(terminZeile).join("")}</div></details>` : ""}`;
+  };
+  V.termin = () => {
+    const t = termin(arg);
+    if (!t || !L.termineFuer(S, ICH().id).includes(t)) return `${titel("Termin", "termine")}<p class="leer">Nicht gefunden.</p>`;
+    const art = L.TERMIN_ARTEN[t.art] || L.TERMIN_ARTEN.sonstiges, ein = L.terminEingeladen(S, t).includes(ICH().id), st = L.terminStand(S, t), meine = (t.antworten || {})[ICH().id];
+    const namen = (ids) => ids.map((id) => esc((person(id) || {}).vorname || "?")).join(", ") || "–";
+    return `${titel(`${art.sym} ${esc(t.titel)}`, "termine")}
+      ${t.abgesagt ? '<p class="hinweis rot"><b>Abgesagt.</b></p>' : ""}
+      <div class="karte"><p><b>${datumLang(t.datum)}</b>, ${t.von}–${t.bis} Uhr</p>${t.ort ? `<p>📍 ${esc(t.ort)}</p>` : ""}
+        <p class="klein muted">${esc(art.name)} · ${t.filiale ? esc(filiale(t.filiale).kurz) : "alle Filialen"} · für ${t.fuer === "leitung" ? "die Leitung" : t.fuer === "personen" ? "bestimmte Personen" : "alle"}${t.pflicht ? " · <b>Pflichttermin</b>" : ""} · von ${esc((person(t.vonId) || {}).vorname || "?")}</p>
+        ${t.notiz ? `<p>${esc(t.notiz).replace(/\n/g, "<br>")}</p>` : ""}</div>
+      ${ein && !t.abgesagt && t.datum >= heute() ? `<div class="karte"><h2>Kommst du?</h2><div class="wahl">${Object.entries(ANTW).map(([k, [sym, txt]]) => `<button class="${meine && meine.a === k ? "an" : ""} ${k === "nein" && meine && meine.a === k ? "nein" : ""}" data-act="termin-antwort" data-id="${t.id}" data-a="${k}">${sym} ${txt}</button>`).join("")}</div>${t.pflicht && meine && meine.a === "nein" ? '<p class="hinweis">Pflichttermin: Bitte sprich die Absage mit deiner Shopleitung ab.</p>' : ""}</div>` : ""}
+      ${!t.abgesagt ? `<div class="karte"><h2>Erinnerung</h2><div class="reihe"><select id="tm-erinnern" aria-label="Erinnerung"><option value="15">15 Min. vorher</option><option value="60" selected>1 Std. vorher</option><option value="1440">am Vortag</option><option value="0">ohne Erinnerung</option></select><button class="btn drei" data-act="termin-ics" data-id="${t.id}">📅 In meinen Kalender</button></div><p class="klein muted">Lädt eine Kalender-Datei. Dein Handy-Kalender erinnert dich dann.</p></div>` : ""}
+      <div class="karte"><h2>Antworten</h2><p>✅ ${st.ja.length} · 🤔 ${st.vielleicht.length} · ❌ ${st.nein.length} · ⏳ ${st.offen.length} offen</p>
+        <p class="klein">✅ ${namen(st.ja)}<br>🤔 ${namen(st.vielleicht)}<br>❌ ${namen(st.nein)}${darfTerminAendern(t) ? `<br>⏳ ${namen(st.offen)}` : ""}</p>
+        ${darfTerminAendern(t) && st.offen.length && !t.abgesagt ? `<button class="btn drei" data-act="termin-erinnern" data-id="${t.id}">📣 Offene im Chat erinnern</button>` : ""}</div>
+      ${darfTerminAendern(t) && !t.abgesagt ? `<div class="reihe"><button class="btn drei" data-go="termin-edit" data-arg="${t.id}">✏️ Ändern</button><button class="btn drei" data-act="termin-absagen" data-id="${t.id}">Absagen</button></div>` : ""}`;
+  };
+  let terminEntwurf = null;
+  V["termin-edit"] = () => {
+    const t = arg ? termin(arg) : terminEntwurf;
+    if (!t) return `${titel("Termin", "termine")}<p class="leer">Nicht gefunden.</p>`;
+    const fils = zentrale() ? S.filialen : [FIL()];
+    const leute = S.personen.filter((p) => p.aktiv !== false && p.rolle !== "berater" && (zentrale() || p.stammfiliale === FIL().id));
+    return `${titel(arg ? "Termin ändern" : "Neuer Termin", "termine")}<div class="karte">
+      <div class="feld"><label for="te-titel">Titel</label><input type="text" id="te-titel" maxlength="80" value="${esc(t.titel)}" placeholder="z. B. Teamsitzung"></div>
+      <div class="gitter2"><div class="feld"><label for="te-art">Art</label><select id="te-art">${Object.entries(L.TERMIN_ARTEN).map(([k, x]) => `<option value="${k}" ${t.art === k ? "selected" : ""}>${x.sym} ${x.name}</option>`).join("")}</select></div>
+        <div class="feld"><label for="te-datum">Datum</label><input type="date" id="te-datum" value="${t.datum}"></div></div>
+      <div class="gitter2"><div class="feld"><label for="te-von">Von</label><input type="time" id="te-von" value="${t.von}"></div><div class="feld"><label for="te-bis">Bis</label><input type="time" id="te-bis" value="${t.bis}"></div></div>
+      <div class="feld"><label for="te-ort">Ort</label><input type="text" id="te-ort" maxlength="80" value="${esc(t.ort || "")}"></div>
+      <div class="gitter2"><div class="feld"><label for="te-fil">Filiale</label><select id="te-fil">${zentrale() ? `<option value="" ${!t.filiale ? "selected" : ""}>alle Filialen</option>` : ""}${fils.map((f) => `<option value="${f.id}" ${t.filiale === f.id ? "selected" : ""}>${esc(f.kurz)}</option>`).join("")}</select></div>
+        <div class="feld"><label for="te-fuer">Eingeladen</label><select id="te-fuer"><option value="alle" ${t.fuer === "alle" ? "selected" : ""}>alle im Team</option><option value="leitung" ${t.fuer === "leitung" ? "selected" : ""}>nur Leitung</option><option value="personen" ${t.fuer === "personen" ? "selected" : ""}>bestimmte Personen</option></select></div></div>
+      <details ${t.fuer === "personen" ? "open" : ""}><summary class="klein">Bestimmte Personen auswählen (bei „bestimmte Personen“)</summary><div class="wahl-liste">${leute.map((p) => `<label class="haken"><input type="checkbox" data-te-person="${p.id}" ${(t.personen || []).includes(p.id) ? "checked" : ""}><span>${esc(name(p))}</span></label>`).join("")}</div></details>
+      <label class="haken"><input type="checkbox" id="te-pflicht" ${t.pflicht ? "checked" : ""}><span>Pflichttermin</span></label>
+      <div class="feld"><label for="te-notiz">Notiz / Tagesordnung</label><textarea id="te-notiz" rows="4" maxlength="1000">${esc(t.notiz || "")}</textarea></div>
+      <label class="haken"><input type="checkbox" id="te-chat" ${arg ? "" : "checked"}><span>Im Chat ankündigen</span></label>
+      <button class="btn gross" data-act="termin-speichern" data-id="${arg || ""}">Speichern</button></div>`;
+  };
+  function icsSpeichern(dateiname, text) {
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
+      const a = document.createElement("a"); a.href = url; a.download = dateiname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      meldung("Kalender-Datei gespeichert. Öffnen, dann übernimmt sie dein Kalender.");
+    } catch (e) { meldung("Kalender-Datei geht hier nicht."); }
+  }
+  // Ankündigung im passenden Chat (Filiale oder Leitungsrunde)
+  function chatAnkuendigen(t, text) {
+    L.chatsSicherstellen(S);
+    const c = t.fuer === "leitung" ? S.chats.find((x) => x.art === "leitung") : t.filiale ? S.chats.find((x) => x.art === "filiale" && x.filiale === t.filiale) : null;
+    const ziele = c ? [c] : S.chats.filter((x) => x.art === "filiale");
+    for (const z of ziele) L.nachrichtSenden(S, z.id, ICH().id, text, jetztIso(), () => neueId("nc"));
+  }
   V.export = () => {
     const f = FIL(), monat = arg || heute().slice(0, 7);
     const vor = (() => { const [y, m] = monat.split("-").map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
@@ -1588,7 +1691,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   function gehe(v, a) {
     const ersetzen = fensterImVerlauf || v === ansicht; fensterImVerlauf = false;
-    ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0);
+    ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, v === "chat" ? document.body.scrollHeight : 0);
     try { history[ersetzen ? "replaceState" : "pushState"](null, "", "#" + v); } catch (e) { /* egal */ }
   }
 
@@ -2039,6 +2142,58 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
       const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
       kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
     },
+    "chat-senden": (el) => {
+      const f = $("#ch-text"); const t = f ? f.value : "";
+      if (!t.trim()) return meldung("Bitte erst etwas schreiben.");
+      const n = L.nachrichtSenden(S, el.dataset.id, ICH().id, t, jetztIso(), () => neueId("nc"));
+      if (!n) return meldung("Senden nicht möglich.");
+      speichern(); zeichnen(); window.scrollTo(0, document.body.scrollHeight); const neu = $("#ch-text"); if (neu) neu.focus();
+    },
+    "chat-lese": (el) => {
+      const n = (S.nachrichten || []).find((x) => x.id === el.dataset.id); if (!n) return;
+      const ls = L.lesestand(S, n);
+      fenster = `<div class="reihe zw"><h2>Wer hat gelesen?</h2><button class="chip" data-act="zu">✕</button></div>
+        <p class="klein muted">„${esc(n.text.slice(0, 80))}${n.text.length > 80 ? "…" : ""}“</p>
+        <div class="liste">${ls.gelesen.map((id) => `<div class="zeile"><span class="punkt gruen"></span><span>${esc(name(person(id)))}<small>gelesen ${uhrzeit(n.gelesen[id])}</small></span><span>✓✓</span></div>`).join("")}
+        ${ls.offen.map((id) => `<div class="zeile"><span class="punkt"></span><span>${esc(name(person(id)))}<small>noch nicht gelesen</small></span><span>✓</span></div>`).join("")}</div>`;
+      zeichnen();
+    },
+    "dm-neu": () => {
+      const ich = ICH().id, ids = new Set();
+      for (const c of L.chatsFuer(S, ich)) for (const id of L.chatMitglieder(S, c)) if (id !== ich) ids.add(id);
+      const leute = [...ids].map(person).filter(Boolean).sort((a, b) => name(a).localeCompare(name(b)));
+      fenster = `<div class="reihe zw"><h2>Direktnachricht an …</h2><button class="chip" data-act="zu">✕</button></div>
+        <div class="liste">${leute.map((p) => `<button class="zeile" data-act="dm-start" data-id="${p.id}"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + esc(filiale(p.stammfiliale).kurz) : ""}</small></span><span>›</span></button>`).join("")}</div>`;
+      zeichnen();
+    },
+    "dm-start": (el) => { const c = L.direktChat(S, ICH().id, el.dataset.id, () => neueId("ch")); speichern(); gehe("chat", c.id); },
+    "termin-antwort": (el) => { if (L.terminAntwort(S, el.dataset.id, ICH().id, el.dataset.a, jetztIso())) { speichern(); meldung(ANTW[el.dataset.a][1] + " gespeichert"); zeichnen(); } },
+    "termin-ics": (el) => {
+      const t = termin(el.dataset.id), min = Number(($("#tm-erinnern") || {}).value || 60);
+      icsSpeichern(`termin-${t.datum}.ics`, L.ics([{ uid: t.id, titel: t.titel, datum: t.datum, von: t.von, bis: t.bis, ort: t.ort, notiz: t.notiz }], min));
+    },
+    "termin-neu": () => { terminEntwurf = { titel: "", art: "teamsitzung", datum: L.plusTage(heute(), 7), von: "18:00", bis: "19:00", ort: "", filiale: FIL().id, fuer: "alle", personen: [], pflicht: false, notiz: "" }; gehe("termin-edit"); },
+    "termin-speichern": (el) => {
+      const w = (id) => $(id).value.trim();
+      const daten = { titel: w("#te-titel"), art: w("#te-art"), datum: w("#te-datum"), von: w("#te-von"), bis: w("#te-bis"), ort: w("#te-ort"), filiale: w("#te-fil") || null, fuer: w("#te-fuer"),
+        personen: [...document.querySelectorAll("[data-te-person]")].filter((x) => x.checked).map((x) => x.dataset.tePerson), pflicht: $("#te-pflicht").checked, notiz: w("#te-notiz") };
+      if (!daten.titel || !daten.datum || !daten.von || !daten.bis) return meldung("Bitte Titel, Datum und Uhrzeit angeben.");
+      if (daten.bis <= daten.von) return meldung("„Bis“ muss nach „Von“ liegen.");
+      if (daten.fuer === "personen" && !daten.personen.length) return meldung("Bitte mindestens eine Person auswählen.");
+      let t = el.dataset.id ? termin(el.dataset.id) : null;
+      if (t) Object.assign(t, daten);
+      else { t = { id: neueId("tm"), ...daten, vonId: ICH().id, antworten: {} }; (S.termine = S.termine || []).push(t); }
+      if ($("#te-chat").checked) chatAnkuendigen(t, `📅 ${el.dataset.id ? "Geändert" : "Neuer Termin"}: ${t.titel}, ${datumLang(t.datum)}, ${t.von}–${t.bis}${t.ort ? ", " + t.ort : ""}. Bitte in „Termine“ zu- oder absagen.`);
+      terminEntwurf = null; speichern(); meldung("Termin gespeichert"); gehe("termin", t.id);
+    },
+    "termin-absagen": (el) => { const t = termin(el.dataset.id); t.abgesagt = { am: jetztIso(), von: ICH().id }; chatAnkuendigen(t, `❌ Abgesagt: ${t.titel} am ${datumLang(t.datum)}.`); speichern(); meldung("Termin abgesagt, im Chat angekündigt"); zeichnen(); },
+    "termin-erinnern": (el) => { const t = termin(el.dataset.id), offen = L.terminStand(S, t).offen; chatAnkuendigen(t, `⏳ Bitte noch zu- oder absagen: ${t.titel} am ${datumLang(t.datum)} (offen: ${offen.map((id) => (person(id) || {}).vorname).join(", ")}).`); speichern(); meldung("Im Chat erinnert"); zeichnen(); },
+    "dienst-ics": () => {
+      const p = ICH(), bis = L.plusTage(heute(), 28);
+      const xs = S.plan.filter((s) => s.personId === p.id && s.datum >= heute() && s.datum <= bis).map((s) => { const z = L.planZeit(S, s); return z ? { uid: s.id, titel: `frooters ${filiale(s.filiale).kurz}: ${L.schicht(s.schicht).name}`, datum: s.datum, von: L.minZuZeit(z.start), bis: L.minZuZeit(z.ende), ort: filiale(s.filiale).name } : null; }).filter(Boolean);
+      if (!xs.length) return meldung("In den nächsten 4 Wochen hast du keine Dienste.");
+      icsSpeichern("meine-dienste.ics", L.ics(xs, 60));
+    },
     "export-csv": (el) => {
       const text = exportCsv(el.dataset.monat);
       try {
@@ -2090,6 +2245,7 @@ const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= i
     if (el.dataset.go) { gehe(el.dataset.go, el.dataset.arg); return; }
     const f = AKT[el.dataset.act]; if (f) f(el, ev);
   });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && ev.target && ev.target.id === "ch-text") { ev.preventDefault(); const b = $('[data-act="chat-senden"]'); if (b) AKT["chat-senden"](b); } });
   document.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target && ev.target.id === "ff-frage") { ev.preventDefault(); AKT["ff-fragen"](); } });
   document.addEventListener("keydown", (ev) => { const tr = ev.target.closest && ev.target.closest("tr[data-go]"); if (tr && ev.target === tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); gehe(tr.dataset.go, tr.dataset.arg); } });
   document.addEventListener("change", (ev) => {
