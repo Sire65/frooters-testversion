@@ -1,10 +1,13 @@
 {
-  "version": "0.11.0",
-  "datum": "2026-11-05",
+  "version": "0.12.0",
+  "datum": "2026-11-12",
   "stufe": "DEV",
   "neu": [
-    "Kassendaten einlesen: CSV aus Gastronovi oder einer anderen Kasse, Spalten werden erkannt oder von Hand zugeordnet",
-    "Umsatz & Personal: Ø Umsatz je Stunde (letzte 4 gleiche Wochentage) neben dem Personal laut Plan, Umsatz je Personalstunde",
-    "Monatsübersicht für den Steuerberater: Soll, gestempelt, geplant, Differenz, Abwesenheitstage je Person als CSV"
+    "Bedienkonzept wie in der Club-App: „Meine App“ mit einfacher oder erweiterter Ansicht, großer Schrift, Hell/Dunkel, Kachelgröße",
+    "Kacheln sortieren und ausblenden",
+    "Zurück-Taste des Handys schließt zuerst das Fenster",
+    "Frootie erklärt jeden Bereich beim ersten Öffnen („👍 Verstanden“), Vorlesen 🔊",
+    "Frag Frootie mit Fragen und „👉 Zeig es mir“, Suche 🔍 über Bereiche, Personen, Rezepte, Zettel",
+    "„Was ist neu“ nach einem Update, höchstens ein Info-Fenster pro Öffnen"
   ]
 }

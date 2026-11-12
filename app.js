@@ -1,4 +1,4 @@
-const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.12.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -84,6 +84,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
     offen: "Hier siehst du Krankmeldungen und Schichten, die noch besetzt werden müssen.",
     hygkontrolle: "So steht es heute um die Hygiene in deinem Shop.",
     hygregeln: "Hier legst du fest, welche Regeln in deinem Shop gelten und welche Geräte es gibt. Ohne Eismaschine gibt es auch keine Eismaschinen-Aufgabe.",
+    einstellungen: "Hier stellst du die App für dich ein: einfache oder erweiterte Ansicht, große Schrift, Farben und die Reihenfolge deiner Kacheln. Das gilt nur auf diesem Gerät.",
     umsatz: "Hier siehst du, wann viel verkauft wird, und daneben, wie viele Leute laut Plan da sind. So erkennst du Stunden mit zu wenig oder zu viel Personal.",
     bestellung: "Erst den Bestand zählen, dann schlage ich vor, was fehlt: Soll minus Ist, auf volle Kartons gerundet. Du prüfst und gibst frei, verschickt wird nichts automatisch.",
     artikel: "Hier legt die Zentrale Artikel mit Lieferant, Gebinde und Lagerort an. Das Soll je Filiale stellt die Shopleitung ein.",
@@ -99,10 +100,198 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
     filialen: "Öffnungszeiten, Besetzung und Sortiment je Filiale. Beim mobilen Stand legst du die Einsatztage mit Ort an.",
     berater: "Sie sehen die Hygiene-Dokumentation aller Filialen. Ändern oder abhaken können Sie nichts.",
   };
-  function frootie(text) { return `<div class="frootie"><img src="frootie.svg" alt="Frootie"><div class="blase">${text}</div></div>`; }
+  // Frootie: Erklärung beim ersten Öffnen eines Bereichs („👍 Verstanden“), danach nur noch über ❓ (Einweisung wie in der Club-App)
+  function frootie(text, immer) {
+    const key = !immer && tippSchluessel(text);
+    if (key && meinGeraet().gesehen[key]) return "";
+    return `<div class="frootie"><img src="frootie.svg" alt="Frootie"><div class="blase">${text}${kannVorlesen() || key ? `<span class="blase-knoepfe">${kannVorlesen() ? `<button class="chip" data-act="vorlesen" data-text="${esc(String(text).replace(/<[^>]+>/g, ""))}" aria-label="Vorlesen">🔊</button>` : ""}${key ? `<button class="chip" data-act="einw-ok" data-k="${key}">👍 Verstanden</button>` : ""}</span>` : ""}</div></div>`;
+  }
 
   // ---------- Ansichten ----------
   const V = {};
+  // ---------- Bedienkonzept wie in der Club-App (0.12.0) ----------
+  // Geräte-Einstellungen: bleiben auf diesem Gerät (Ansicht, Schrift, Design, Kacheln, gesehene Einweisungen)
+  let geraet = {};
+  try { geraet = JSON.parse(localStorage.getItem("frooters_geraet") || "{}"); } catch (e) { geraet = {}; }
+  const geraetMerken = () => { try { localStorage.setItem("frooters_geraet", JSON.stringify(geraet)); } catch (e) { /* nur Komfort */ } };
+  const meinGeraet = () => { const id = sitzung.ich || "_"; geraet.p = geraet.p || {}; return (geraet.p[id] = geraet.p[id] || { kacheln: { folge: [], aus: [] }, gesehen: {} }); };
+  const einfach = () => (geraet.ansicht || "erweitert") === "einfach";
+  function geraetAnwenden() {
+    const h = document.documentElement;
+    if (geraet.design === "hell") h.setAttribute("data-theme", "light"); else if (geraet.design === "dunkel") h.setAttribute("data-theme", "dark"); else h.removeAttribute("data-theme");
+    h.classList.toggle("gross", geraet.schrift === "gross");
+    h.classList.toggle("kachel-klein", geraet.kachel === "klein");
+  }
+  geraetAnwenden();
+  // In der einfachen Ansicht nur das Nötigste (wie „Einfach“ in der Club-App)
+  const EINFACH_KACHELN = ["dienst", "stechuhr", "abwesenheit", "tausch", "hygiene", "rezepte", "pinnwand", "nachrichten", "termine", "plan", "offen", "antraege", "bestellung", "ma", "freigaben", "rezeptpflege", "hilfe", "einstellungen"];
+  // Startseite nach Wunsch: eigene Reihenfolge, ausgeblendete Kacheln, einfache Ansicht
+  function startAnpassen(html) {
+    const t = document.createElement("template"); t.innerHTML = html;
+    const k = meinGeraet().kacheln, folge = k.folge || [], aus = new Set(k.aus || []);
+    for (const gruppe of t.content.querySelectorAll(".kacheln")) {
+      const ks = [...gruppe.children];
+      ks.sort((a, b) => { const ia = folge.indexOf(a.dataset.go), ib = folge.indexOf(b.dataset.go); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
+      for (const x of ks) { if (aus.has(x.dataset.go) || (einfach() && !EINFACH_KACHELN.includes(x.dataset.go))) x.remove(); else gruppe.appendChild(x); }
+      if (!gruppe.children.length) { const ab = gruppe.closest(".abschnitt"); if (ab) ab.remove(); }
+    }
+    return t.innerHTML;
+  }
+  // Rechte je Ansicht an einer Stelle (für Zeichnen, Suche und „Zeig es mir“)
+  function erlaubteAnsicht(v) {
+    let r = V[v] ? v : "start";
+    const nurLeitung = ["umsatz", "kasse-import", "bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
+    const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
+    if (r !== "login" && !ICH()) return "login";
+    if (["buero", "ordner", "studio", "druck-edit"].includes(r) && !bueroOrdner().length) r = "start";
+    if (nurLeitung.includes(r) && !leitung()) r = "start";
+    if (r === "hygkontrolle" && !(leitung() || uebergreifend())) r = "start";
+    if (nurZentrale.includes(r) && !zentrale()) r = "start";
+    if (["ma", "ma-edit", "ma-import"].includes(r) && !(zentrale() || leitung())) r = "start";
+    if (["regeln", "regel-edit"].includes(r) && !qualitaet()) r = "start";
+    if (["rezeptpflege", "rezept-edit", "zutaten", "zutat-edit", "freigaben"].includes(r) && !rezeptRecht()) r = "start";
+    if (berater() && ["quiz", "pinnwand", "nachrichten", "chat"].includes(r)) r = "start";
+    if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(r)) r = "start";
+    return r;
+  }
+  // Einweisung: Frootie erklärt einen Bereich beim ersten Öffnen, danach nur noch über ❓
+  const tippSchluessel = (text) => Object.keys(FROOTIE_TIPPS).find((k) => FROOTIE_TIPPS[k] === text);
+  const kannVorlesen = () => { try { return "speechSynthesis" in window && typeof SpeechSynthesisUtterance === "function"; } catch (e) { return false; } };
+  function vorlesen(text) {
+    if (!kannVorlesen()) return meldung("Vorlesen kann dieses Gerät nicht.");
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
+  }
+  // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
+  const WAS_NEU = { text: "Neu wie in der Club-App: Einstellungen „Meine App“ (große Schrift, einfache Ansicht, Kacheln sortieren), Suche 🔍 und „Frag Frootie“.", go: "einstellungen" };
+  function wasNeuPruefen() {
+    if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
+    geraet.wasNeu = APP_VERSION; geraetMerken();
+    if (!geraet.ersterStart) { geraet.ersterStart = heute(); geraetMerken(); return; }
+    fenster = `<div class="reihe zw"><h2>✨ Neu in ${APP_VERSION}</h2><button class="chip" data-act="zu" aria-label="Schließen">✕</button></div>${frootie(WAS_NEU.text, true)}
+      <div class="reihe"><button class="btn" data-go="${WAS_NEU.go}">Ansehen</button><button class="btn drei" data-act="zu">Später</button></div>`;
+  }
+  // Zähler am App-Symbol (wo das Handy es kann)
+  function appZaehler() {
+    try {
+      if (!ICH() || !("setAppBadge" in navigator)) return;
+      const n = L.pinUngelesen(S, ICH(), heute()).length + (typeof chatUngelesenGesamt === "function" ? chatUngelesenGesamt() : 0);
+      if (n) navigator.setAppBadge(n); else navigator.clearAppBadge();
+    } catch (e) { /* nicht wichtig */ }
+  }
+  // Zurück-Taste des Handys: zuerst das Fenster schließen, dann eine Seite zurück (wie in der Club-App)
+  let fensterImVerlauf = false, popIgnorieren = false;
+  function verlaufFenster() {
+    try {
+      if (fenster && !fensterImVerlauf) { history.pushState({ fenster: 1 }, "", location.hash || "#" + ansicht); fensterImVerlauf = true; }
+      else if (!fenster && fensterImVerlauf) { fensterImVerlauf = false; popIgnorieren = true; history.back(); }
+    } catch (e) { /* ohne Verlauf geht es auch */ }
+  }
+  window.addEventListener("popstate", () => {
+    if (popIgnorieren) { popIgnorieren = false; return; }
+    if (fensterImVerlauf || fenster) { fensterImVerlauf = false; fenster = null; zeichnen(); return; }
+    const v = (location.hash || "").slice(1).split("?")[0] || "start";
+    ansicht = V[v] ? v : "start"; arg = null; zeichnen(); window.scrollTo(0, 0);
+  });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && fenster) { fenster = null; zeichnen(); } });
+
+  // ----- Meine App (Einstellungen auf diesem Gerät) -----
+  V.einstellungen = () => {
+    const wahl = (k, opts, std) => `<div class="wahl">${opts.map(([v, t]) => `<button class="${(geraet[k] || std) === v ? "an" : ""}" data-act="geraet" data-k="${k}" data-v="${v}">${t}</button>`).join("")}</div>`;
+    return `${titel("Meine App")}${frootie(FROOTIE_TIPPS.einstellungen)}
+      <div class="karte"><h2>Ansicht</h2>${wahl("ansicht", [["einfach", "🙂 Einfach"], ["erweitert", "🧭 Erweitert"]], "erweitert")}
+        <p class="klein muted">„Einfach“ zeigt nur die wichtigsten Kacheln. Alles andere bleibt über die Suche 🔍 erreichbar.</p></div>
+      <div class="karte"><h2>Schrift</h2>${wahl("schrift", [["normal", "Normal"], ["gross", "Groß"]], "normal")}</div>
+      <div class="karte"><h2>Farben</h2>${wahl("design", [["auto", "Wie das Handy"], ["hell", "☀️ Hell"], ["dunkel", "🌙 Dunkel"]], "auto")}</div>
+      <div class="karte"><h2>Kacheln</h2>${wahl("kachel", [["normal", "Normal"], ["klein", "Klein"]], "normal")}
+        <button class="btn drei" data-go="kacheln">↕️ Kacheln sortieren und ausblenden</button></div>
+      <div class="karte"><h2>Erklärungen</h2><p class="klein muted">Frootie erklärt jeden Bereich beim ersten Öffnen. Danach hilft ❓ oben rechts.</p>
+        <button class="btn drei" data-act="einw-reset">🍓 Alle Erklärungen wieder zeigen</button>${kannVorlesen() ? ' <button class="btn drei" data-act="vorlesen" data-text="So klingt das Vorlesen in der frooters Team-App.">🔊 Vorlesen testen</button>' : ""}</div>
+      <p class="klein muted">Diese Einstellungen gelten nur auf diesem Gerät${ICH() ? ` und für ${esc(ICH().vorname)}` : ""}.</p>`;
+  };
+  V.kacheln = () => {
+    const t = document.createElement("template"); t.innerHTML = V.start();
+    const k = meinGeraet().kacheln, aus = new Set(k.aus || []), folge = k.folge || [];
+    const gruppen = [...t.content.querySelectorAll(".abschnitt")].map((ab) => ({ t: ab.querySelector("h2").textContent, ks: [...ab.querySelectorAll(".kachel")].map((x) => ({ go: x.dataset.go, sym: x.querySelector(".sym").textContent, name: x.querySelector("b").textContent })) })).filter((g) => g.ks.length);
+    for (const g of gruppen) g.ks.sort((a, b) => { const ia = folge.indexOf(a.go), ib = folge.indexOf(b.go); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
+    return `${titel("Kacheln anpassen", "einstellungen")}<p class="klein muted">Mit ↑ ↓ die Reihenfolge ändern, mit dem Auge aus- oder einblenden. Ausgeblendetes bleibt über die Suche 🔍 erreichbar.</p>
+      ${gruppen.map((g) => `<div class="abschnitt"><h2>${esc(g.t)}</h2><div class="liste">${g.ks.map((x, i) => `<div class="zeile ${aus.has(x.go) ? "aus" : ""}"><span style="font-size:1.4rem">${esc(x.sym)}</span><span><b>${esc(x.name)}</b>${aus.has(x.go) ? "<small>ausgeblendet</small>" : ""}</span>
+        <span class="reihe"><button class="chip" data-act="kachel-schieben" data-go2="${x.go}" data-gruppe="${g.ks.map((y) => y.go).join(",")}" data-r="-1" ${i === 0 ? "disabled" : ""} aria-label="nach oben">↑</button><button class="chip" data-act="kachel-schieben" data-go2="${x.go}" data-gruppe="${g.ks.map((y) => y.go).join(",")}" data-r="1" ${i === g.ks.length - 1 ? "disabled" : ""} aria-label="nach unten">↓</button><button class="chip" data-act="kachel-aus" data-go2="${x.go}" aria-label="${aus.has(x.go) ? "einblenden" : "ausblenden"}">${aus.has(x.go) ? "🙈" : "👁️"}</button></span></div>`).join("")}</div></div>`).join("")}
+      <button class="btn drei" data-act="kacheln-reset">Wie am Anfang</button>`;
+  };
+
+  // ----- Frag Frootie (Hilfe-Zentrum ohne KI und ohne Server, wie „Frag Twinkey“) -----
+  const FAQ = [
+    ["Wie melde ich mich krank?", "abwesenheit", "Kachel „Abwesenheit“, Art „Krankmeldung“ wählen, Tage eintragen, senden. Die Shopleitung sieht es sofort."],
+    ["Wie beantrage ich Urlaub?", "abwesenheit", "Kachel „Abwesenheit“, Art „Urlaub“. Du siehst gleich, wie viele Tage danach übrig sind."],
+    ["Wie viel Urlaub habe ich noch?", "abwesenheit", "In „Abwesenheit“ steht dein Urlaubskonto: Anspruch, genommen, geplant, Rest."],
+    ["Wie stemple ich ein?", "stechuhr", "Kachel „Stechuhr“: Kommen, Pause, Gehen. Vergessen? Die Shopleitung kann korrigieren."],
+    ["Wie tausche ich eine Schicht?", "tausch", "In der Tauschbörse deine Schicht oder ein paar Stunden anbieten. Wer übernimmt, braucht noch das OK der Shopleitung."],
+    ["Wann habe ich Dienst?", "dienst", "Kachel „Mein Dienstplan“. Dort kannst du Dienste auch in deinen Handy-Kalender übernehmen."],
+    ["Wie gebe ich Dienstwünsche ab?", "wuensche", "Kachel „Dienstwünsche“: je Tag möchte, kann oder kann nicht."],
+    ["Was muss ich heute bei der Hygiene machen?", "hygiene", "„Hygiene heute“ zeigt alle Aufgaben mit Uhrzeit. Messwerte eintragen und abhaken."],
+    ["Welche Allergene sind drin?", "rezepte", "In jedem Rezept stehen Allergene und Spuren. Sie kommen aus den Zutaten."],
+    ["Wie lerne ich die Rezepte?", "quiz", "Mit dem Rezept-Quiz: 10 Fragen, gemischt."],
+    ["Wer hat meinen Zettel gelesen?", "pinnwand", "Auf der Pinnwand an deinem Zettel: „gelesen von …“ und wer noch fehlt."],
+    ["Wie schreibe ich dem Team?", "nachrichten", "In „Nachrichten“ gibt es den Chat deiner Filiale, die Leitung und Direktnachrichten."],
+    ["Wann ist die nächste Teamsitzung?", "termine", "In „Termine“ stehen Teamsitzungen, Schulungen und Inventuren. Zusagen mit einem Tipp."],
+    ["Wie plane ich die Woche?", "plan", "Im Einsatzplan „Vorschlag“ tippen, prüfen, Lücken von Hand füllen, dann veröffentlichen."],
+    ["Warum ist eine Zeit rot?", "besetzung", "Rot heißt: zu wenig Leute oder es fehlt die Leitung. Die Liste darunter sagt den Grund."],
+    ["Wie bestelle ich Ware?", "bestellung", "Erst „Bestand aufnehmen“, dann prüft die App Soll minus Ist. Mengen anpassen und freigeben."],
+    ["Wie drucke ich eine Preisliste?", "studio", "Büro, Ordner „Grafik & Druck“, Vorlage „Preisliste“. Drucken oder als PDF speichern."],
+    ["Wie ändere ich ein Allergen?", "zutaten", "Unter „Rezepte pflegen“ die Zutat öffnen. Die Änderung gilt nach der Freigabe durch eine zweite Person."],
+    ["Wie lege ich einen Mitarbeiter an?", "ma", "Kachel „Mitarbeiter“, „+ Mitarbeiter anlegen“ oder aus Excel einlesen."],
+    ["Wie wird die Schrift größer?", "einstellungen", "In „Meine App“ Schrift „Groß“ wählen."],
+    ["Wie sortiere ich meine Kacheln?", "kacheln", "In „Meine App“ → „Kacheln sortieren und ausblenden“."],
+  ];
+  const FROOTIE_SYN = { krank: "krankmeldung abwesenheit", krankmeldung: "abwesenheit", urlaub: "abwesenheit urlaubskonto", frei: "urlaub abwesenheit", schicht: "dienst dienstplan", dienste: "dienst", arbeitszeit: "dienst stechuhr", stempeln: "stechuhr einstempeln", einstempeln: "stechuhr", ausstempeln: "stechuhr", pause: "stechuhr", tauschen: "tausch tauschbörse", tausch: "tauschbörse", temperatur: "hygiene", putzen: "hygiene reinigen", reinigung: "hygiene", allergie: "allergene", allergen: "allergene", zutat: "zutaten allergene", rezept: "rezepte", quiz: "rezepte lernen", zettel: "pinnwand", chat: "nachrichten", schreiben: "nachrichten", nachricht: "nachrichten", treffen: "termine", sitzung: "termine teamsitzung", schulung: "termine", plan: "einsatzplan dienstplan", ware: "bestellung", bestellen: "bestellung", lager: "bestand bestellung", inventur: "bestand bestellung", drucken: "preisliste druck büro", schild: "druck büro", schrift: "einstellungen groß", kacheln: "einstellungen sortieren", dunkel: "einstellungen farben" };
+  const normWort = (w) => w.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, "");
+  const woerter = (t) => String(t || "").split(/[\s,.;:!?„“"()/–-]+/).map(normWort).filter((w) => w.length > 2 && !["wie", "ich", "der", "die", "das", "und", "ein", "eine", "mein", "meine", "was", "wer", "wo", "wann", "kann", "mit", "fuer", "ist", "den", "dem"].includes(w));
+  // Tippfehler verzeihen: gleicher Wortanfang oder höchstens ein Buchstabe anders (wie die Suche der Club-App)
+  function abstand(a, b) { if (Math.abs(a.length - b.length) > 1) return 2; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+  function aehnlich(a, b) {
+    if (a === b) return true;
+    if (a.length > 4 && b.length > 4 && (a.startsWith(b.slice(0, 5)) || b.startsWith(a.slice(0, 5)))) return true;
+    if (a.length >= 4 && b.length >= 4) { const k = Math.min(a.length, b.length); if (abstand(a, b) <= 1 || abstand(a, b.slice(0, a.length)) <= 1 || abstand(a, b.slice(0, a.length + 1)) <= 1 || abstand(b, a.slice(0, k)) <= 1 && k === b.length && b.length >= 5) return true; }
+    return false;
+  }
+  function frootieSuchen(frage) {
+    let ws = woerter(frage); ws = [...ws, ...ws.flatMap((w) => woerter(FROOTIE_SYN[w] || ""))];
+    if (!ws.length) return [];
+    const quellen = [...FAQ.map(([f, go, a]) => ({ f, go, a })), ...Object.entries(FROOTIE_TIPPS).filter(([k]) => V[k]).map(([go, a]) => ({ f: ({ einstellungen: "Meine App" }[go]) || go, go, a }))];
+    return quellen.map((q) => { const qw = woerter(q.f + " " + q.a + " " + q.go); const p = ws.reduce((n, w) => n + (qw.some((x) => aehnlich(x, w)) ? 1 : 0), 0); return { ...q, p }; })
+      .filter((q) => q.p > 0 && erlaubteAnsicht(q.go) === q.go).sort((a, b) => b.p - a.p).filter((q, i, arr) => arr.findIndex((x) => x.go === q.go && x.f === q.f) === i).slice(0, 4);
+  }
+  let frootieFrage = "";
+  V.hilfe = () => {
+    const r = frootieFrage ? frootieSuchen(frootieFrage) : [];
+    return `${titel("Frag Frootie")}${frootie("Frag mich einfach, zum Beispiel: „Wie melde ich mich krank?“ oder „Wie tausche ich eine Schicht?“", true)}
+      <div class="karte"><div class="feld"><label for="ff-frage">Deine Frage</label><input type="search" id="ff-frage" value="${esc(frootieFrage)}" placeholder="z. B. Wie viel Urlaub habe ich noch?" enterkeyhint="search"></div>
+        <button class="btn" data-act="ff-fragen">Frootie fragen</button></div>
+      ${frootieFrage ? (r.length ? r.map((x) => `<div class="karte"><b>${esc(/\?$/.test(x.f) ? x.f : "Zu „" + ((filterKachelName(x.go)) || x.go) + "“")}</b><p>${esc(x.a)}</p><div class="reihe"><button class="btn zwei" data-go="${x.go}">👉 Zeig es mir</button>${kannVorlesen() ? `<button class="chip" data-act="vorlesen" data-text="${esc(x.a)}">🔊</button>` : ""}</div></div>`).join("") : `<p class="hinweis">Dazu weiß ich noch nichts. Frag deine Shopleitung, oder schau unten in die Liste.</p>`) : ""}
+      <div class="abschnitt"><h2>Häufige Fragen</h2><div class="liste">${FAQ.filter(([, go]) => erlaubteAnsicht(go) === go).map(([f, go]) => `<button class="zeile" data-act="ff-faq" data-f="${esc(f)}"><span>❓</span><span>${esc(f)}</span><span>›</span></button>`).join("")}</div></div>`;
+  };
+  function filterKachelName(go) { const t = document.createElement("template"); t.innerHTML = V.start(); const k = t.content.querySelector(`.kachel[data-go="${go}"] b`); return k ? k.textContent : ""; }
+
+  // ----- Suche über alles (Lupe im Kopf) -----
+  let suchText = "";
+  function suchErgebnisse(q) {
+    const n = normWort(q); if (n.length < 2) return [];
+    const passt = (t) => normWort(t).includes(n) || woerter(t).some((w) => aehnlich(w, n));
+    const r = [];
+    const t = document.createElement("template"); t.innerHTML = V.start();
+    for (const k of t.content.querySelectorAll(".kachel")) if (passt(k.querySelector("b").textContent + " " + k.querySelector("span:not(.sym)").textContent)) r.push({ sym: k.querySelector(".sym").textContent, t: k.querySelector("b").textContent, u: "Bereich", go: k.dataset.go });
+    for (const p of S.personen) if (p.aktiv !== false && passt(name(p))) { const darf = erlaubteAnsicht("ma-edit") === "ma-edit" && (zentrale() || p.stammfiliale === FIL().id); r.push({ sym: "👤", t: name(p), u: `${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + filiale(p.stammfiliale).kurz : ""}`, go: darf ? "ma-edit" : "", arg: p.id }); }
+    for (const x of L.rezepteFreigegeben(S)) if (passt(x.name + " " + x.beschreibung)) r.push({ sym: "📖", t: x.name, u: "Rezept", go: "rezept", arg: x.id });
+    if (rezeptRecht()) for (const z of S.rezepte.zutaten) if (passt(z.name)) r.push({ sym: "🧾", t: z.name, u: "Zutat", go: "zutat-edit", arg: z.id });
+    if (zentrale()) for (const a of L.waren(S).artikel) if (passt(a.name)) r.push({ sym: "🏷️", t: a.name, u: "Artikel", go: "artikel-edit", arg: a.id });
+    if (!berater()) for (const z of S.pinnwand) if (L.pinSichtbar(S, z, ICH(), heute()) && passt(z.text)) r.push({ sym: "📌", t: z.text.slice(0, 60) + (z.text.length > 60 ? "…" : ""), u: "Pinnwand", go: "pinnwand" });
+    if (typeof termineSichtbar === "function") for (const x of termineSichtbar()) if (passt(x.titel + " " + (x.ort || ""))) r.push({ sym: "📅", t: x.titel, u: `Termin ${L.datumKurz(x.datum)}`, go: "termin", arg: x.id });
+    for (const [f, go] of FAQ) if (erlaubteAnsicht(go) === go && passt(f)) r.push({ sym: "❓", t: f, u: "Frag Frootie", go: "hilfe", act: f });
+    return r.slice(0, 30);
+  }
+  const suchListe = (q) => { const r = suchErgebnisse(q); return q.trim().length < 2 ? '<p class="klein muted">Mindestens 2 Buchstaben.</p>' : r.length ? `<div class="liste">${r.map((x) => x.act ? `<button class="zeile" data-act="ff-faq" data-f="${esc(x.act)}"><span>${x.sym}</span><span><b>${esc(x.t)}</b><small>${esc(x.u)}</small></span><span>›</span></button>` : x.go ? `<button class="zeile" data-go="${x.go}"${x.arg ? ` data-arg="${esc(x.arg)}"` : ""}><span>${x.sym}</span><span><b>${esc(x.t)}</b><small>${esc(x.u)}</small></span><span>›</span></button>` : `<div class="zeile"><span>${x.sym}</span><span><b>${esc(x.t)}</b><small>${esc(x.u)}</small></span><span></span></div>`).join("")}</div>` : `<p class="leer">Nichts gefunden zu „${esc(q)}“.</p>`; };
+  V.suche = () => `${titel("Suchen")}<div class="karte"><div class="feld"><label for="su-text">Suchen nach Bereich, Person, Rezept, Zettel …</label><input type="search" id="su-text" data-suche value="${esc(suchText)}" placeholder="z. B. Urlaub, Lena, Mango" autocomplete="off" enterkeyhint="search"></div></div><div id="su-liste">${suchText ? suchListe(suchText) : ""}</div>`;
+  document.addEventListener("input", (ev) => { if (ev.target.dataset && ev.target.dataset.suche != null) { suchText = ev.target.value; const l = $("#su-liste"); if (l) l.innerHTML = suchText ? suchListe(suchText) : ""; } });
   let ansicht = "start", arg = null, fenster = null, quizStand = null, hygFilter = "alle", rezeptGruppe = "alle", rezeptGroesse = {};
 
   function kopf() {
@@ -112,6 +301,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
     return `<header class="kopf">
       <button class="marke" data-go="start" aria-label="Startseite"><span class="logo-plate"><img class="logo" src="logo.svg" alt="frooters"></span><span class="team">Team</span></button>
       <div class="rechts">${p ? `<button class="chip fil" ${mehr ? 'data-act="filiale-wahl"' : "disabled"} aria-label="Filiale wechseln">📍 ${esc(fil.kurz)}${mehr ? " ▾" : ""}</button>
+      <button class="chip" data-go="suche" aria-label="Suchen">🔍</button>
       <button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>` : ""}</div></header>
       <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser · Pilot: Ochtrup</div>`;
   }
@@ -208,7 +398,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
       </div></div>`;
     }
     if (berater()) k += `<div class="abschnitt"><h2>Büro</h2><div class="kacheln">${kachel("🗂️", "Büro", "Hygiene-Dokumentation", "buero")}</div></div>`;
-    k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Hilfe zu allen Bereichen", "hilfe")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
+    k += `<div class="abschnitt"><h2>Hilfe</h2><div class="kacheln">${kachel("🍓", "Frag Frootie", "Fragen und Antworten", "hilfe")}${kachel("⚙️", "Meine App", "Schrift, Ansicht, Kacheln", "einstellungen")}${kachel("🔄", "Version", "v" + APP_VERSION, "info")}</div></div>`;
     const heuteKarte = uebergreifend() ? (berater() ? frootie(FROOTIE_TIPPS.berater) : "") : `<div class="karte"><div class="reihe zw"><h2>Heute</h2><span class="muted klein">${datumLang(d)}</span></div>
       ${krank ? `<p class="hinweis">${L.abwArt(krank.art).sym} Du bist bis ${L.datumKurz(krank.bis)} abwesend: ${esc(L.abwArt(krank.art).name)}.</p>` : ""}
       ${meine.length ? meine.map((s) => `<p>🗓️ <b>${planTxt(s)}</b> in ${esc(filiale(s.filiale).kurz)}${ortTxt(filiale(s.filiale), d)}</p>`).join("") : '<p class="muted">Heute hast du keinen Dienst.</p>'}
@@ -218,7 +408,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
     const erinnernKarte = pinErinnern.length ? `<div class="hinweis">📌 Dein Zettel „${esc(pinErinnern[0].text.slice(0, 50))}${pinErinnern[0].text.length > 50 ? "…" : ""}“ hängt seit ${Math.round((L.ausIso(d) - L.ausIso(pinErinnern[0].zeit.slice(0, 10))) / 864e5)} Tagen. <button class="chip" data-act="pin-abnehmen" data-id="${pinErinnern[0].id}">abnehmen</button> <button class="chip" data-act="pin-haengen" data-id="${pinErinnern[0].id}">hängen lassen</button></div>` : "";
     const qa = (leitung() || zentrale()) ? L.qualiAblauf({ personen: maSichtbar() }, d, 30) : [];
     const qualiHinweis = qa.length ? `<button class="hinweis zeile-hinweis" data-go="ma">🎓 ${qa.length} Qualifikation${qa.length > 1 ? "en" : ""} ${qa.some((x) => x.abgelaufen) ? "abgelaufen oder bald fällig" : "bald fällig"}: ${qa.slice(0, 3).map((x) => `${esc(x.person.vorname)} (${esc(x.name)})`).join(", ")}${qa.length > 3 ? " …" : ""} ›</button>` : "";
-    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${pin.wichtig ? "❗ " : ""}${esc(pin.text)}` : FROOTIE_TIPPS.start}`)}${erinnernKarte}${qualiHinweis}${heuteKarte}${k}`;
+    return `${frootie(`Hallo ${esc(p.vorname)}! ${pin ? `📌 ${pin.wichtig ? "❗ " : ""}${esc(pin.text)}` : FROOTIE_TIPPS.start.replace(/^Hallo! /, "")}`)}${erinnernKarte}${qualiHinweis}${heuteKarte}${k}`;
   };
 
   // ----- Mitarbeiter -----
@@ -457,7 +647,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
         ${sp.length ? `<p class="klein">Kann Spuren enthalten von: <b>${sp.map(esc).join(", ")}</b></p>` : ""}
         ${!al.includes("Gluten") && !sp.includes("Gluten") ? '<span class="marke-s gruen">ohne glutenhaltige Zutaten</span>' : ""}
         <p class="klein muted">Fassung ${r.fassung || 1}${r.freigabe ? ` · ${freigabeTxt(r)}` : ""}</p></div>
-      <div class="karte"><h2>Zubereitung</h2><ol class="schritte">${r.schritte.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+      <div class="karte"><div class="reihe zw"><h2>Zubereitung</h2>${kannVorlesen() ? `<button class="chip" data-act="vorlesen" data-text="${esc(r.name + ". " + r.schritte.map((x, i) => `Schritt ${i + 1}: ${x}`).join(". "))}">🔊 Vorlesen</button>` : ""}</div><ol class="schritte">${r.schritte.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
         ${r.standzeit ? `<p class="hinweis">⏳ Standzeit: ${esc(r.standzeit)}</p>` : ""}
         <p class="klein muted">🎬 Arbeitsvideo folgt.</p></div>`;
   };
@@ -1381,47 +1571,50 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
         <button class="btn gross" data-act="regel-speichern" data-id="${r.id}">Speichern</button></div>`;
   };
 
-  V.hilfe = () => `${titel("Frag Frootie")}${frootie("Hier findest du zu jedem Bereich eine kurze Erklärung. Videoanleitungen zu allen Funktionen kommen mit der nächsten Version.")}
-    <div class="liste">${[["dienst", "🗓️ Mein Dienstplan"], ["wuensche", "📝 Dienstwünsche"], ["abwesenheit", "🏖️ Abwesenheit und Urlaubskonto"], ["stechuhr", "⏱️ Stechuhr"], ["hygiene", "🧼 Hygiene"], ["rezepte", "📖 Rezepte"], ["quiz", "🎯 Quiz"], ["plan", "📅 Einsatzplan (Leitung)"], ["hygregeln", "⚙️ Regeln & Geräte (Leitung)"], ["ma", "👤 Mitarbeiter und Springer (Zentrale)"]]
-      .map(([k, t]) => `<div class="karte"><b>${t}</b><p class="muted">${FROOTIE_TIPPS[k]}</p><p class="klein muted">🎬 Video folgt</p></div>`).join("")}</div>`;
   V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
 
   let updateBand = "", wartend = null, letzteBreit = null, resizeTimer = null;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (breit() !== letzteBreit) zeichnen(); }, 150); });
   // ---------- Zeichnen ----------
   function zeichnen() {
-    if (!ICH()) ansicht = "login";
-    let rechte = ansicht;
-    const nurLeitung = ["umsatz", "kasse-import", "bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
-    const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
-    const nurQualitaet = ["regeln", "regel-edit"];
-    if (["buero", "ordner", "studio", "druck-edit"].includes(rechte) && !bueroOrdner().length) rechte = "start";
-    if (nurLeitung.includes(rechte) && !leitung()) rechte = "start";
-    if (rechte === "hygkontrolle" && !(leitung() || uebergreifend())) rechte = "start";
-    if (nurZentrale.includes(rechte) && !zentrale()) rechte = "start";
-    if (["ma", "ma-edit", "ma-import"].includes(rechte) && !(zentrale() || leitung())) rechte = "start";
-    if (nurQualitaet.includes(rechte) && !qualitaet()) rechte = "start";
-    if (["rezeptpflege", "rezept-edit", "zutaten", "zutat-edit", "freigaben"].includes(rechte) && !rezeptRecht()) rechte = "start";
-    if (berater() && ["quiz", "pinnwand"].includes(rechte)) rechte = "start";
-    if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(rechte)) rechte = "start";
-    ansicht = rechte;
-    const inhalt = (V[ansicht] || V.start)();
+    ansicht = erlaubteAnsicht(ansicht);
+    let inhalt = (V[ansicht] || V.start)();
+    if (ansicht === "start") inhalt = startAnpassen(inhalt);
     const pc = breit(); letzteBreit = pc;
     document.body.classList.toggle("pc", pc);
     $("#app").innerHTML = `${updateBand}${kopf()}${pc ? `<div class="pc-rahmen">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
     einpassen($("#app"));
+    verlaufFenster(); appZaehler();
   }
-  function gehe(v, a) { ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0); try { history.replaceState(null, "", "#" + v); } catch (e) { /* egal */ } }
+  function gehe(v, a) {
+    const ersetzen = fensterImVerlauf || v === ansicht; fensterImVerlauf = false;
+    ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, 0);
+    try { history[ersetzen ? "replaceState" : "pushState"](null, "", "#" + v); } catch (e) { /* egal */ }
+  }
 
   // ---------- Aktionen ----------
   const AKT = {
-    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); pinNeuFenster(); if (fenster) zeichnen(); },
+    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); pinNeuFenster(); wasNeuPruefen(); if (fenster) zeichnen(); },
     reset: () => { A.zuruecksetzen(); S = D.demoDaten(heute()); A.speichern(S); meldung("Beispieldaten neu geladen"); gehe("login"); },
     "filiale-wahl": () => { fenster = `<h2>Filiale wählen</h2><div class="liste">${meineFilialen().map((f) => `<button class="zeile" data-act="filiale" data-id="${f.id}"><span class="punkt ${f.id === FIL().id ? "gruen" : ""}"></span><span>${esc(f.name)}${ICH().stammfiliale && f.id !== ICH().stammfiliale ? "<small>als Springer</small>" : ""}</span><span>›</span></button>`).join("")}</div>`; zeichnen(); },
     filiale: (el) => { sitzung.filiale = el.dataset.id; merke(); fenster = null; zeichnen(); },
     zu: () => { fenster = null; zeichnen(); },
     "zu-hg": (el, ev) => { if (ev.target === el) { fenster = null; zeichnen(); } },
-    hilfe: () => { fenster = `${frootie(FROOTIE_TIPPS[ansicht] || FROOTIE_TIPPS.start)}<button class="btn" data-act="zu">Danke, Frootie!</button>`; zeichnen(); },
+    hilfe: () => { fenster = `${frootie(FROOTIE_TIPPS[ansicht] || FROOTIE_TIPPS.start, true)}<div class="reihe"><button class="btn" data-act="zu">Danke, Frootie!</button><button class="btn drei" data-go="hilfe">Frag Frootie</button></div>`; zeichnen(); },
+    geraet: (el) => { geraet[el.dataset.k] = el.dataset.v; geraetMerken(); geraetAnwenden(); meldung("Gespeichert"); zeichnen(); },
+    "einw-ok": (el) => { meinGeraet().gesehen[el.dataset.k] = true; geraetMerken(); zeichnen(); },
+    "einw-reset": () => { meinGeraet().gesehen = {}; geraetMerken(); meldung("Frootie erklärt alles wieder beim ersten Öffnen."); zeichnen(); },
+    vorlesen: (el) => vorlesen(el.dataset.text || ""),
+    "kachel-schieben": (el) => {
+      const k = meinGeraet().kacheln, g = el.dataset.gruppe.split(","), i = g.indexOf(el.dataset.go2), j = i + Number(el.dataset.r);
+      if (j < 0 || j >= g.length) return;
+      [g[i], g[j]] = [g[j], g[i]];
+      k.folge = [...(k.folge || []).filter((x) => !g.includes(x)), ...g]; geraetMerken(); zeichnen();
+    },
+    "kachel-aus": (el) => { const k = meinGeraet().kacheln, a = new Set(k.aus || []); if (a.has(el.dataset.go2)) a.delete(el.dataset.go2); else a.add(el.dataset.go2); k.aus = [...a]; geraetMerken(); zeichnen(); },
+    "kacheln-reset": () => { meinGeraet().kacheln = { folge: [], aus: [] }; geraetMerken(); meldung("Kacheln wie am Anfang"); zeichnen(); },
+    "ff-fragen": () => { const f = $("#ff-frage"); frootieFrage = f ? f.value.trim() : ""; zeichnen(); const n = $("#ff-frage"); if (n) n.focus(); },
+    "ff-faq": (el) => { frootieFrage = el.dataset.f; if (ansicht === "hilfe") { zeichnen(); window.scrollTo(0, 0); } else gehe("hilfe"); },
     wunsch: (el) => {
       const p = ICH(), d = el.dataset.datum; let w = L.wunschAm(S, p.id, d);
       if (w && w.art === el.dataset.art) S.wuensche = S.wuensche.filter((x) => x !== w);
@@ -1897,6 +2090,7 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
     if (el.dataset.go) { gehe(el.dataset.go, el.dataset.arg); return; }
     const f = AKT[el.dataset.act]; if (f) f(el, ev);
   });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target && ev.target.id === "ff-frage") { ev.preventDefault(); AKT["ff-fragen"](); } });
   document.addEventListener("keydown", (ev) => { const tr = ev.target.closest && ev.target.closest("tr[data-go]"); if (tr && ev.target === tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); gehe(tr.dataset.go, tr.dataset.arg); } });
   document.addEventListener("change", (ev) => {
     const el = ev.target;
@@ -1938,7 +2132,8 @@ const APP_VERSION = "0.11.0"; // gleich halten mit sw.js, version.json und ?v= i
   if (start && V[start]) ansicht = start;
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (V[h] && h !== ansicht) { ansicht = h; arg = null; fenster = null; zeichnen(); } });
   zeichnen();
-  if (ansicht === "start") { pinNeuFenster(); if (fenster) zeichnen(); }
+  try { history.replaceState(null, "", "#" + ansicht); } catch (e) { /* egal */ }
+  if (ansicht === "start") { pinNeuFenster(); wasNeuPruefen(); if (fenster) zeichnen(); }
 
   // ---------- Update wie in der Club-App: komplett oder gar nicht ----------
   function swDa() { try { return "serviceWorker" in navigator && !!navigator.serviceWorker && location.protocol !== "file:"; } catch (e) { return false; } }

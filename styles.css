@@ -366,6 +366,14 @@ table.dp-bestell .z { text-align: right; white-space: nowrap; }
 .kpi small { display: block; color: var(--muted); font-size: .8rem; } .kpi b { font-family: var(--f-display); font-size: 1.4rem; }
 table.pc-tab td.minus { color: var(--red); } table.pc-tab td.plus { color: var(--green); }
 @media (max-width: 560px) { .um-zeile { grid-template-columns: 46px minmax(0, 1fr) 62px; } .um-jp { display: none; } .um-p { letter-spacing: 0; } .um-p { font-size: 0; } .um-p small { font-size: .8rem; margin: 0; } .um-p::before { content: "👤"; font-size: .8rem; } }
+
+/* ---------- 0.12.0: Bedienkonzept wie in der Club-App ---------- */
+html.gross body { font-size: 20px; }
+html.gross .kachel b { font-size: 1.12rem; }
+html.kachel-klein .kacheln { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+html.kachel-klein .kachel { min-height: 82px; padding: 10px; } html.kachel-klein .kachel > span:not(.sym):not(.zahl) { display: none; } html.kachel-klein .kachel .sym { font-size: 1.4rem; }
+.blase-knoepfe { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.zeile.aus { opacity: .55; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }
