@@ -1,4 +1,4 @@
-const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -143,6 +143,10 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
   // Rechte je Ansicht an einer Stelle (für Zeichnen, Suche und „Zeig es mir“)
   function erlaubteAnsicht(v) {
     let r = V[v] ? v : "start";
+    const tbAnsichten = ["tablet", "tablet-wer", "tablet-pin", "tablet-stempel"];
+    if (tablet() && !tabletSitzung()) return tbAnsichten.includes(r) ? r : "tablet";
+    if (tbAnsichten.includes(r)) r = "start";
+    if (tabletSitzung() && r === "login") r = "start";
     const nurLeitung = ["umsatz", "kasse-import", "bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
     if (r !== "login" && !ICH()) return "login";
@@ -166,7 +170,7 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu: Richte dein Büro selbst ein. Teile umstellen und weitere aus dem Katalog dazustellen (✏️ Einrichten).", go: "buero" };
+  const WAS_NEU = { text: "Neu: Shop-Tablet als gemeinsame Stechuhr mit PIN. Die Leitung richtet es unter „Meine App“ ein.", go: "einstellungen" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -199,6 +203,72 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
   document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && fenster) { fenster = null; zeichnen(); } });
 
   // ----- Meine App (Einstellungen auf diesem Gerät) -----
+  // ----- Shop-Tablet: gemeinsame Stechuhr an der Theke, Anmelden mit PIN, Sperre bei Nichtbenutzung (wie PIN-Schutz der Club-App) -----
+  const TABLET_AUS_MS = 90000, TABLET_WARN_MS = 70000;
+  let tabletPin = null, tabletSperren = {}, tabletLetzte = Date.now(), tabletDanke = null;
+  const tablet = () => geraet.tablet && filiale(geraet.tablet.filiale) ? geraet.tablet : null;
+  const tabletSitzung = () => !!(tablet() && sitzung.tablet && ICH());
+  const TABLET_MODI = { stempeln: ["⏱️", "Kommen · Pause · Gehen"], hygiene: ["🧼", "Hygiene abhaken"], pinnwand: ["📌", "Pinnwand lesen"], dienst: ["🗓️", "Mein Dienstplan"], ende: ["🔒", "Tablet-Modus beenden"] };
+  const uhrGross = () => new Date().toTimeString().slice(0, 5);
+  V.tablet = () => {
+    const f = filiale(tablet().filiale), d = heute(), leute = L.tabletLeute(S, f.id, d);
+    const hs = L.tagesSumme(L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() }));
+    const da = leute.filter((x) => x.status !== "aus");
+    return `<div class="tb-kopf"><div><span class="tb-uhr" id="tb-uhr">${uhrGross()}</span><small>${datumLang(d)}</small></div><span class="logo-plate"><img class="logo gross" src="logo.svg" alt="frooters"></span><div class="tb-fil">📍 ${esc(f.kurz)}<small>Shop-Tablet</small></div></div>
+      ${tabletDanke ? `<div class="tb-danke" role="status">${tabletDanke}</div>` : ""}
+      <div class="tb-knoepfe">
+        <button class="tb-knopf rot" data-act="tb-wer" data-m="stempeln"><span>⏱️</span><b>Kommen · Pause · Gehen</b></button>
+        <button class="tb-knopf" data-act="tb-wer" data-m="hygiene"><span>🧼</span><b>Hygiene</b><small>${hs.gesamt ? `${hs.faellig + hs.ueberfaellig} jetzt fällig · ${hs.erledigt + hs.abweichung} von ${hs.gesamt} erledigt` : "heute nichts"}</small></button>
+        <button class="tb-knopf" data-act="tb-wer" data-m="pinnwand"><span>📌</span><b>Pinnwand</b></button>
+        <button class="tb-knopf" data-act="tb-wer" data-m="dienst"><span>🗓️</span><b>Mein Dienstplan</b></button>
+      </div>
+      <div class="karte"><h2>Heute im Dienst</h2><div class="tb-leute">${leute.filter((x) => x.geplant || x.status !== "aus").map((x) => `<span class="tb-person st-${x.status}"><span class="punkt ${x.status === "da" ? "gruen" : x.status === "pause" ? "gelb" : ""}"></span><b>${esc(x.person.vorname)}</b><small>${x.schichten.map((y) => `${L.minZuZeit(y.z.start)}–${L.minZuZeit(y.z.ende)}`).join(", ") || "ungeplant"}${x.status === "da" ? " · da" : x.status === "pause" ? " · Pause" : ""}</small></span>`).join("") || '<p class="muted">Heute ist niemand eingeplant.</p>'}</div>
+        <p class="klein muted">${da.length} von ${leute.filter((x) => x.geplant).length} Geplanten eingestempelt.</p></div>
+      <div class="reihe zw"><button class="chip" data-act="tb-wer" data-m="ende">🔒 Tablet-Modus beenden (Leitung)</button><span class="klein muted">Testversion: PIN für alle 1234</span></div>`;
+  };
+  V["tablet-wer"] = () => {
+    const m = arg || "stempeln", f = filiale(tablet().filiale), leute = L.tabletLeute(S, f.id, heute()).filter((x) => m === "ende" ? L.istLeitung(x.person, f.id) : !(["stempeln", "dienst"].includes(m) && x.person.rolle === "bezirk"));
+    return `<div class="tb-zeile"><button class="zurueck" data-act="tb-zurueck" aria-label="Zurück">←</button><h1>${TABLET_MODI[m][0]} ${TABLET_MODI[m][1]}</h1></div><p class="muted">Wer bist du?</p>
+      <div class="tb-wahl">${leute.map((x) => `<button class="tb-wer st-${x.status}" data-act="tb-person" data-id="${x.person.id}" data-m="${m}"><span class="tb-av">${esc(x.person.vorname.slice(0, 1))}</span><b>${esc(x.person.vorname)}</b><small>${x.geplant ? x.schichten.map((y) => L.minZuZeit(y.z.start)).join(", ") : esc(L.ROLLEN[x.person.rolle].name)}${x.status === "da" ? " · da" : x.status === "pause" ? " · Pause" : ""}</small></button>`).join("")}</div>`;
+  };
+  function pinPad() {
+    const p = person(tabletPin.pid), sp = tabletSperren[p.id], gesperrt = sp && sp.bis > Date.now();
+    return `<div class="tb-zeile"><button class="zurueck" data-act="tb-zurueck" aria-label="Zurück">←</button><h1>Hallo ${esc(p.vorname)}!</h1></div>
+      <p class="muted">${TABLET_MODI[tabletPin.m][0]} ${TABLET_MODI[tabletPin.m][1]} · Bitte deine PIN eingeben.</p>
+      <div class="tb-pin" aria-live="polite">${[0, 1, 2, 3, 4, 5].slice(0, Math.max(4, String(p.pin || "").length)).map((i) => `<span class="${i < tabletPin.eingabe.length ? "voll" : ""}"></span>`).join("")}</div>
+      ${tabletPin.fehler ? `<p class="hinweis rot">${esc(tabletPin.fehler)}</p>` : ""}
+      <div class="tb-tasten">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "←", "0", "OK"].map((t) => `<button class="tb-taste${t === "OK" ? " ok" : ""}" data-act="tb-taste" data-t="${t}" ${gesperrt ? "disabled" : ""} aria-label="${t === "←" ? "löschen" : t}">${t}</button>`).join("")}</div>`;
+  }
+  V["tablet-pin"] = () => tabletPin ? pinPad() : V.tablet();
+  V["tablet-stempel"] = () => {
+    const p = person(arg); if (!p || !tabletPin || !tabletPin.ok) return V.tablet();
+    const f = filiale(tablet().filiale), e = L.stempelAm(S, p.id, heute()), st = L.stempelStatus(e), sum = L.stempelSumme(e, jetztIso());
+    const sch = L.tabletLeute(S, f.id, heute()).find((x) => x.person.id === p.id);
+    return `<div class="tb-zeile"><button class="zurueck" data-act="tb-zurueck" aria-label="Zurück">←</button><h1>${esc(p.vorname)}</h1></div>
+      <div class="karte"><p><b>${st === "da" ? "🟢 Eingestempelt" : st === "pause" ? "🟡 In Pause" : "⚪ Nicht eingestempelt"}</b>${sch && sch.geplant ? ` · Dienst heute ${sch.schichten.map((y) => `${L.minZuZeit(y.z.start)}–${L.minZuZeit(y.z.ende)}`).join(", ")}` : " · heute nicht eingeplant"}</p>
+        <p class="muted">Arbeit heute: ${Math.floor(sum.arbeit / 60)} Std. ${sum.arbeit % 60} Min. · Pause ${sum.pause} Min.</p></div>
+      <div class="tb-knoepfe zwei">${st === "aus" ? `<button class="tb-knopf rot" data-act="tb-stempel" data-art="kommen"><span>▶️</span><b>Kommen</b></button>`
+        : st === "pause" ? `<button class="tb-knopf rot" data-act="tb-stempel" data-art="weiter"><span>▶️</span><b>Pause beenden</b></button>`
+        : `<button class="tb-knopf" data-act="tb-stempel" data-art="pause"><span>☕</span><b>Pause</b></button><button class="tb-knopf rot" data-act="tb-stempel" data-art="gehen"><span>⏹️</span><b>Gehen</b></button>`}</div>`;
+  };
+  function tabletAbmelden(text) {
+    sitzung.ich = null; sitzung.tablet = false; merke(); tabletPin = null; fenster = null;
+    if (text) tabletDanke = text;
+    ansicht = "tablet"; arg = null; zeichnen(); window.scrollTo(0, 0);
+    try { history.replaceState(null, "", "#tablet"); } catch (e) { /* egal */ }
+    if (text) setTimeout(() => { if (tabletDanke === text) { tabletDanke = null; if (ansicht === "tablet") zeichnen(); } }, 6000);
+  }
+  // Nach 90 Sekunden ohne Berührung meldet das Tablet ab (Warnung ab 70 Sekunden)
+  ["pointerdown", "keydown"].forEach((e) => document.addEventListener(e, () => { tabletLetzte = Date.now(); const w = $(".tb-warn"); if (w) w.remove(); }, true));
+  setInterval(() => {
+    const u = document.getElementById("tb-uhr"); if (u) u.textContent = uhrGross();
+    if (!tablet()) return;
+    const still = Date.now() - tabletLetzte, aktiv = tabletSitzung() || (ansicht !== "tablet" && ansicht !== "login");
+    if (!aktiv) return;
+    if (still > TABLET_AUS_MS) { tabletAbmelden("🔒 Automatisch abgemeldet."); return; }
+    if (still > TABLET_WARN_MS && !$(".tb-warn")) { const w = document.createElement("div"); w.className = "tb-warn"; w.setAttribute("role", "alert"); w.textContent = "Noch 20 Sekunden – antippen, um angemeldet zu bleiben."; document.body.appendChild(w); }
+  }, 5000);
+  const tabletBand = () => tabletSitzung() ? `<div class="tb-band">📟 Shop-Tablet · ${esc(ICH().vorname)} ist angemeldet <button class="chip" data-act="tb-ab">⏏ Abmelden</button></div>` : "";
   V.einstellungen = () => {
     const wahl = (k, opts, std) => `<div class="wahl">${opts.map(([v, t]) => `<button class="${(geraet[k] || std) === v ? "an" : ""}" data-act="geraet" data-k="${k}" data-v="${v}">${t}</button>`).join("")}</div>`;
     return `${titel("Meine App")}${frootie(FROOTIE_TIPPS.einstellungen)}
@@ -210,6 +280,11 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
         <button class="btn drei" data-go="kacheln">↕️ Kacheln sortieren und ausblenden</button></div>
       <div class="karte"><h2>Erklärungen</h2><p class="klein muted">Frootie erklärt jeden Bereich beim ersten Öffnen. Danach hilft ❓ oben rechts.</p>
         <button class="btn drei" data-act="einw-reset">🍓 Alle Erklärungen wieder zeigen</button>${kannVorlesen() ? ' <button class="btn drei" data-act="vorlesen" data-text="So klingt das Vorlesen in der frooters Team-App.">🔊 Vorlesen testen</button>' : ""}</div>
+      ${ICH() && !berater() ? `<div class="karte"><h2>🔢 Meine PIN für das Shop-Tablet</h2><p class="klein muted">Mit der PIN stempelst du dich am Tablet im Shop ein und hakst Hygiene ab.</p>
+        <div class="gitter3"><div class="feld"><label for="pin-alt">Bisherige PIN</label><input type="password" inputmode="numeric" autocomplete="off" id="pin-alt" maxlength="6"></div><div class="feld"><label for="pin-neu">Neue PIN</label><input type="password" inputmode="numeric" autocomplete="off" id="pin-neu" maxlength="6"></div><div class="feld"><label for="pin-neu2">Noch einmal</label><input type="password" inputmode="numeric" autocomplete="off" id="pin-neu2" maxlength="6"></div></div>
+        <button class="btn drei" data-act="pin-aendern">PIN ändern</button><p class="klein muted">Testversion: Die PIN liegt nur in diesem Browser. Mit dem Server wird sie nur als Prüfwert gespeichert.</p></div>` : ""}
+      ${leitung() && !uebergreifend() || zentrale() ? `<div class="karte"><h2>📟 Shop-Tablet</h2><p>Dieses Gerät wird zur gemeinsamen Stechuhr für <b>${esc(FIL().kurz)}</b>: Name antippen, PIN eingeben, kommen, Pause, gehen. Hygiene wird mit PIN abgehakt. Nach 90 Sekunden ohne Berührung meldet sich das Tablet von selbst ab.</p>
+        <button class="btn zwei" data-act="tablet-an">📟 Dieses Gerät als Shop-Tablet für ${esc(FIL().kurz)} einrichten</button><p class="klein muted">Beenden geht nur mit der PIN einer Leitung dieser Filiale.</p></div>` : ""}
       <p class="klein muted">Diese Einstellungen gelten nur auf diesem Gerät${ICH() ? ` und für ${esc(ICH().vorname)}` : ""}.</p>`;
   };
   V.kacheln = () => {
@@ -306,7 +381,7 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
       <button class="marke" data-go="start" aria-label="Startseite"><span class="logo-plate"><img class="logo" src="logo.svg" alt="frooters"></span><span class="team">Team</span></button>
       <div class="rechts">${p ? `<button class="chip fil" ${mehr ? 'data-act="filiale-wahl"' : "disabled"} aria-label="Filiale wechseln">📍 ${esc(fil.kurz)}${mehr ? " ▾" : ""}</button>
       <button class="chip" data-go="suche" aria-label="Suchen">🔍</button>
-      <button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>` : ""}</div></header>
+      ${tabletSitzung() ? `<button class="chip" data-act="tb-ab" aria-label="Abmelden">⏏ ${esc(p.vorname)}</button>` : `<button class="chip" data-go="login" aria-label="Person wechseln">👤 ${esc(p.vorname)} ▾</button>`}` : ""}</div></header>
       <div class="demo-band">Testversion ${APP_VERSION} · Beispieldaten nur in diesem Browser · Pilot: Ochtrup</div>`;
   }
   function titel(t, zurueck) {
@@ -1824,7 +1899,8 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
     if (ansicht === "start") inhalt = startAnpassen(inhalt);
     const pc = breit(); letzteBreit = pc;
     document.body.classList.toggle("pc", pc);
-    $("#app").innerHTML = `${updateBand}${kopf()}${pc ? `<div class="pc-rahmen">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
+    const kiosk = ansicht.startsWith("tablet");
+    $("#app").innerHTML = `${updateBand}${kiosk ? `<div class="demo-band">Testversion ${APP_VERSION} · Shop-Tablet · Beispieldaten nur in diesem Browser</div>` : kopf() + tabletBand()}${kiosk ? `<main class="tb-main">${inhalt}</main>` : pc ? `<div class="pc-rahmen">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
     einpassen($("#app"));
     verlaufFenster(); appZaehler();
   }
@@ -2282,6 +2358,45 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
       const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
       kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
     },
+    "tablet-an": () => {
+      if (!(leitung() || zentrale())) return;
+      geraet.tablet = { filiale: FIL().id, seit: jetztIso() }; geraetMerken();
+      sitzung.ich = null; sitzung.tablet = false; merke(); meldung(`📟 Shop-Tablet für ${FIL().kurz}`); gehe("tablet");
+    },
+    "tb-wer": (el) => { tabletPin = null; gehe("tablet-wer", el.dataset.m); },
+    "tb-person": (el) => { tabletPin = { pid: el.dataset.id, m: el.dataset.m, eingabe: "", fehler: "" }; gehe("tablet-pin"); },
+    "tb-zurueck": () => { tabletPin = null; gehe("tablet"); },
+    "tb-ab": () => tabletAbmelden("Abgemeldet. Bis später! 👋"),
+    "tb-taste": (el) => {
+      const t = el.dataset.t, tp = tabletPin; if (!tp) return;
+      const p = person(tp.pid), laenge = String(p.pin || "").length || 4;
+      if (t === "←") tp.eingabe = tp.eingabe.slice(0, -1);
+      else if (t !== "OK" && tp.eingabe.length < 6) tp.eingabe += t;
+      if (t === "OK" || (t !== "←" && tp.eingabe.length === laenge)) {
+        const r = L.pinPruefen(S, tp.pid, tp.eingabe, Date.now(), tabletSperren);
+        tp.eingabe = "";
+        if (!r.ok) { tp.fehler = r.grund === "gesperrt" ? "Zu viele falsche Versuche. Bitte in 5 Minuten noch einmal." : `Falsche PIN. Noch ${r.rest} Versuch${r.rest === 1 ? "" : "e"}.`; return zeichnen(); }
+        tp.ok = true; tp.fehler = "";
+        if (tp.m === "stempeln") return gehe("tablet-stempel", tp.pid);
+        if (tp.m === "ende") { geraet.tablet = null; geraetMerken(); tabletPin = null; sitzung.ich = null; sitzung.tablet = false; merke(); meldung("Tablet-Modus beendet"); return gehe("login"); }
+        sitzung.ich = tp.pid; sitzung.filiale = tablet().filiale; sitzung.tablet = true; merke(); tabletPin = null; tabletLetzte = Date.now();
+        return gehe(tp.m);
+      }
+      zeichnen();
+    },
+    "tb-stempel": (el) => {
+      const tp = tabletPin; if (!tp || !tp.ok) return;
+      const p = person(tp.pid), art = el.dataset.art;
+      S.stempel.push({ id: neueId("t"), personId: p.id, filiale: tablet().filiale, art, zeit: jetztIso(), quelle: "tablet" }); speichern();
+      tabletAbmelden(`${{ kommen: "▶️ Guten Start", pause: "☕ Gute Pause", weiter: "▶️ Weiter geht's", gehen: "👋 Schönen Feierabend" }[art]}, ${esc(p.vorname)}! <small>${jetztIso().slice(11, 16)} Uhr gestempelt</small>`);
+    },
+    "pin-aendern": () => {
+      const p = ICH(), alt = $("#pin-alt").value.trim(), neu = $("#pin-neu").value.trim(), neu2 = $("#pin-neu2").value.trim();
+      if (String(p.pin || "") !== alt) return meldung("Die bisherige PIN stimmt nicht.");
+      const f = L.pinGueltig(neu); if (f) return meldung(f);
+      if (neu !== neu2) return meldung("Die neue PIN ist zweimal verschieden.");
+      p.pin = neu; speichern(); meldung("PIN geändert"); zeichnen();
+    },
     "bue-start": () => { buEinr = true; buWahl = null; buVorher = JSON.parse(JSON.stringify(meineEinrichtung())); zeichnen(); },
     "bue-fertig": () => { buEinr = false; buWahl = null; buVorher = null; meldung("Büro eingerichtet ✓"); zeichnen(); },
     "bue-tipp": (el) => {
@@ -2489,6 +2604,7 @@ const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= i
   // und darf die App nie am Starten hindern.
   const start = (location.hash || "").slice(1);
   if (start && V[start]) ansicht = start;
+  if (tablet()) { if (sitzung.tablet) { sitzung.ich = null; sitzung.tablet = false; merke(); } ansicht = "tablet"; }
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (V[h] && h !== ansicht) { ansicht = h; arg = null; fenster = null; zeichnen(); } });
   zeichnen();
   try { history.replaceState(null, "", "#" + ansicht); } catch (e) { /* egal */ }

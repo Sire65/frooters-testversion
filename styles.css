@@ -488,6 +488,30 @@ html.kachel-klein .kachel { min-height: 82px; padding: 10px; } html.kachel-klein
 .bue-kat-text { flex: 1; display: grid; gap: 2px; min-width: 0; } .bue-kat-text small { color: var(--muted); }
 .bu-o-uhr svg { max-width: 58px; } .bu-o-register svg { max-width: 76px; } .bu-o-kopierer svg { max-width: 92px; } .bu-o-becher svg { max-width: 44px; } .bu-o-figur svg { max-width: 54px; } .bu-o-rahmen svg { max-width: 70px; } .bu-o-pflanze svg { max-width: 44px; }
 .bu-o-pflanze { cursor: default; }
+
+/* ---------- 0.16.0: Shop-Tablet ---------- */
+main.tb-main { max-width: 1100px; }
+.tb-kopf { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.tb-kopf > div:first-child { display: grid; } .tb-uhr { font-family: var(--f-display); font-size: clamp(2.2rem, 7vw, 3.4rem); font-weight: 700; line-height: 1; color: var(--red); font-variant-numeric: tabular-nums; }
+.tb-fil { justify-self: end; display: grid; justify-items: end; font-weight: 700; color: var(--green); } .tb-fil small { color: var(--muted); font-weight: 400; }
+.tb-knoepfe { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; } .tb-knoepfe.zwei { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.tb-knopf { min-height: 120px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; align-content: center; gap: 4px; padding: 16px; text-align: center; color: var(--ink); }
+.tb-knopf span { font-size: 2.4rem; line-height: 1; } .tb-knopf b { font-family: var(--f-display); font-size: 1.2rem; } .tb-knopf small { color: var(--muted); }
+.tb-knopf.rot { background: var(--red); color: var(--on-red); border-color: transparent; } .tb-knopf.rot small { color: inherit; opacity: .85; }
+.tb-leute { display: flex; flex-wrap: wrap; gap: 8px; }
+.tb-person { display: grid; grid-template-columns: auto 1fr; column-gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; background: var(--bg); } .tb-person small { grid-column: 2; color: var(--muted); font-size: .78rem; }
+.tb-zeile { display: flex; align-items: center; gap: 10px; }
+.tb-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.tb-wer { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tb-wer small { color: var(--muted); font-size: .78rem; text-align: center; } .tb-wer.st-da { border-color: var(--green); } .tb-wer.st-pause { border-color: var(--amber); }
+.tb-av { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--red-soft); color: var(--red); font-family: var(--f-display); font-size: 1.6rem; font-weight: 700; }
+.tb-pin { display: flex; justify-content: center; gap: 14px; margin: 8px 0; } .tb-pin span { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted); } .tb-pin span.voll { background: var(--red); border-color: var(--red); }
+.tb-tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 340px; margin: 0 auto; width: 100%; }
+.tb-taste { height: 70px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); font-size: 1.6rem; font-weight: 700; box-shadow: var(--shadow); } .tb-taste.ok { background: var(--green); color: #fff; border-color: transparent; font-size: 1.2rem; } .tb-taste:disabled { opacity: .4; }
+.tb-danke { background: var(--green-soft); color: var(--ink); border-radius: 16px; padding: 14px 18px; font-size: 1.3rem; font-weight: 700; text-align: center; } .tb-danke small { display: block; font-size: .9rem; font-weight: 400; color: var(--muted); }
+.tb-band { background: var(--red); color: var(--on-red); display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 12px; font-size: .9rem; } .tb-band .chip { background: rgba(255,255,255,.9); color: #1d1d1b; border: 0; }
+.tb-warn { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9000; background: #1d1d1b; color: #fff; border-radius: 99px; padding: 12px 20px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+@media (max-width: 560px) { .tb-kopf { grid-template-columns: 1fr auto; } .tb-kopf .logo-plate { display: none; } }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

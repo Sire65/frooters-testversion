@@ -553,6 +553,39 @@
     if (letzt.art === "pause") return "pause";
     return "da";
   }
+  // ---------- Shop-Tablet: gemeinsame Stechuhr an der Theke ----------
+  // Wer kommt auf dem Tablet einer Filiale vor? Alle, die dort arbeiten dürfen, und die Leitung. Geplante Personen zuerst (nach Beginn), dann Eingestempelte, dann der Rest.
+  function tabletLeute(state, filialeId, datum) {
+    const f = (state.filialen || []).find((x) => x.id === filialeId);
+    const leute = (state.personen || []).filter((p) => p.aktiv !== false && (darfInFiliale(p, filialeId) || (p.rolle !== "zentrale" && istLeitung(p, filialeId))));
+    return leute.map((p) => {
+      const sch = schichtenAm(state, datum, (s) => s.personId === p.id && s.filiale === filialeId).map((s) => ({ s, z: planZeit(state, s) })).filter((x) => x.z).sort((a, b) => a.z.start - b.z.start);
+      const status = stempelStatus(stempelAm(state, p.id, datum));
+      return { person: p, schichten: sch, geplant: sch.length > 0, beginn: sch.length ? sch[0].z.start : null, status, abwesend: !!abwesenheitAm(state, p.id, datum) };
+    }).sort((a, b) => (b.geplant - a.geplant) || ((a.beginn ?? 9999) - (b.beginn ?? 9999)) || ((b.status !== "aus") - (a.status !== "aus")) || a.person.vorname.localeCompare(b.person.vorname))
+      .filter((x) => f && (!x.abwesend || x.status !== "aus"));
+  }
+  // PIN prüfen; nach 5 falschen Versuchen ist die Person 5 Minuten gesperrt (sperren wird mitgeführt, z. B. im Speicher des Tablets)
+  const PIN_VERSUCHE = 5, PIN_SPERRE_MS = 5 * 60000;
+  function pinPruefen(state, personId, pin, jetztMs, sperren) {
+    const p = (state.personen || []).find((x) => x.id === personId);
+    if (!p || p.aktiv === false) return { ok: false, grund: "unbekannt" };
+    const sp = sperren[personId] || { fehler: 0, bis: 0 };
+    if (sp.bis > jetztMs) return { ok: false, grund: "gesperrt", bis: sp.bis };
+    if (p.pin && String(pin) === String(p.pin)) { delete sperren[personId]; return { ok: true }; }
+    sp.fehler = (sp.bis && sp.bis <= jetztMs ? 0 : sp.fehler) + 1; sp.bis = 0;
+    if (sp.fehler >= PIN_VERSUCHE) { sp.bis = jetztMs + PIN_SPERRE_MS; sp.fehler = 0; sperren[personId] = sp; return { ok: false, grund: "gesperrt", bis: sp.bis }; }
+    sperren[personId] = sp;
+    return { ok: false, grund: "falsch", rest: PIN_VERSUCHE - sp.fehler };
+  }
+  // Neue PIN: 4 bis 6 Ziffern, nicht alle gleich, nicht 1234/123456
+  function pinGueltig(pin) {
+    const t = String(pin || "");
+    if (!/^\d{4,6}$/.test(t)) return "Bitte 4 bis 6 Ziffern.";
+    if (/^(\d)\1+$/.test(t) || "1234567890".includes(t) || "0987654321".includes(t)) return "Bitte keine einfache Folge wie 1111 oder 1234.";
+    return "";
+  }
+
   // Arbeits- und Pausenminuten eines Tages; offene Zeiten bis "jetzt" gerechnet.
   function stempelSumme(eintraege, jetztIso) {
     let arbeit = 0, pause = 0, seit = null, modus = "aus";
@@ -1230,6 +1263,7 @@
     PIN_STANDARD, pinEinstellungen, pinEmpfaenger, pinAktiv, pinSichtbar, pinStand, pinUngelesen, pinEigeneAktiv, pinErinnern,
     SCHRITTE, geheimErkannt, pruefeVerbindung, betreiberStand,
     schichtenAm, stundenInWoche, wunschAm, kandidaten, abdeckung, planVorschlag, betroffeneSchichten,
+    tabletLeute, PIN_VERSUCHE, PIN_SPERRE_MS, pinPruefen, pinGueltig,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     chatsSicherstellen, chatMitglieder, chatsFuer, chatNachrichten, chatUngelesen, nachrichtSenden, chatGelesen, lesestand, direktChat,
     TERMIN_ARTEN, terminEingeladen, termineFuer, terminAntwort, terminStand, ics,

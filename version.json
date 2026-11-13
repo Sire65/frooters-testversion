@@ -1,10 +1,11 @@
 {
-  "version": "0.15.0",
+  "version": "0.16.0",
   "datum": "2026-11-13",
   "stufe": "DEV",
   "neu": [
-    "Büro einrichten wie in der Club-App: Teile wackeln, zwei antippen oder eines auf ein anderes ziehen, dann tauschen sie die Plätze",
-    "Zusatzkatalog: Tischuhr, Dreh-Adressregister, Kopierer, frooters-Becher, Frootie-Figur, Teamfoto, Pflanze (bis zu 4 Teile, jedes mit Aufgabe)",
-    "Rückgängig und Grundaufstellung; die Einrichtung gilt je Person"
+    "Shop-Tablet: ein Gerät an der Theke als gemeinsame Stechuhr für die Filiale (Name antippen, PIN, Kommen/Pause/Gehen)",
+    "Hygiene, Pinnwand und Dienstplan am Tablet mit PIN; nach 90 Sekunden ohne Berührung automatisch abgemeldet",
+    "PIN-Schutz wie in der Club-App: 5 Fehlversuche, dann 5 Minuten Pause; eigene PIN in „Meine App“ ändern",
+    "Tablet-Modus beenden nur mit der PIN einer Leitung"
   ]
 }
