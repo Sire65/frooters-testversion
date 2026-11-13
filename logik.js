@@ -62,6 +62,7 @@
     mitarbeiter: { name: "Mitarbeiter", stufe: 2 },
     stv: { name: "Stellv. Shopleitung", stufe: 3 },
     shopleitung: { name: "Shopleitung", stufe: 4 },
+    bezirk: { name: "Bezirksleitung", stufe: 5 },
     qualitaet: { name: "Qualität & Pflege", stufe: 8 },
     berater: { name: "Hygieneberater (nur lesen)", stufe: 0 },
     zentrale: { name: "Inhaber / Zentrale", stufe: 9 },
@@ -71,6 +72,7 @@
   function istLeitung(p, filialeId) {
     if (!p) return false;
     if (p.rolle === "zentrale") return true;
+    if (p.rolle === "bezirk") return (p.bezirk || []).includes(filialeId);
     return (p.rolle === "shopleitung" || p.rolle === "stv") && p.stammfiliale === filialeId;
   }
   // In welcher Filiale darf jemand eingesetzt werden? Stammfiliale immer, andere nur als Springer mit Haken.
@@ -81,6 +83,7 @@
   }
   function filialenVon(p) {
     if (!p) return [];
+    if (p.rolle === "bezirk") return [...(p.bezirk || [])];
     const s = new Set([p.stammfiliale]);
     if (p.springer) (p.einsatzfilialen || []).forEach((f) => s.add(f));
     return [...s].filter(Boolean);
@@ -700,8 +703,8 @@
   function chatMitglieder(state, c) {
     const aktiv = (state.personen || []).filter((p) => p.aktiv !== false && p.rolle !== "berater");
     if (c.art === "direkt") return (c.mitglieder || []).filter((id) => aktiv.some((p) => p.id === id));
-    if (c.art === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "zentrale", "qualitaet"].includes(p.rolle)).map((p) => p.id);
-    if (c.art === "filiale") return aktiv.filter((p) => p.rolle === "zentrale" || p.stammfiliale === c.filiale || (p.springer && (p.einsatzfilialen || []).includes(c.filiale))).map((p) => p.id);
+    if (c.art === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "bezirk", "zentrale", "qualitaet"].includes(p.rolle)).map((p) => p.id);
+    if (c.art === "filiale") return aktiv.filter((p) => p.rolle === "zentrale" || (p.rolle === "bezirk" && (p.bezirk || []).includes(c.filiale)) || p.stammfiliale === c.filiale || (p.springer && (p.einsatzfilialen || []).includes(c.filiale))).map((p) => p.id);
     return [];
   }
   function chatsFuer(state, personId) {
@@ -739,9 +742,9 @@
   const TERMIN_ARTEN = { teamsitzung: { name: "Teamsitzung", sym: "👥" }, schulung: { name: "Schulung", sym: "🎓" }, inventur: { name: "Inventur", sym: "📋" }, hygiene: { name: "Hygiene-Besuch", sym: "🧼" }, sonstiges: { name: "Termin", sym: "📅" } };
   function terminEingeladen(state, t) {
     const aktiv = (state.personen || []).filter((p) => p.aktiv !== false);
-    const inFiliale = (p) => !t.filiale || p.rolle === "zentrale" || p.stammfiliale === t.filiale || (p.springer && (p.einsatzfilialen || []).includes(t.filiale));
+    const inFiliale = (p) => !t.filiale || p.rolle === "zentrale" || (p.rolle === "bezirk" && (p.bezirk || []).includes(t.filiale)) || p.stammfiliale === t.filiale || (p.springer && (p.einsatzfilialen || []).includes(t.filiale));
     if (t.fuer === "personen") return (t.personen || []).filter((id) => aktiv.some((p) => p.id === id));
-    if (t.fuer === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "zentrale", "qualitaet"].includes(p.rolle) && inFiliale(p)).map((p) => p.id);
+    if (t.fuer === "leitung") return aktiv.filter((p) => ["shopleitung", "stv", "bezirk", "zentrale", "qualitaet"].includes(p.rolle) && inFiliale(p)).map((p) => p.id);
     return aktiv.filter((p) => p.rolle !== "berater" && inFiliale(p)).map((p) => p.id);
   }
   function termineFuer(state, personId, abDatum) {

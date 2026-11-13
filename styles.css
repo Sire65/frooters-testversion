@@ -389,6 +389,87 @@ html.kachel-klein .kachel { min-height: 82px; padding: 10px; } html.kachel-klein
 .chat-eingabe .btn { padding: 11px 16px; }
 .t-datum { display: grid; justify-items: center; min-width: 42px; background: var(--red-soft); color: var(--red); border-radius: 10px; padding: 3px 6px; line-height: 1.1; } .t-datum b { font-size: 1.15rem; } .t-datum small { font-size: .72rem; }
 .wahl-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 12px; }
+
+/* ---------- 0.14.0: Büro als Raum wie in der Club-App (Aktenschrank mit Jalousie, Ordner, Schreibtisch) ---------- */
+:root { --bu-wand1: #f1f2ea; --bu-wand2: #e4e6d6; --bu-brett1: #b9976d; --bu-brett2: #a4835b; --bu-tisch1: #cdb08a; --bu-tisch2: #b8996f; --bu-lam1: #fbfbf6; --bu-lam2: #e8eadc; --bu-lam3: #c9cdb3; --bu-zeile1: #eceee2; --bu-zeile2: #dfe2cf; --bu-schrift: #c10230; }
+:root[data-theme="dark"] { --bu-wand1: #34362c; --bu-wand2: #2c2e25; --bu-tisch1: #5a4836; --bu-tisch2: #4e3e2f; --bu-lam1: #5c604a; --bu-lam2: #4f533f; --bu-lam3: #3e4232; --bu-zeile1: #34362c; --bu-zeile2: #2a2c24; --bu-schrift: #ff8fa5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bu-wand1: #34362c; --bu-wand2: #2c2e25; --bu-tisch1: #5a4836; --bu-tisch2: #4e3e2f; --bu-lam1: #5c604a; --bu-lam2: #4f533f; --bu-lam3: #3e4232; --bu-zeile1: #34362c; --bu-zeile2: #2a2c24; --bu-schrift: #ff8fa5; } }
+.bu-gruss { display: grid; gap: 6px; }
+.bu-raum { border-radius: 18px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, .14); }
+.bu-schrank { position: relative; }
+.bu-schrank-zeile { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; padding: 12px 14px; color: var(--ink); text-align: left; background: linear-gradient(180deg, var(--bu-zeile1), var(--bu-zeile2)); border-bottom: 3px solid var(--bu-brett2); }
+.bu-schrank-zeile b { font-family: var(--f-display); font-size: 1.05rem; } .bu-schrank-zeile small { flex: 1; color: var(--muted); font-weight: 700; } .bu-schrank-pfeil { font-size: 1.3rem; font-weight: 900; line-height: 1; }
+.bu-schrank-koerper { position: relative; overflow: hidden; }
+.bu-wand { background: linear-gradient(180deg, var(--bu-wand1), var(--bu-wand2)); padding: 12px 12px 0; }
+.bu-regal { display: grid; grid-template-columns: repeat(auto-fit, 48px); grid-auto-rows: 226px; justify-content: center; column-gap: 6px; margin: 0 -12px; padding: 0 12px;
+  background: repeating-linear-gradient(180deg, transparent 0 210px, var(--bu-brett1) 210px 214px, var(--bu-brett2) 214px 226px); }
+.bu-ordner { width: 48px; height: 204px; align-self: end; margin-bottom: 16px; position: relative; border: none; padding: 8px 0 10px; border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(90deg, rgba(0,0,0,.18), transparent 22%, transparent 78%, rgba(0,0,0,.14)), var(--of); color: #fffdf8;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.bu-ordner:hover, .bu-ordner:focus-visible { transform: translateY(-8px); box-shadow: 0 8px 14px rgba(0,0,0,.25); }
+.bu-ordner:active { transform: translateY(-12px) scale(1.02); }
+.bu-osym { font-size: 1.25rem; line-height: 1; }
+.bu-otext { flex: 1; writing-mode: vertical-rl; transform: rotate(180deg); background: #fbf7ef; color: #3b2f2a; border-radius: 3px; padding: 6px 3px; font-weight: 800; font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 150px; }
+.bu-oloch { width: 15px; height: 15px; border-radius: 50%; background: rgba(0,0,0,.25); box-shadow: inset 0 2px 3px rgba(0,0,0,.35); }
+.bu-ozahl { position: absolute; top: -7px; right: -5px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--red); color: #fff; font-size: .75rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 5px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+/* Jalousie: senkrechte Lamellen mit „frooters“, klappen auf und fahren nach links zusammen */
+.bu-jalousie { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; z-index: 2; overflow: hidden; pointer-events: none; perspective: 700px; transition: width 1s cubic-bezier(.45,.05,.3,1) .3s; }
+.bu-schrank.auf .bu-jalousie { width: 0; }
+.bu-jal-lamellen { position: absolute; inset: 0; display: flex; gap: 1px; background: rgba(29, 29, 27, .25); }
+.bu-jal-lamelle { flex: 1; position: relative; display: flex; justify-content: center; transform-origin: center; transition: transform .32s ease; background: linear-gradient(to right, var(--bu-lam1) 0%, var(--bu-lam2) 45%, var(--bu-lam3) 100%); box-shadow: 1px 0 2px rgba(0,0,0,.25); }
+.bu-schrank.auf .bu-jal-lamelle { transform: rotateY(68deg); }
+.bu-jal-lamelle > b { position: absolute; top: calc(50% + 30px); font: 700 clamp(12px, 3.6vw, 22px)/1 var(--f-display); color: var(--bu-schrift); }
+.bu-jal-marke { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -64%); display: grid; justify-items: center; gap: 2px; transition: opacity .3s; }
+.bu-jal-marke img { width: 130px; height: auto; filter: grayscale(.3) opacity(.55); } .bu-jal-marke small { font: italic 700 .85rem/1 var(--f-display); color: var(--bu-schrift); }
+.bu-schrank.auf .bu-jal-marke { opacity: 0; }
+.bu-jal-griff { position: absolute; top: 50%; right: 8px; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border-radius: 50%; border: 2px solid #fff; color: #fff; font-size: 1.05rem;
+  background: radial-gradient(circle at 40% 35%, #e0365c, #c10230 70%); box-shadow: 0 3px 8px rgba(0,0,0,.35); transition: right 1s cubic-bezier(.45,.05,.3,1) .3s; }
+.bu-schrank.auf .bu-jal-griff { right: calc(100% - 40px); top: 22px; width: 34px; height: 34px; margin-top: -17px; font-size: .85rem; opacity: .9; }
+@media (prefers-reduced-motion: reduce) { .bu-jalousie, .bu-jal-lamelle, .bu-jal-griff { transition: none; } }
+/* Schreibtisch mit Pinnwand und gezeichneten Teilen */
+.bu-tisch { position: relative; background: linear-gradient(180deg, var(--bu-tisch1), var(--bu-tisch2)); padding: 16px 12px 14px; }
+.bu-tisch::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: rgba(0,0,0,.12); }
+.bu-pinnwand { margin: 0 auto 12px; max-width: 520px; padding: 12px 10px 8px; border-radius: 10px; border: 5px solid #8b6440; background: radial-gradient(circle at 20% 30%, rgba(0,0,0,.05) 1px, transparent 2px) 0 0/9px 9px, #c79a63; box-shadow: inset 0 2px 6px rgba(0,0,0,.25); }
+.bu-zettelreihe { display: flex; gap: 14px; justify-content: space-between; align-items: flex-start; }
+.bu-zettel { position: relative; flex: 1 1 0; min-width: 0; border: none; text-align: left; color: #4a3b1a; background: #f6e7a8; padding: 16px 12px 10px; transform: rotate(-1.5deg); box-shadow: 0 4px 8px rgba(0,0,0,.2); border-radius: 2px 2px 10px 2px; font-size: .9rem; }
+.bu-zettel b { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; opacity: .75; }
+.bu-zettel.gruen { background: #e2f0cf; color: #2f4d12; transform: rotate(1.5deg); }
+.bu-zettel::before { content: ""; position: absolute; top: -6px; left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f3a59a, #c10230 55%, #6e0a1c); box-shadow: 0 2px 3px rgba(0,0,0,.35); }
+.bu-zettel.gruen::before { background: radial-gradient(circle at 35% 30%, #c7e89a, #4f8a12 55%, #2a4a09); }
+.bu-platte { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: dense; gap: 8px; align-items: end; max-width: 760px; margin: 0 auto; }
+@media (min-width: 640px) { .bu-platte { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.bu-obj { position: relative; border: 0; background: none; padding: 2px; display: grid; justify-items: center; align-content: end; gap: 3px; color: #3b2f2a; min-width: 0; min-height: 44px; }
+.bu-obj svg { width: 100%; max-width: 92px; height: auto; display: block; filter: drop-shadow(0 3px 3px rgba(0,0,0,.28)); transition: transform .15s; }
+.bu-obj:hover svg, .bu-obj:focus-visible svg { transform: translateY(-3px) scale(1.04); }
+.bu-olabel { font-size: .72rem; font-weight: 800; line-height: 1.1; text-align: center; background: rgba(255,253,246,.85); color: #3b2f2a; padding: 2px 6px; border-radius: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bu-dzahl { position: absolute; top: 0; right: 8%; min-width: 22px; height: 22px; border-radius: 11px; background: var(--red); color: #fff; font-size: .78rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
+.bu-o-monitor { grid-column: span 2; grid-row: span 2; align-self: start; align-content: start; width: 100%; }
+.bu-o-tastatur { grid-column: span 3; } .bu-o-tastatur svg { max-width: 260px; }
+.bu-o-handy svg { max-width: 34px; } .bu-o-kaffee svg { max-width: 46px; } .bu-o-lampe svg { max-width: 60px; } .bu-o-fueller svg { max-width: 54px; } .bu-o-rechner svg { max-width: 58px; }
+.bu-o-korb svg, .bu-o-drucker svg, .bu-o-telefon svg { max-width: 92px; } .bu-o-thermometer svg { max-width: 30px; } .bu-o-klemmbrett svg { max-width: 48px; } .bu-o-rezeptbuch svg, .bu-o-landkarte svg { max-width: 84px; }
+.bu-mon { display: block; width: 100%; max-width: 240px; aspect-ratio: 16 / 10; padding: 5px; border-radius: 9px; background: #22262b; box-shadow: 0 4px 8px rgba(0,0,0,.3); }
+.bu-mon-schirm { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; height: 100%; border-radius: 4px; padding: 6px 8px; overflow: hidden; background: linear-gradient(160deg, #f4f6ee, #e1e6d2); color: #1d1d1b; text-align: left; font-size: clamp(.62rem, 2.7vw, .76rem); line-height: 1.25; }
+.bu-mon-uhr { font-weight: 800; font-size: 1rem; color: #c10230; font-variant-numeric: tabular-nums; }
+.bu-mon-zeile { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.bu-mon-logo { display: grid; justify-items: center; gap: 2px; } .bu-mon-logo img { width: 70px; }
+.bu-mon-fuss { display: block; width: 26%; height: 9px; margin: -1px auto 0; background: #3a3f45; border-radius: 0 0 6px 6px; }
+.bu-namensschild { display: grid; justify-items: center; max-width: min(100%, 230px); margin: 6px auto 0; padding: 4px 14px 5px; border-radius: 5px; background: linear-gradient(180deg, #f8e7a0 0%, #e6c55c 35%, #d4af37 65%, #c9a032 100%); border: 1px solid #8a6a12; box-shadow: 0 2px 3px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.6); color: #3b2a05; line-height: 1.15; text-align: center; }
+.bu-namensschild b { font-size: .8rem; overflow-wrap: anywhere; } .bu-namensschild small { font-size: .6rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; opacity: .85; }
+.bu-kal { width: 54px; border-radius: 6px; overflow: hidden; background: #fffdf8; box-shadow: 0 2px 4px rgba(0,0,0,.25); display: flex; flex-direction: column; align-items: center; color: #3b2f2a; }
+.bu-kmon { width: 100%; background: #c10230; color: #fff; font-size: .7rem; font-weight: 800; text-transform: uppercase; text-align: center; padding: 2px 0; }
+.bu-ktag { font-size: 1.45rem; font-weight: 900; line-height: 1.1; } .bu-kwt { font-size: .66rem; padding-bottom: 2px; color: #7a6a64; }
+/* Pause: Bildschirmschoner mit Frootie */
+.bu-schoner { position: fixed; inset: 0; z-index: 9800; display: grid; grid-template-rows: 1fr auto; cursor: pointer; color: #fff; background: radial-gradient(circle at 50% 35%, #7d8360, #2c2e25 75%); }
+.bu-schoner-feld { display: grid; place-items: center; }
+.bu-schoner-logo { display: grid; justify-items: center; gap: 12px; text-align: center; animation: buSchweben 24s ease-in-out infinite alternate; } .bu-schoner-logo > img { width: 130px; } .bu-schoner-logo span:last-child { font-size: 1.1rem; }
+.bu-schoner-weiter { margin: 0 auto 28px; background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: 10px 18px; }
+@keyframes buSchweben { 0% { transform: translate(-5vw, -14vh); } 33% { transform: translate(5vw, -4vh); } 66% { transform: translate(-4vw, 10vh); } 100% { transform: translate(3vw, -2vh); } }
+@media (prefers-reduced-motion: reduce) { .bu-schoner-logo { animation: none; } }
+/* Tischrechner */
+.rechner { display: grid; gap: 10px; max-width: 320px; margin: 0 auto; }
+.re-anzeige { background: #b9d3a8; color: #22301a; border-radius: 10px; padding: 8px 12px; text-align: right; font-family: ui-monospace, monospace; display: grid; } .re-anzeige small { min-height: 1.2em; opacity: .7; } .re-anzeige b { font-size: 1.8rem; overflow-wrap: anywhere; }
+.re-tasten { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.re-t { height: 52px; border: 0; border-radius: 12px; background: var(--tint); font-size: 1.25rem; font-weight: 700; } .re-t.op { background: var(--red); color: var(--on-red); } .re-t.breit { grid-column: span 2; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

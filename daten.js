@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v12";
+  const SCHLUESSEL = "frooters_demo_v13";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -46,6 +46,7 @@
       P("Inhaber", "(Demo)", "zentrale", null, { wochenstunden: 0 }),
       P("Petra", "Lange", "qualitaet", null, { wochenstunden: 0 }),
       P("Hygieneberater", "(Demo)", "berater", null, { wochenstunden: 0 }),
+      P("Bezirksleitung", "(Demo)", "bezirk", null, { wochenstunden: 0, bezirk: ["och", "obh", "sin"] }),
       P("Sandra", "Becker", "shopleitung", "och", { wochenstunden: 38 }),
       P("Tom", "Krüger", "stv", "och", { wochenstunden: 35 }),
       P("Lena", "Hoffmann", "mitarbeiter", "och", { wochenstunden: 25 }),
@@ -256,7 +257,7 @@
     ];
 
     const state = {
-      version: 12, verkauf, termine, nachrichten, chats: [], erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 13, verkauf, termine, nachrichten, chats: [], erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       waren: { lieferanten, artikel, sortiment: sortimentWaren, inventuren, bestellungen },

@@ -1,10 +1,11 @@
 {
-  "version": "0.13.0",
-  "datum": "2026-11-12",
+  "version": "0.14.0",
+  "datum": "2026-11-13",
   "stufe": "DEV",
   "neu": [
-    "Nachrichten wie in der Club-App: Chat je Filiale, Leitungsrunde, Direktnachrichten; Lesebestätigung ✓✓ und wer gelesen hat",
-    "Termine: Teamsitzung, Schulung, Inventur, Hygiene-Besuch; Zusage, Absage, Vielleicht; Stand der Antworten; Ankündigung und Erinnerung im Chat",
-    "Termine und eigene Dienste als Kalender-Datei mit Erinnerung in den Handy-Kalender"
+    "Büro wie in der Club-App: Aktenschrank mit Jalousie, Ordnerrücken im Regal, Schreibtisch mit Pinnwand, Bildschirm, Kalender, Eingang, Drucker, Telefon, Rechner und mehr",
+    "Jede Rolle hat ihr eigenes Büro: Inhaber, Bezirksleitung, Hygiene & Qualität, Shopleitung, Stellvertretung, Hygieneberatung",
+    "Neue Ordner: Mein Bezirk, Schulungen & Belehrungen, Mitarbeiter, Urlaub & Einsatz, Bestellung, Hygieneregeln, Rezepte & Allergene, Artikel & Lieferanten, Betreiber & Franchise",
+    "Neue Rolle Bezirksleitung mit eigenen Filialen"
   ]
 }

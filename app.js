@@ -1,4 +1,4 @@
-const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 12) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 13) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -26,15 +26,15 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
   const filiale = (id) => S.filialen.find((f) => f.id === id);
   const name = (p) => p ? `${p.vorname} ${p.nachname}`.trim() : "–";
   const ICH = () => person(sitzung.ich);
-  const FIL = () => filiale(sitzung.filiale) || filiale(ICH() && ICH().stammfiliale) || S.filialen[0];
+  const FIL = () => filiale(sitzung.filiale) || filiale(ICH() && (ICH().stammfiliale || (ICH().bezirk || [])[0])) || S.filialen[0];
   const leitung = () => L.istLeitung(ICH(), FIL().id);
   const rolle = () => (ICH() || {}).rolle;
   const zentrale = () => rolle() === "zentrale";
   const qualitaet = () => rolle() === "qualitaet" || zentrale();
   const berater = () => rolle() === "berater";
   const rezeptRecht = () => qualitaet() || rolle() === "shopleitung";
-  const uebergreifend = () => L.UEBERGREIFEND.includes(rolle());
-  const meineFilialen = () => uebergreifend() ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
+  const uebergreifend = () => L.UEBERGREIFEND.includes(rolle()) || rolle() === "bezirk";
+  const meineFilialen = () => L.UEBERGREIFEND.includes(rolle()) ? S.filialen : L.filialenVon(ICH()).map(filiale).filter(Boolean);
   const sortiment = (f) => S.rezepte.warengruppen.filter((g) => !f.sortiment || f.sortiment.includes(g.id));
   const ortTxt = (f, d) => { const o = L.oeffnung(f, d); return o && o.ort ? ` · 📍 ${esc(o.ort)}` : ""; };
   let meldTimer;
@@ -66,7 +66,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     dienst: "Hier siehst du deine Schichten, auch die in anderen Filialen, wenn du als Springer eingeteilt bist.",
     wuensche: "Tipp für jeden Tag an, ob du möchtest, kannst oder nicht kannst. Die Shopleitung sieht das beim Planen.",
     krank: "Gute Besserung! Melde dich hier krank, deine Shopleitung bekommt sofort Bescheid. Diagnosen gehören hier nicht hin.",
-    buero: "Das Büro: Jeder Ordner hat seine Aufgabe. Was du siehst, hängt von deiner Rolle ab. Der Inhaber legt unter „Freigaben“ fest, wer welchen Ordner sieht.",
+    buero: "Dein Büro: Im Aktenschrank stehen deine Ordner, auf dem Schreibtisch alles, was du oft brauchst. Tipp auf ein Teil. Jede Rolle hat ihr eigenes Büro, der Inhaber legt unter „Freigaben“ fest, wer welchen Ordner sieht.",
     studio: "Wähle eine Vorlage, trag deinen Text ein und drucke das Blatt im frooters-Design. Preise denkst du dir nicht aus: leere Preise stehen als „… €“ auf dem Blatt.",
     abwesenheit: "Hier meldest du dich krank oder beantragst Urlaub, Bildungsurlaub und mehr. Oben siehst du dein Urlaubskonto: Anspruch, genommen, geplant und Rest.",
     urlaubsuebersicht: "Wähle oben die Filialen: deine, alle oder nur bestimmte. Im Kalender siehst du, wer wann fehlt. Unter „Urlaubskonten“ steht der Rest jeder Person.",
@@ -166,7 +166,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu: 💬 Nachrichten mit Lesebestätigung und 📅 Termine zum Zusagen, dazu Dienste und Termine im Handy-Kalender.", go: "nachrichten" };
+  const WAS_NEU = { text: "Neu: Dein Büro wie in der Club-App, mit Aktenschrank, Ordnern und Schreibtisch. Jede Rolle hat ihr eigenes Büro.", go: "buero" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -284,7 +284,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     const r = [];
     const t = document.createElement("template"); t.innerHTML = V.start();
     for (const k of t.content.querySelectorAll(".kachel")) if (passt(k.querySelector("b").textContent + " " + k.querySelector("span:not(.sym)").textContent)) r.push({ sym: k.querySelector(".sym").textContent, t: k.querySelector("b").textContent, u: "Bereich", go: k.dataset.go });
-    for (const p of S.personen) if (p.aktiv !== false && passt(name(p))) { const darf = erlaubteAnsicht("ma-edit") === "ma-edit" && (zentrale() || p.stammfiliale === FIL().id); r.push({ sym: "👤", t: name(p), u: `${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + filiale(p.stammfiliale).kurz : ""}`, go: darf ? "ma-edit" : "", arg: p.id }); }
+    for (const p of S.personen) if (p.aktiv !== false && passt(name(p))) { const darf = erlaubteAnsicht("ma-edit") === "ma-edit" && (zentrale() || p.stammfiliale === FIL().id); r.push({ sym: "👤", t: name(p), u: `${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + (filiale(p.stammfiliale) || {}).kurz : ""}`, go: darf ? "ma-edit" : "", arg: p.id }); }
     for (const x of L.rezepteFreigegeben(S)) if (passt(x.name + " " + x.beschreibung)) r.push({ sym: "📖", t: x.name, u: "Rezept", go: "rezept", arg: x.id });
     if (rezeptRecht()) for (const z of S.rezepte.zutaten) if (passt(z.name)) r.push({ sym: "🧾", t: z.name, u: "Zutat", go: "zutat-edit", arg: z.id });
     if (zentrale()) for (const a of L.waren(S).artikel) if (passt(a.name)) r.push({ sym: "🏷️", t: a.name, u: "Artikel", go: "artikel-edit", arg: a.id });
@@ -514,12 +514,12 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
         <div class="wahl"><button class="${uebAnsicht === "kalender" ? "an" : ""}" data-act="ueb-ansicht" data-a="kalender">📅 Kalender</button><button class="${uebAnsicht === "konten" ? "an" : ""}" data-act="ueb-ansicht" data-a="konten">🧮 Urlaubskonten</button><button class="${uebAnsicht === "liste" ? "an" : ""}" data-act="ueb-ansicht" data-a="liste">📋 Liste</button></div></div>
       ${uebAnsicht === "kalender" ? `<div class="karte"><div class="reihe zw"><button class="chip" data-go="urlaubsuebersicht" data-arg="${vor}">‹</button><b>${["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"][m - 1]} ${y} · ${esc(filText)}</b><button class="chip" data-go="urlaubsuebersicht" data-arg="${nach}">›</button></div>
         <div class="matrix-scroll"><table class="ukal"><thead><tr><th></th>${tage.map((t) => `<th class="${L.wochentag(t) === "so" ? "u-so" : ""}">${Number(t.slice(8))}<small>${L.TAG_NAME[L.wochentag(t)].slice(0, 2)}</small></th>`).join("")}</tr></thead>
-          <tbody>${leute.map((p) => `<tr><th>${esc(p.vorname)} ${esc(p.nachname.slice(0, 1))}.<small>${esc(filiale(p.stammfiliale).kurz)}</small></th>${tage.map((t) => zelle(p, t)).join("")}</tr>`).join("")}
+          <tbody>${leute.map((p) => `<tr><th>${esc(p.vorname)} ${esc(p.nachname.slice(0, 1))}.<small>${esc((filiale(p.stammfiliale) || {}).kurz)}</small></th>${tage.map((t) => zelle(p, t)).join("")}</tr>`).join("")}
           <tr class="u-summe"><th>abwesend</th>${tage.map((t) => { const n = leute.filter((p) => abw.some((a) => a.personId === p.id && L.zwischen(t, a.von, a.bis) && a.status !== "beantragt")).length; return `<td class="${n >= 3 ? "u-viel" : ""}">${n || ""}</td>`; }).join("")}</tr></tbody></table></div>
         <div class="legende"><span class="u-urlaub">🏖️ Urlaub</span><span class="u-krank">🤒 krank</span><span class="u-bildungsurlaub">🎓 Bildung</span><span class="u-antrag">beantragt</span><span class="u-abw">• abwesend</span></div></div>`
       : uebAnsicht === "konten" ? `<div class="karte"><h2>Urlaubskonten ${jahr} · ${esc(filText)}</h2><div class="matrix-scroll"><table class="zutaten"><thead><tr><td><b>Name</b></td><td><b>Anspruch</b></td><td><b>genommen</b></td><td><b>geplant</b></td><td><b>beantragt</b></td><td><b>Rest</b></td></tr></thead><tbody>
-          ${leute.map((p) => { const k = L.urlaubskonto(S, p, jahr, d); return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc(filiale(p.stammfiliale).kurz)}</span></td><td>${k.anspruch}${k.uebertrag ? ` +${k.uebertrag}` : ""}</td><td>${k.genommen}</td><td>${k.geplant}</td><td>${k.beantragt || ""}</td><td><b class="${k.rest < 0 ? "rot-txt" : ""}">${k.rest}</b></td></tr>`; }).join("")}</tbody></table></div></div>`
-      : `<div class="liste">${abw.sort((a, b) => a.von.localeCompare(b.von)).map((a) => { const p = person(a.personId), art = sichtArt(a, p); return `<div class="zeile"><span class="punkt ${ABW_FARBE[a.status] || ""}"></span><span><b>${esc(name(p))}</b> · ${art.sym} ${esc(art.name)}<small>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)} · ${esc(filiale(p.stammfiliale).kurz)}</small></span><span class="marke-s ${ABW_FARBE[a.status] || ""}">${ABW_STATUS[a.status] || a.status}</span></div>`; }).join("") || '<p class="leer">Keine Abwesenheiten in diesem Monat.</p>'}</div>`}`;
+          ${leute.map((p) => { const k = L.urlaubskonto(S, p, jahr, d); return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc((filiale(p.stammfiliale) || {}).kurz)}</span></td><td>${k.anspruch}${k.uebertrag ? ` +${k.uebertrag}` : ""}</td><td>${k.genommen}</td><td>${k.geplant}</td><td>${k.beantragt || ""}</td><td><b class="${k.rest < 0 ? "rot-txt" : ""}">${k.rest}</b></td></tr>`; }).join("")}</tbody></table></div></div>`
+      : `<div class="liste">${abw.sort((a, b) => a.von.localeCompare(b.von)).map((a) => { const p = person(a.personId), art = sichtArt(a, p); return `<div class="zeile"><span class="punkt ${ABW_FARBE[a.status] || ""}"></span><span><b>${esc(name(p))}</b> · ${art.sym} ${esc(art.name)}<small>${L.datumKurz(a.von)} bis ${L.datumKurz(a.bis)} · ${esc((filiale(p.stammfiliale) || {}).kurz)}</small></span><span class="marke-s ${ABW_FARBE[a.status] || ""}">${ABW_STATUS[a.status] || a.status}</span></div>`; }).join("") || '<p class="leer">Keine Abwesenheiten in diesem Monat.</p>'}</div>`}`;
   };
 
   V.tausch = () => {
@@ -769,7 +769,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     fenster = `<div class="reihe zw"><h2>${L.schicht(schId).name}, ${datumLang(d)}</h2><button class="chip" data-act="zu">✕</button></div>
       <p class="muted klein">${esc(f.kurz)} · ${zeitTxt(L.schichtZeit(f, d, schId))}. Grauer Rand = Springer aus einer anderen Filiale.</p>
       <div class="liste">${ks.map((k) => `<button class="zeile ${k.person.stammfiliale !== f.id ? "springer" : ""}" data-act="einteilen" data-id="${k.person.id}" data-datum="${d}" data-schicht="${schId}" ${k.moeglich ? "" : "disabled"} style="${k.moeglich ? "" : "opacity:.5"}">
-        <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc(filiale(k.person.stammfiliale).kurz)}</span>` : ""}
+        <span class="punkt ${k.moeglich ? (k.punkte > 0 ? "gruen" : "gelb") : "rot"}"></span><span><b>${esc(name(k.person))}</b> ${k.person.stammfiliale !== f.id ? `<span class="marke-s">Springer · ${esc((filiale(k.person.stammfiliale) || {}).kurz)}</span>` : ""}
         <small>${L.ROLLEN[k.person.rolle].name} · ${k.stand.ist} von ${k.stand.soll || "–"} Std. ${k.stand.einheit === "monat" ? "im Monat" : "in der Woche"}${k.gruende.length ? " · " + k.gruende.map(esc).join(", ") : ""}</small></span><span>${k.moeglich ? (k.stand.ueberGrenze || k.profil.length || k.gesetz.length ? "⚠️" : "+") : ""}</span></button>`).join("")}</div>`;
   }
 
@@ -920,7 +920,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
   V.team = () => {
     const f = FIL();
     const leute = S.personen.filter((p) => L.darfInFiliale(p, f.id));
-    return `${titel("Team " + esc(f.kurz))}<div class="liste">${leute.map((p) => `<div class="zeile"><span class="punkt ${L.abwesenheitAm(S, p.id, heute()) ? "rot" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale !== f.id ? ` · Springer aus ${esc(filiale(p.stammfiliale).kurz)}` : p.springer ? ` · Springer auch in ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ")}` : ""} · ${p.wochenstunden} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"}</small></span><span></span></div>`).join("")}</div>`;
+    return `${titel("Team " + esc(f.kurz))}<div class="liste">${leute.map((p) => `<div class="zeile"><span class="punkt ${L.abwesenheitAm(S, p.id, heute()) ? "rot" : "gruen"}"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale !== f.id ? ` · Springer aus ${esc((filiale(p.stammfiliale) || {}).kurz)}` : p.springer ? ` · Springer auch in ${p.einsatzfilialen.map((x) => esc(filiale(x).kurz)).join(", ")}` : ""} · ${p.wochenstunden} Std./${p.stundenEinheit === "monat" ? "Monat" : "Woche"}</small></span><span></span></div>`).join("")}</div>`;
   };
 
   // ----- Zentrale -----
@@ -1071,7 +1071,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
         <div class="feld"><label for="imp-text">Daten</label><textarea id="imp-text" rows="7" placeholder="${esc(IMPORT_VORLAGE)}">${esc(importText)}</textarea></div>
         <button class="btn zwei" data-act="imp-pruefen">Prüfen</button></div>
       ${r ? `<div class="karte"><h2>Vorschau</h2>${r.fehlerGesamt ? `<p class="hinweis">${esc(r.fehlerGesamt)}</p>` : `<div class="tab-karte"><table class="pc-tab"><thead><tr><th>Zeile</th><th>Name</th><th>Filiale · Rolle</th><th>Beschäftigung · Umfang</th><th>Ergebnis</th></tr></thead><tbody>
-        ${r.zeilen.map((z) => { const fremd = z.person && !zentrale() && z.person.stammfiliale !== FIL().id; return `<tr><td>${z.nr}</td><td>${z.person ? esc(z.person.vorname + " " + z.person.nachname) : "–"}</td><td>${z.person ? `${esc(filiale(z.person.stammfiliale).kurz)} · ${L.ROLLEN[z.person.rolle].name}` : ""}</td><td>${z.person ? `${esc((L.beschaeftigung(z.person.beschaeftigung) || { name: "–" }).name)} · ${z.person.wochenstunden} Std./${z.person.stundenEinheit === "monat" ? "Monat" : "Woche"}` : ""}</td>
+        ${r.zeilen.map((z) => { const fremd = z.person && !zentrale() && z.person.stammfiliale !== FIL().id; return `<tr><td>${z.nr}</td><td>${z.person ? esc(z.person.vorname + " " + z.person.nachname) : "–"}</td><td>${z.person ? `${esc((filiale(z.person.stammfiliale) || {}).kurz)} · ${L.ROLLEN[z.person.rolle].name}` : ""}</td><td>${z.person ? `${esc((L.beschaeftigung(z.person.beschaeftigung) || { name: "–" }).name)} · ${z.person.wochenstunden} Std./${z.person.stundenEinheit === "monat" ? "Monat" : "Woche"}` : ""}</td>
           <td>${z.fehler.length ? `<span class="marke-s rot">${esc(z.fehler.join(", "))}</span>` : z.doppelt ? '<span class="marke-s gelb">gibt es schon, wird übersprungen</span>' : fremd ? '<span class="marke-s gelb">andere Filiale, wird übersprungen</span>' : '<span class="marke-s gruen">wird angelegt</span>'}</td></tr>`; }).join("")}</tbody></table></div>
         <button class="btn gross" data-act="imp-ok" ${ok.length ? "" : "disabled"}>${ok.length} Mitarbeiter anlegen</button><p class="klein muted">Einsatzprofil, Springer und Qualifikationen danach je Person ergänzen.</p>`}</div>` : ""}`;
   };
@@ -1175,12 +1175,134 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     st.textContent = `@page { size: A4 ${quer ? "landscape" : "portrait"}; margin: 0; }`;
     setTimeout(() => { try { window.print(); } catch (e) { meldung("Drucken ist hier nicht möglich"); } }, 80);
   }
-  V.buero = () => {
-    const ord = bueroOrdner();
-    return `${titel("Büro")}${frootie(FROOTIE_TIPPS.buero)}
-      <div class="regal">${ord.map((o) => `<button class="ordner" data-go="${o.id === "studio" ? "studio" : "ordner"}" data-arg="${o.id}" style="--o:${o.farbe}"><span class="ruecken"><span class="loch"></span><span class="schild">${o.sym}<b>${esc(o.t)}</b></span></span><span class="o-text">${esc(o.u)}</span></button>`).join("")}</div>
-      <p class="klein muted">${zentrale() ? `Du siehst alle ${B.ORDNER.length} Ordner. Shopleitungen sehen ${B.ORDNER.filter((o) => B.darfOrdner(S, "shopleitung", o.id)).length}.` : `${ord.length} Ordner für dich freigegeben.`}</p>`;
-  };
+  // ----- Büro als Raum (wie in der Club-App): Aktenschrank mit Jalousie, Ordner, Schreibtisch. Jede Rolle hat ihr eigenes Büro. -----
+  const ordnerZiel = (o) => o.go || (o.id === "studio" ? "studio" : "ordner");
+  const ordnerSichtbar = () => bueroOrdner().filter((o) => !o.go || erlaubteAnsicht(o.go) === o.go);
+  const meinBuero = () => B.BUEROS[rolle()] || B.BUEROS.shopleitung;
+  const tageszeitGruss = () => { const h = new Date().getHours(); return h < 11 ? "Guten Morgen" : h < 17 ? "Hallo" : "Guten Abend"; };
+  // Eingang (Ablagekorb): alles, was auf diese Person wartet, mit Sprung dorthin
+  function bueroEingang() {
+    const f = FIL(), r = [];
+    if (leitung()) {
+      const a = offeneAntraege(f.id).length + tauschAnfragen(f.id).length; if (a) r.push({ sym: "✅", t: `${a} Antr${a > 1 ? "äge" : "ag"} zu entscheiden`, go: "antraege" });
+      const o = offeneSchichten(f.id, heute(), 7).length + leitungsMeldungen(f.id).length; if (o) r.push({ sym: "🚨", t: `${o} offene Schicht${o > 1 ? "en" : ""} oder Meldung${o > 1 ? "en" : ""}`, go: "offen" });
+      const b = bestellZaehler(f.id); if (b) r.push({ sym: "📦", t: `${b} × Bestellung prüfen (knapp oder freigegeben)`, go: "bestellung" });
+    }
+    if (rezeptRecht()) { const n = meineFreigaben().length; if (n) r.push({ sym: "📝", t: `${n} Änderung${n > 1 ? "en" : ""} an Rezepten/Allergenen freigeben`, go: "freigaben" }); }
+    const q = (leitung() || zentrale() || qualitaet()) ? L.qualiAblauf({ personen: schulungsLeute() }, heute(), 30).length : 0; if (q) r.push({ sym: "🎓", t: `${q} Belehrung${q > 1 ? "en" : ""}/Schulung${q > 1 ? "en" : ""} laufen ab`, go: "ordner", arg: "schulungen" });
+    const t = terminOffen(); if (t) r.push({ sym: "📅", t: `${t} Termin${t > 1 ? "e" : ""} ohne deine Antwort`, go: "termine" });
+    const n = chatUngelesenGesamt(); if (n) r.push({ sym: "💬", t: `${n} ungelesene Nachricht${n > 1 ? "en" : ""}`, go: "nachrichten" });
+    return r;
+  }
+  // Wer gehört zu meinen Schulungen/Belehrungen? Inhaber und Qualität: alle; Bezirk: seine Filialen; Shopleitung: eigene Filiale
+  const schulungsLeute = () => S.personen.filter((p) => p.stammfiliale && p.aktiv !== false && (zentrale() || rolle() === "qualitaet" || meineFilialen().some((f) => f.id === p.stammfiliale)));
+  const BU_LAMELLEN = 26, BU_SCHRIFT = "Team App";
+  function jalousieLamellen() { const w = [...BU_SCHRIFT], ab = Math.floor((BU_LAMELLEN - w.length) / 2); return Array.from({ length: BU_LAMELLEN }, (_, i) => `<i class="bu-jal-lamelle">${w[i - ab] ? `<b>${w[i - ab]}</b>` : ""}</i>`).join(""); }
+  function bueroRaum() {
+    const p = ICH(), def = meinBuero(), ord = ordnerSichtbar(), ein = bueroEingang(), auf = geraet.schrankZu !== true;
+    const naechst = termineSichtbar().find((t) => !t.abgesagt);
+    const zahl = { rezepte: meineFreigaben().length, bestellung: leitung() ? bestellZaehler(FIL().id) : 0, schulungen: L.qualiAblauf({ personen: schulungsLeute() }, heute(), 30).length, einsatz: leitung() ? offeneAntraege(FIL().id).length : 0 };
+    const ruecken = (o) => `<button class="bu-ordner" style="--of:${o.farbe}" data-go="${ordnerZiel(o)}" data-arg="${o.id}" title="${esc(o.t + " – " + o.u)}" aria-label="${esc(o.t)}${zahl[o.id] ? `, ${zahl[o.id]} offen` : ""}"><span class="bu-osym" aria-hidden="true">${o.sym}</span><span class="bu-otext">${esc(o.t)}</span>${zahl[o.id] ? `<span class="bu-ozahl">${zahl[o.id]}</span>` : ""}<span class="bu-oloch" aria-hidden="true"></span></button>`;
+    const nacht = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    const monZeilen = [naechst ? `📅 ${esc(naechst.titel)} ${naechst.datum === heute() ? "heute" : L.datumKurz(naechst.datum)}` : "", ein.length ? `📥 ${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"}` : "", chatUngelesenGesamt() ? `💬 ${chatUngelesenGesamt()} ungelesen` : ""].filter(Boolean);
+    const ding = (id, inhalt, label, ziel, extra) => `<button type="button" class="bu-obj bu-o-${id}" ${ziel} aria-label="${esc(label)}">${inhalt}<span class="bu-olabel">${label}</span>${extra || ""}</button>`;
+    const go = (v, a) => erlaubteAnsicht(v) === v ? `data-go="${v}"${a ? ` data-arg="${a}"` : ""}` : null;
+    const ordnerGo = (id) => darfO(id) ? `data-go="${id === "studio" ? "studio" : "ordner"}" data-arg="${id}"` : null;
+    const DINGE = {
+      lampe: () => ding("lampe", B.BU_SVG.lampe(nacht), nacht ? "Licht aus" : "Licht an", 'data-act="bu-lampe"'),
+      monitor: () => `<button type="button" class="bu-obj bu-o-monitor" data-act="bu-liste" aria-label="Bildschirm – Büro als Liste"><span class="bu-mon"><span class="bu-mon-schirm"><span class="bu-mon-uhr" id="bu-uhr">${new Date().toTimeString().slice(0, 5)}</span>${monZeilen.length ? monZeilen.map((z) => `<span class="bu-mon-zeile">${z}</span>`).join("") : '<span class="bu-mon-logo"><img src="logo.svg" alt=""><small>Alles erledigt 👍</small></span>'}</span></span><span class="bu-mon-fuss"></span><span class="bu-namensschild"><b>${esc(name(p))}</b><small>${esc(def.schild)}${FIL() && !zentrale() && rolle() !== "qualitaet" && rolle() !== "berater" ? " · " + esc(FIL().kurz) : ""}</small></span></button>`,
+      kalender: () => ding("kalender", naechst ? `<span class="bu-kal"><span class="bu-kmon">${new Date(naechst.datum + "T12:00").toLocaleDateString("de-DE", { month: "short" })}</span><span class="bu-ktag">${Number(naechst.datum.slice(8, 10))}</span><span class="bu-kwt">${L.TAG_NAME[L.wochentag(naechst.datum)].slice(0, 2)}</span></span>` : '<span class="bu-kal"><span class="bu-kmon">–</span><span class="bu-ktag">·</span></span>', "Termine", 'data-go="termine"', terminOffen() ? `<span class="bu-dzahl">${terminOffen()}</span>` : ""),
+      korb: () => ding("korb", B.BU_SVG.korb, "Eingang", 'data-act="bu-eingang"', ein.length ? `<span class="bu-dzahl">${ein.length}</span>` : ""),
+      drucker: () => { const z = ordnerGo("studio") || ordnerGo("hygiene"); return z ? ding("drucker", B.BU_SVG.drucker, darfO("studio") ? "Drucken" : "Bericht", z) : ""; },
+      handy: () => go("nachrichten") ? ding("handy", B.BU_SVG.handy, "Team-Chat", go("nachrichten"), chatUngelesenGesamt() ? `<span class="bu-dzahl">${chatUngelesenGesamt()}</span>` : "") : "",
+      kaffee: () => ding("kaffee", B.BU_SVG.kaffee, "Pause", 'data-act="bu-pause"'),
+      fueller: () => ordnerGo("briefe") ? ding("fueller", B.BU_SVG.fueller, "Briefe", ordnerGo("briefe")) : "",
+      telefon: () => ordnerGo("adressen") ? ding("telefon", B.BU_SVG.telefon, "Adressen", ordnerGo("adressen")) : "",
+      tastatur: () => go("nachrichten") ? ding("tastatur", B.BU_SVG.tastatur, "Nachricht schreiben", go("nachrichten")) : "",
+      rechner: () => ding("rechner", B.BU_SVG.rechner, "Rechner", 'data-act="bu-rechner"'),
+      thermometer: () => { const z = go("hygkontrolle"); return z ? ding("thermometer", B.BU_SVG.thermometer, "Hygiene-Kontrolle", z) : ""; },
+      rezeptbuch: () => { const z = go("rezeptpflege"); return z ? ding("rezeptbuch", B.BU_SVG.rezeptbuch, "Rezepte", z, meineFreigaben().length ? `<span class="bu-dzahl">${meineFreigaben().length}</span>` : "") : ""; },
+      landkarte: () => ordnerGo("bezirk") ? ding("landkarte", B.BU_SVG.landkarte, "Mein Bezirk", ordnerGo("bezirk")) : "",
+      klemmbrett: () => { const z = rolle() === "qualitaet" ? go("regeln") : rolle() === "berater" ? ordnerGo("hygiene") : go("hygiene"); return z ? ding("klemmbrett", B.BU_SVG.klemmbrett, rolle() === "qualitaet" ? "Hygieneregeln" : rolle() === "berater" ? "Nachweise" : "Hygiene heute", z) : ""; },
+    };
+    const dinge = def.dinge.map((k) => (DINGE[k] || (() => ""))()).filter(Boolean).join("");
+    return `${titel(esc(def.titel))}
+      <div class="karte bu-gruss"><b>${tageszeitGruss()}, ${esc(p.vorname)}!</b> <span class="muted">${ein.length ? `${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"} im Eingang.` : "Im Eingang ist alles erledigt. 👍"}</span>
+        <div class="reihe"><button class="chip" data-act="bu-liste">☰ Als Liste</button>${rolle() === "zentrale" ? '<button class="chip" data-go="ordner" data-arg="freigaben">🔐 Wer sieht welchen Ordner?</button>' : ""}</div></div>
+      <div class="bu-raum">
+        <div class="bu-schrank ${auf ? "auf" : ""}" id="bu-schrank">
+          <button type="button" class="bu-schrank-zeile" data-act="bu-schrank" aria-expanded="${auf}"><span aria-hidden="true">🗄️</span><b>Aktenschrank</b><small>${ord.length} Ordner</small><span class="bu-schrank-pfeil" aria-hidden="true">${auf ? "⌃" : "⌄"}</span></button>
+          <div class="bu-schrank-koerper">
+            <div class="bu-wand"><div class="bu-regal">${ord.map(ruecken).join("")}</div></div>
+            <div class="bu-jalousie" aria-hidden="true"><div class="bu-jal-lamellen">${jalousieLamellen()}</div><div class="bu-jal-marke"><img src="logo.svg" alt=""></div></div>
+            <button type="button" class="bu-jal-griff" data-act="bu-schrank" aria-label="${auf ? "Aktenschrank schließen" : "Aktenschrank öffnen"}">${auf ? "▶" : "◀"}</button>
+          </div></div>
+        <div class="bu-tisch">
+          <div class="bu-pinnwand" aria-label="Pinnwand im Büro"><div class="bu-zettelreihe">
+            <button class="bu-zettel" ${naechst ? `data-go="termin" data-arg="${naechst.id}"` : 'data-go="termine"'}><b>Nächster Termin</b>${naechst ? `${esc(naechst.titel)} · ${L.datumKurz(naechst.datum)} ${naechst.von}` : "Keiner geplant"}</button>
+            <button class="bu-zettel gruen" data-act="bu-eingang"><b>Eingang</b>${ein.length ? `${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"} auf dich` : "Alles erledigt 👍"}</button>
+          </div></div>
+          <div class="bu-platte">${dinge}</div>
+        </div>
+      </div>`;
+  }
+  function bueroListe() {
+    const ord = ordnerSichtbar();
+    return `${titel(esc(meinBuero().titel))}${frootie(FROOTIE_TIPPS.buero)}
+      <div class="reihe"><button class="chip" data-act="bu-raum">🪑 Als Büro mit Schreibtisch</button></div>
+      <div class="regal">${ord.map((o) => `<button class="ordner" data-go="${ordnerZiel(o)}" data-arg="${o.id}" style="--o:${o.farbe}"><span class="ruecken"><span class="loch"></span><span class="schild">${o.sym}<b>${esc(o.t)}</b></span></span><span class="o-text">${esc(o.u)}</span></button>`).join("")}</div>
+      <p class="klein muted">${zentrale() ? `Du siehst alle ${B.ORDNER.length} Ordner. Jede Rolle hat ihr eigenes Büro: ${Object.entries(B.BUEROS).filter(([r]) => r !== "zentrale").map(([r, b]) => `${esc(b.schild)} ${B.ORDNER.filter((o) => B.darfOrdner(S, r, o.id)).length}`).join(" · ")}.` : `${ord.length} Ordner für dich freigegeben.`}</p>`;
+  }
+  // Mein Bezirk: Filialen im Vergleich (Bezirksleitung: ihre Filialen; Inhaber: alle)
+  function bezirkOrdner(kopf) {
+    const d = heute(), mo = L.montag(d), fs = zentrale() ? S.filialen : meineFilialen();
+    const zeilen = fs.map((f) => {
+      let soll = 0, ist = 0; for (const t of L.woche(mo)) for (const sch of L.SCHICHTEN) { const a = L.abdeckung(S, f.id, t, sch.id); soll += a.soll; ist += Math.min(a.ist, a.soll); }
+      const hs = L.tagesSumme(L.tagesliste(S, f.id, d, { datum: d, min: jetztMin() }));
+      const krank = S.abwesenheiten.filter((a) => a.art === "krank" && L.zwischen(d, a.von, a.bis) && (person(a.personId) || {}).stammfiliale === f.id).length;
+      const knapp = L.bestellVorschlag(S, f.id).filter((z) => z.unterMin).length, antr = offeneAntraege(f.id).length;
+      return `<tr><td><b>${esc(f.kurz)}</b></td><td class="z">${soll ? Math.round((ist / soll) * 100) + " %" : "–"}</td><td class="z">${hs.gesamt ? Math.round(((hs.erledigt + hs.abweichung) / hs.gesamt) * 100) + " %" : "–"}${hs.abweichung ? ` <span class="marke-s rot">${hs.abweichung} Abw.</span>` : ""}</td><td class="z">${krank || "–"}</td><td class="z">${knapp ? `<span class="marke-s gelb">${knapp}</span>` : "–"}</td><td class="z">${antr || "–"}</td><td><button class="chip" data-act="filiale-sprung" data-id="${f.id}">öffnen</button></td></tr>`;
+    }).join("");
+    return `${kopf}<div class="karte tab-karte"><table class="pc-tab"><thead><tr><th>Filiale</th><th class="z">besetzt (Woche)</th><th class="z">Hygiene heute</th><th class="z">krank</th><th class="z">knapp im Lager</th><th class="z">Anträge</th><th></th></tr></thead><tbody>${zeilen}</tbody></table></div>
+      <p class="klein muted">„öffnen“ wechselt in die Filiale (oben rechts 📍) und zeigt ihre Startseite.</p>`;
+  }
+  // Schulungen & Belehrungen: wer braucht wann eine Auffrischung, dazu die nächsten Schulungstermine
+  function schulungenOrdner(kopf) {
+    const leute = schulungsLeute(), ab = L.qualiAblauf({ personen: leute }, heute(), 60);
+    const ohne = leute.filter((p) => !(p.quali || []).some((q) => q.art === "ifsg"));
+    const termine = termineSichtbar().filter((t) => t.art === "schulung" && !t.abgesagt);
+    return `${kopf}<div class="karte"><h2>Läuft in 60 Tagen ab</h2>${ab.length ? `<div class="liste">${ab.map((x) => `<div class="zeile"><span class="punkt ${x.abgelaufen ? "rot" : "gelb"}"></span><span><b>${esc(name(x.person))}</b><small>${esc(x.name)} · ${x.abgelaufen ? "abgelaufen seit" : "bis"} ${L.datumKurz(x.bis)} · ${esc((filiale(x.person.stammfiliale) || {}).kurz || "")}</small></span><span></span></div>`).join("")}</div>` : '<p class="muted">Nichts läuft bald ab. 👍</p>'}</div>
+      ${ohne.length ? `<div class="karte"><h2>Ohne Belehrung § 43 IfSG eingetragen</h2><p class="klein">${ohne.map((p) => esc(name(p))).join(", ")}</p><p class="klein muted">Bitte Datum der Belehrung bei der Person unter „Mitarbeiter“ eintragen.</p></div>` : ""}
+      <div class="karte"><h2>Schulungstermine</h2>${termine.length ? `<div class="liste">${termine.map(terminZeile).join("")}</div>` : '<p class="muted">Keine Schulung geplant.</p>'}${leitung() || zentrale() ? '<button class="btn drei" data-act="schulung-neu">+ Schulung planen</button>' : ""}</div>`;
+  }
+  // Tischrechner (einfach, wie der Rechner auf dem Club-Schreibtisch)
+  let rechner = { anzeige: "0", rechnung: "" };
+  const rechnerFenster = () => `<div class="reihe zw"><h2>🧮 Rechner</h2><button class="chip" data-act="zu">✕</button></div>
+    <div class="rechner"><div class="re-anzeige" aria-live="polite"><small>${esc(rechner.rechnung)}</small><b>${esc(rechner.anzeige)}</b></div>
+    <div class="re-tasten">${["C", "←", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "0", ",", "="].map((t) => `<button class="re-t ${/[÷×−+=]/.test(t) ? "op" : ""} ${t === "0" ? "breit" : ""}" data-act="re-taste" data-t="${t}">${t}</button>`).join("")}</div></div>`;
+  function rechnerTaste(t) {
+    let { anzeige: a, rechnung: r } = rechner;
+    if (t === "C") { a = "0"; r = ""; }
+    else if (t === "←") a = a.length > 1 ? a.slice(0, -1) : "0";
+    else if (/\d/.test(t)) a = a === "0" || a === "Fehler" ? t : a + t;
+    else if (t === ",") { if (!a.includes(",")) a += ","; }
+    else if (t === "%") a = String(Number(a.replace(",", ".")) / 100).replace(".", ",");
+    else {
+      const ausdruck = (r + " " + a).replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-").replace(/,/g, ".");
+      if (t === "=") { if (!/^[\d.\s+\-*/]+$/.test(ausdruck)) { a = "Fehler"; r = ""; } else { const v = rechnen(ausdruck); a = v == null ? "Fehler" : String(Math.round(v * 1e8) / 1e8).replace(".", ","); r = ""; } }
+      else { r = (r + " " + a + " " + t).trim(); a = "0"; }
+    }
+    rechner = { anzeige: a, rechnung: r };
+  }
+  // Rechnet + − × ÷ mit Punkt vor Strich, ohne eval
+  function rechnen(t) {
+    const teile = t.trim().split(/\s+/); if (!teile.length) return null;
+    const zahlen = [Number(teile[0])], ops = [];
+    for (let i = 1; i < teile.length; i += 2) { const op = teile[i], z = Number(teile[i + 1]); if (isNaN(z)) return null; if (op === "*") zahlen.push(zahlen.pop() * z); else if (op === "/") { if (z === 0) return null; zahlen.push(zahlen.pop() / z); } else { ops.push(op); zahlen.push(z); } }
+    let e = zahlen[0]; ops.forEach((op, i) => { e = op === "+" ? e + zahlen[i + 1] : e - zahlen[i + 1]; });
+    return isNaN(e) ? null : e;
+  }
+  V.buero = () => geraet.bueroListe ? bueroListe() : bueroRaum();
   V.studio = () => {
     if (!darfO("studio")) return V.buero();
     const f = FIL(), gesp = ablage().filter((x) => x.ordner === "studio" && !x.entfernt && (zentrale() || x.filiale === f.id || x.filiale === null)).sort((a, b) => b.zeit.localeCompare(a.zeit));
@@ -1215,6 +1337,9 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
     const id = arg, o = B.ORDNER.find((x) => x.id === id);
     if (!o || !darfO(id)) return V.buero();
     const f = FIL(), kopf = `${titel(o.sym + " " + esc(o.t), "buero")}`;
+    if (o.go) return (V[erlaubteAnsicht(o.go)] || V.buero)();
+    if (id === "bezirk") return bezirkOrdner(kopf);
+    if (id === "schulungen") return schulungenOrdner(kopf);
     if (id === "shop" || id === "zentrale") {
       const docs = ablage().filter((x) => x.ordner === id && !x.entfernt && (id === "zentrale" || x.filiale === f.id)).sort((a, b) => b.zeit.localeCompare(a.zeit));
       return `${kopf}<p class="muted">${id === "shop" ? `Unterlagen für ${esc(f.kurz)}: Arbeitsanweisungen, Geräte, Center, Sonstiges.` : "Unterlagen der Geschäftsführung. Nur der Inhaber sieht diesen Ordner."}</p>
@@ -1250,7 +1375,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
       const sp = [["vertrag", "Arbeitsvertrag", 0], ["belehrung", "Belehrung § 43 IfSG", 2], ["datenschutz", "Datenschutz-Info", 0], ["schulung", "Hygieneschulung", 1]];
       return `${kopf}<p class="muted">Nur der Inhaber. Belehrung nach § 43 IfSG mindestens alle 2 Jahre, Hygieneschulung jährlich (Vorschlag).</p>
         <div class="karte"><div class="matrix-scroll"><table class="zutaten pakte"><thead><tr><td><b>Name</b></td>${sp.map(([, t]) => `<td><b>${t}</b></td>`).join("")}</tr></thead><tbody>
-        ${leute.map((p) => { const a = S.buero.personal[p.id] || {}; return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc(filiale(p.stammfiliale).kurz)} · ${L.ROLLEN[p.rolle].name}</span></td>${sp.map(([k, , j]) => { const [farbe, txt] = j ? ampel(a[k], j) : (a[k] ? ["gruen", "ok"] : ["rot", "fehlt"]); return `<td><input type="date" data-pakte="${p.id}|${k}" value="${esc(a[k] || "")}" aria-label="${k} ${esc(p.vorname)}"><span class="marke-s ${farbe}">${txt}</span></td>`; }).join("")}</tr>`; }).join("")}</tbody></table></div></div>`;
+        ${leute.map((p) => { const a = S.buero.personal[p.id] || {}; return `<tr><td>${esc(name(p))}<br><span class="klein muted">${esc((filiale(p.stammfiliale) || { kurz: p.rolle === "bezirk" ? "Bezirk" : "" }).kurz)} · ${L.ROLLEN[p.rolle].name}</span></td>${sp.map(([k, , j]) => { const [farbe, txt] = j ? ampel(a[k], j) : (a[k] ? ["gruen", "ok"] : ["rot", "fehlt"]); return `<td><input type="date" data-pakte="${p.id}|${k}" value="${esc(a[k] || "")}" aria-label="${k} ${esc(p.vorname)}"><span class="marke-s ${farbe}">${txt}</span></td>`; }).join("")}</tr>`; }).join("")}</tbody></table></div></div>`;
     }
     if (id === "briefe") {
       if (!briefEntwurf) briefEntwurf = { an: "", betreff: "", text: "", ort: f.kurz, datum: L.datumKurz(heute()).slice(3) + heute().slice(0, 4), unterschrift: name(ICH()) };
@@ -1676,6 +1801,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
 
   V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
 
+  setInterval(() => { const u = document.getElementById("bu-uhr"); if (u && !document.hidden) u.textContent = new Date().toTimeString().slice(0, 5); }, 30000);
   let updateBand = "", wartend = null, letzteBreit = null, resizeTimer = null;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (breit() !== letzteBreit) zeichnen(); }, 150); });
   // ---------- Zeichnen ----------
@@ -1697,7 +1823,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
 
   // ---------- Aktionen ----------
   const AKT = {
-    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || S.filialen[0].id; merke(); gehe("start"); pinNeuFenster(); wasNeuPruefen(); if (fenster) zeichnen(); },
+    ich: (el) => { sitzung.ich = el.dataset.id; const p = ICH(); sitzung.filiale = p.stammfiliale || (p.bezirk || [])[0] || S.filialen[0].id; merke(); gehe("start"); pinNeuFenster(); wasNeuPruefen(); if (fenster) zeichnen(); },
     reset: () => { A.zuruecksetzen(); S = D.demoDaten(heute()); A.speichern(S); meldung("Beispieldaten neu geladen"); gehe("login"); },
     "filiale-wahl": () => { fenster = `<h2>Filiale wählen</h2><div class="liste">${meineFilialen().map((f) => `<button class="zeile" data-act="filiale" data-id="${f.id}"><span class="punkt ${f.id === FIL().id ? "gruen" : ""}"></span><span>${esc(f.name)}${ICH().stammfiliale && f.id !== ICH().stammfiliale ? "<small>als Springer</small>" : ""}</span><span>›</span></button>`).join("")}</div>`; zeichnen(); },
     filiale: (el) => { sitzung.filiale = el.dataset.id; merke(); fenster = null; zeichnen(); },
@@ -2142,6 +2268,31 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
       const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
       kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
     },
+    "bu-lampe": () => { const dunkel = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches); geraet.design = dunkel ? "hell" : "dunkel"; geraetMerken(); geraetAnwenden(); meldung(dunkel ? "☀️ Licht aus – heller Bildschirm" : "💡 Licht an – dunkler Bildschirm"); zeichnen(); },
+    "bu-liste": () => { geraet.bueroListe = true; geraetMerken(); zeichnen(); },
+    "bu-raum": () => { geraet.bueroListe = false; geraetMerken(); zeichnen(); },
+    "bu-schrank": () => {
+      const sch = $("#bu-schrank"); if (!sch) return;
+      const auf = !sch.classList.contains("auf"); sch.classList.toggle("auf", auf);
+      geraet.schrankZu = !auf; geraetMerken();
+      const z = sch.querySelector(".bu-schrank-zeile"); z.setAttribute("aria-expanded", String(auf)); z.querySelector(".bu-schrank-pfeil").textContent = auf ? "⌃" : "⌄";
+      const g = sch.querySelector(".bu-jal-griff"); g.textContent = auf ? "▶" : "◀"; g.setAttribute("aria-label", auf ? "Aktenschrank schließen" : "Aktenschrank öffnen");
+    },
+    "bu-eingang": () => {
+      const r = bueroEingang();
+      fenster = `<div class="reihe zw"><h2>📥 Eingang</h2><button class="chip" data-act="zu">✕</button></div>${r.length ? `<div class="liste">${r.map((x) => `<button class="zeile" data-go="${x.go}"${x.arg ? ` data-arg="${x.arg}"` : ""}><span style="font-size:1.4rem">${x.sym}</span><span><b>${esc(x.t)}</b></span><span>›</span></button>`).join("")}</div>` : '<p class="leer">Alles erledigt. 👍</p>'}`;
+      zeichnen();
+    },
+    "bu-pause": () => {
+      if ($(".bu-schoner")) return;
+      const d = document.createElement("div"); d.className = "bu-schoner"; d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Pause – antippen zum Weiterarbeiten");
+      d.innerHTML = `<div class="bu-schoner-feld"><div class="bu-schoner-logo"><img src="frootie.svg" alt="Frootie"><span class="logo-plate"><img class="logo gross" src="logo.svg" alt="frooters"></span><span>Kurze Pause ☕ – Frootie passt auf.</span></div></div><button class="bu-schoner-weiter">Weiterarbeiten</button>`;
+      d.addEventListener("click", () => d.remove()); document.body.appendChild(d);
+    },
+    "bu-rechner": () => { fenster = rechnerFenster(); zeichnen(); },
+    "re-taste": (el) => { rechnerTaste(el.dataset.t); fenster = rechnerFenster(); zeichnen(); },
+    "filiale-sprung": (el) => { sitzung.filiale = el.dataset.id; merke(); meldung(`📍 ${filiale(el.dataset.id).kurz}`); gehe("start"); },
+    "schulung-neu": () => { terminEntwurf = { titel: "Hygieneschulung", art: "schulung", datum: L.plusTage(heute(), 14), von: "09:00", bis: "11:00", ort: "", filiale: zentrale() ? null : FIL().id, fuer: "alle", personen: [], pflicht: true, notiz: "Bitte Belehrung § 43 IfSG mitbringen." }; gehe("termin-edit"); },
     "chat-senden": (el) => {
       const f = $("#ch-text"); const t = f ? f.value : "";
       if (!t.trim()) return meldung("Bitte erst etwas schreiben.");
@@ -2163,7 +2314,7 @@ const APP_VERSION = "0.13.0"; // gleich halten mit sw.js, version.json und ?v= i
       for (const c of L.chatsFuer(S, ich)) for (const id of L.chatMitglieder(S, c)) if (id !== ich) ids.add(id);
       const leute = [...ids].map(person).filter(Boolean).sort((a, b) => name(a).localeCompare(name(b)));
       fenster = `<div class="reihe zw"><h2>Direktnachricht an …</h2><button class="chip" data-act="zu">✕</button></div>
-        <div class="liste">${leute.map((p) => `<button class="zeile" data-act="dm-start" data-id="${p.id}"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + esc(filiale(p.stammfiliale).kurz) : ""}</small></span><span>›</span></button>`).join("")}</div>`;
+        <div class="liste">${leute.map((p) => `<button class="zeile" data-act="dm-start" data-id="${p.id}"><span class="punkt gruen"></span><span><b>${esc(name(p))}</b><small>${L.ROLLEN[p.rolle].name}${p.stammfiliale ? " · " + esc((filiale(p.stammfiliale) || {}).kurz) : ""}</small></span><span>›</span></button>`).join("")}</div>`;
       zeichnen();
     },
     "dm-start": (el) => { const c = L.direktChat(S, ICH().id, el.dataset.id, () => neueId("ch")); speichern(); gehe("chat", c.id); },
