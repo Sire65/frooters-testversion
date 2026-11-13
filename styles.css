@@ -470,6 +470,24 @@ html.kachel-klein .kachel { min-height: 82px; padding: 10px; } html.kachel-klein
 .re-anzeige { background: #b9d3a8; color: #22301a; border-radius: 10px; padding: 8px 12px; text-align: right; font-family: ui-monospace, monospace; display: grid; } .re-anzeige small { min-height: 1.2em; opacity: .7; } .re-anzeige b { font-size: 1.8rem; overflow-wrap: anywhere; }
 .re-tasten { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .re-t { height: 52px; border: 0; border-radius: 12px; background: var(--tint); font-size: 1.25rem; font-weight: 700; } .re-t.op { background: var(--red); color: var(--on-red); } .re-t.breit { grid-column: span 2; }
+
+/* ---------- 0.15.0: Büro einrichten ---------- */
+.bu-einrichten .bu-obj { animation: bue-wackeln .32s ease-in-out infinite alternate; touch-action: none; cursor: grab; outline: 2px dashed rgba(193, 2, 48, .45); outline-offset: 1px; border-radius: 10px; user-select: none; -webkit-user-select: none; }
+.bu-einrichten .bu-obj:nth-child(2n) { animation-delay: -.16s; }
+.bu-einrichten .bu-obj.gewaehlt { animation: none; outline: 3px solid var(--red); background: rgba(193, 2, 48, .10); }
+.bu-einrichten .bu-obj.bu-zieht { animation: none; z-index: 20; opacity: .9; cursor: grabbing; }
+@keyframes bue-wackeln { from { transform: rotate(-1.6deg); } to { transform: rotate(1.6deg); } }
+@media (prefers-reduced-motion: reduce) { .bu-einrichten .bu-obj { animation: none; } }
+.bu-leer { border: 2px dashed rgba(59,47,42,.4); border-radius: 10px; background: rgba(255,255,255,.2); min-height: 64px; color: #3b2f2a; font-size: 1.3rem; display: grid; place-items: center; align-content: center; }
+.bu-leer small { font-size: .7rem; font-weight: 700; }
+.bu-einr-leiste { margin: 0 auto 12px; max-width: 760px; }
+.bue-katalog { display: grid; gap: 8px; }
+.bue-kat-teil { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; }
+.bue-kat-teil.da { background: var(--green-soft); border-color: var(--green); }
+.bue-kat-bild { flex: 0 0 56px; } .bue-kat-bild svg { width: 56px; height: auto; display: block; }
+.bue-kat-text { flex: 1; display: grid; gap: 2px; min-width: 0; } .bue-kat-text small { color: var(--muted); }
+.bu-o-uhr svg { max-width: 58px; } .bu-o-register svg { max-width: 76px; } .bu-o-kopierer svg { max-width: 92px; } .bu-o-becher svg { max-width: 44px; } .bu-o-figur svg { max-width: 54px; } .bu-o-rahmen svg { max-width: 70px; } .bu-o-pflanze svg { max-width: 44px; }
+.bu-o-pflanze { cursor: default; }
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }

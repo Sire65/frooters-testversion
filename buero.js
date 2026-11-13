@@ -51,6 +51,27 @@
     return r && r[rolle] != null ? !!r[rolle] : o.rollen.includes(rolle);
   }
 
+  // ---------- Büro einrichten (wie in der Club-App): Teile umstellen, Zusatzkatalog ----------
+  // Katalog: weitere Teile mit Aufgabe (go = Bereich, ordner = Büro-Ordner, deko = nur zum Anschauen). Höchstens KATALOG_MAX Stück.
+  const KATALOG_MAX = 4;
+  const KATALOG = [
+    { id: "uhr", t: "Tischuhr", u: "Zeigt die Uhrzeit. Antippen: wer heute da ist (Leitung) oder Stechuhr", go: "stempelzeiten", go2: "stechuhr" },
+    { id: "register", t: "Dreh-Adressregister", u: "Antippen: Adressbuch", ordner: "adressen" },
+    { id: "kopierer", t: "Kopierer", u: "Antippen: Archiv mit allen Drucken zum erneuten Drucken", ordner: "archiv" },
+    { id: "becher", t: "frooters-Becher", u: "Antippen: Rezepte", go: "rezepte" },
+    { id: "figur", t: "Frootie-Figur", u: "Antippen: Frag Frootie", go: "hilfe" },
+    { id: "rahmen", t: "Teamfoto", u: "Antippen: dein Team", go: "team" },
+    { id: "pflanze", t: "Pflanze", u: "Deko – will ab und zu gegossen werden", deko: true },
+  ];
+  // Reihenfolge der Teile: gespeicherte Folge zuerst, Unbekanntes und Neues hinten; Zusatzteile nur aus dem erlaubten Katalog
+  function einrichtungAnwenden(basis, einr, erlaubt) {
+    const e = einr || {}, extra = (e.extra || []).filter((id, i, a) => a.indexOf(id) === i && (erlaubt || KATALOG.map((k) => k.id)).includes(id) && !basis.includes(id)).slice(0, KATALOG_MAX);
+    const alle = [...basis, ...extra], folge = (e.folge || []).filter((id) => alle.includes(id));
+    return [...folge, ...alle.filter((id) => !folge.includes(id))];
+  }
+  function teileTauschen(liste, a, b) { const l = [...liste], i = l.indexOf(a), j = l.indexOf(b); if (i < 0 || j < 0) return l; [l[i], l[j]] = [l[j], l[i]]; return l; }
+  function teilSchieben(liste, id, r) { const l = [...liste], i = l.indexOf(id), j = i + r; if (i < 0 || j < 0 || j >= l.length) return l; [l[i], l[j]] = [l[j], l[i]]; return l; }
+
   // Schreibtisch-Teile (selbst gezeichnet, aus der Club-App übernommen und an frooters angepasst)
   const BU_SVG = {
   lampe: (an) => `<svg viewBox="0 0 70 90" aria-hidden="true" style="overflow:visible">${an ? '<path d="M47 33 L58 21 L132 64 L92 94 Z" fill="rgba(255,231,150,.42)"/>' : ""}<g transform="rotate(-32 40 19)"><path d="M60 8 L30 4 L20 30 L50 34 Z" fill="${an ? "#f2c14e" : "#2f3b4a"}"/><circle cx="35" cy="33" r="${an ? 4 : 0}" fill="#fff6c8"/></g>
@@ -70,6 +91,13 @@
   rezeptbuch: '<svg viewBox="0 0 80 64" aria-hidden="true"><path d="M40 10 C28 4 14 4 4 8 V58 C14 54 28 54 40 60 Z" fill="#fffdf6" stroke="#d8cfbf"/><path d="M40 10 C52 4 66 4 76 8 V58 C66 54 52 54 40 60 Z" fill="#fff" stroke="#d8cfbf"/><path d="M40 10 V60" stroke="#c9bfae"/><text x="22" y="34" font-size="14" text-anchor="middle">🍓</text><g stroke="#c9bfae" stroke-width="2"><path d="M48 20 H68"/><path d="M48 28 H68"/><path d="M48 36 H64"/><path d="M48 44 H68"/></g></svg>',
   landkarte: '<svg viewBox="0 0 100 70" aria-hidden="true"><path d="M4 12 L34 4 L66 12 L96 4 V58 L66 66 L34 58 L4 66 Z" fill="#eef6e2" stroke="#a3a983" stroke-width="2"/><path d="M34 4 V58 M66 12 V66" stroke="#a3a983" stroke-width="2"/><path d="M14 46 C30 30 48 50 60 30 S84 20 90 26" fill="none" stroke="#4f8a12" stroke-width="3" stroke-dasharray="5 4"/><circle cx="14" cy="46" r="5" fill="#c10230"/><circle cx="60" cy="30" r="5" fill="#c10230"/><circle cx="88" cy="26" r="5" fill="#c10230"/></svg>',
   klemmbrett: '<svg viewBox="0 0 64 84" aria-hidden="true"><rect x="4" y="8" width="56" height="74" rx="5" fill="#a07a4f"/><rect x="10" y="16" width="44" height="60" fill="#fff"/><rect x="22" y="3" width="20" height="10" rx="3" fill="#9aa4ad"/><g stroke="#4f8a12" stroke-width="3" fill="none"><path d="M15 28 l4 4 l7 -8"/><path d="M15 44 l4 4 l7 -8"/></g><g stroke="#c9bfae" stroke-width="2"><path d="M30 29 H49"/><path d="M30 45 H49"/><path d="M30 61 H49"/></g><rect x="15" y="56" width="10" height="10" fill="none" stroke="#9aa4ad" stroke-width="2"/></svg>',
+  uhr: (d) => { const n = d || new Date(), h = (n.getHours() % 12) * 30 + n.getMinutes() * 0.5, m = n.getMinutes() * 6; return `<svg viewBox="0 0 70 80" aria-hidden="true"><rect x="12" y="62" width="46" height="12" rx="4" fill="#8b6440"/><circle cx="35" cy="36" r="30" fill="#c10230"/><circle cx="35" cy="36" r="24" fill="#fffdf8"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => `<rect x="34" y="14" width="2" height="${i % 3 ? 3 : 5}" fill="#3b2f2a" transform="rotate(${i * 30} 35 36)"/>`).join("")}<rect x="33.5" y="22" width="3" height="15" rx="1.5" fill="#1d1d1b" transform="rotate(${h} 35 36)"/><rect x="34.2" y="15" width="1.6" height="22" rx=".8" fill="#4f8a12" transform="rotate(${m} 35 36)"/><circle cx="35" cy="36" r="2.5" fill="#1d1d1b"/></svg>`; },
+  register: '<svg viewBox="0 0 90 70" aria-hidden="true"><path d="M14 66 L22 40 H68 L76 66 Z" fill="#3a3f45"/><circle cx="45" cy="34" r="6" fill="#9aa4ad"/><path d="M8 34 H82" stroke="#9aa4ad" stroke-width="4" stroke-linecap="round"/><g fill="#fffdf8" stroke="#c9bfae">' + [-36, -18, 0, 18, 36].map((a) => `<rect x="30" y="6" width="30" height="24" rx="2" transform="rotate(${a} 45 34)"/>`).join("") + '</g><rect x="30" y="8" width="30" height="24" rx="2" fill="#fff" stroke="#c10230"/><path d="M34 15 H56 M34 21 H50" stroke="#c9bfae" stroke-width="2"/></svg>',
+  kopierer: '<svg viewBox="0 0 110 80" aria-hidden="true"><rect x="8" y="20" width="94" height="56" rx="6" fill="#e9ecef" stroke="#c9cfd4"/><rect x="14" y="8" width="82" height="14" rx="3" fill="#cdd3d8"/><rect x="24" y="2" width="60" height="9" fill="#fff" stroke="#d8dde1"/><rect x="18" y="32" width="40" height="10" rx="2" fill="#2c3e50"/><circle cx="82" cy="37" r="5" fill="#4f8a12"/><rect x="18" y="52" width="74" height="6" rx="2" fill="#b8c0c7"/><rect x="18" y="62" width="74" height="6" rx="2" fill="#b8c0c7"/></svg>',
+  becher: '<svg viewBox="0 0 60 80" aria-hidden="true"><path d="M10 30 H50 L44 76 H16 Z" fill="#fff" stroke="#e0d6c8"/><path d="M12 44 H48" stroke="#c10230" stroke-width="7"/><path d="M8 30 C8 12 22 8 30 14 C38 4 54 12 52 30 Z" fill="#fbe5ea"/><path d="M20 22 C26 16 34 16 40 22" fill="none" stroke="#f4b6c2" stroke-width="3"/><circle cx="36" cy="12" r="5" fill="#c10230"/><path d="M36 7 Q40 2 44 4" stroke="#4f8a12" stroke-width="2" fill="none"/></svg>',
+  figur: '<svg viewBox="30 30 165 190" aria-hidden="true"><path d="M100 74 C150 74 168 112 154 154 C141 192 116 212 100 212 C84 212 59 192 46 154 C32 112 50 74 100 74 Z" fill="#c10230"/><g fill="#ffd9a0"><ellipse cx="66" cy="130" rx="2.6" ry="3.6"/><ellipse cx="134" cy="130" rx="2.6" ry="3.6"/><ellipse cx="78" cy="182" rx="2.6" ry="3.6"/><ellipse cx="122" cy="182" rx="2.6" ry="3.6"/></g><g transform="rotate(16 100 98)"><path d="M47 102 Q46 50 100 46 Q154 50 153 102 Q100 116 47 102 Z" fill="#76bc21"/><path d="M130 99 Q160 90 180 102 Q179 114 162 116 Q144 117 127 110 Z" fill="#a3a983"/><circle cx="100" cy="76" r="9" fill="#fff"/><circle cx="100" cy="77.5" r="5.6" fill="#c10230"/></g><ellipse cx="80" cy="120" rx="11" ry="12" fill="#fff"/><circle cx="83" cy="121" r="5.5" fill="#1d1d1b"/><path d="M110 121 Q120 113 130 121" stroke="#1d1d1b" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M84 146 Q100 160 118 144" stroke="#1d1d1b" stroke-width="4" fill="none" stroke-linecap="round"/></svg>',
+  rahmen: '<svg viewBox="0 0 80 70" aria-hidden="true"><path d="M30 64 L40 46 L50 64" stroke="#8b6440" stroke-width="4" fill="none"/><rect x="6" y="4" width="68" height="50" rx="3" fill="#a07a4f"/><rect x="12" y="10" width="56" height="38" fill="#eef6e2"/><circle cx="26" cy="26" r="6" fill="#f2c9a0"/><path d="M16 46 Q26 32 36 46 Z" fill="#c10230"/><circle cx="42" cy="24" r="6" fill="#e8b98e"/><path d="M32 46 Q42 30 52 46 Z" fill="#4f8a12"/><circle cx="56" cy="27" r="5" fill="#f2c9a0"/><path d="M47 46 Q56 34 65 46 Z" fill="#a3a983"/></svg>',
+  pflanze: '<svg viewBox="0 0 60 80" aria-hidden="true"><path d="M16 52 H44 L40 78 H20 Z" fill="#c10230"/><path d="M14 50 H46 V56 H14 Z" fill="#9e0227"/><g fill="#4f8a12"><path d="M30 52 C20 40 12 30 14 16 C24 22 30 34 30 52 Z"/><path d="M30 52 C40 40 48 30 46 14 C36 22 30 34 30 52 Z"/><path d="M30 52 C28 34 30 18 30 4 C34 18 34 34 30 52 Z" fill="#76bc21"/></g></svg>',
 };
 
   // ---------- Grafik- & Druckstudio ----------
@@ -198,5 +226,5 @@
       <div class="dp-fuss"><span>Erstellt mit der frooters Team-App (Testversion, Beispieldaten). Nicht erledigte Aufgaben sind markiert.</span></div></div>`;
   }
 
-  return { ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
+  return { ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, KATALOG, KATALOG_MAX, einrichtungAnwenden, teileTauschen, teilSchieben, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
 });

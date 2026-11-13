@@ -1,11 +1,10 @@
 {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "datum": "2026-11-13",
   "stufe": "DEV",
   "neu": [
-    "Büro wie in der Club-App: Aktenschrank mit Jalousie, Ordnerrücken im Regal, Schreibtisch mit Pinnwand, Bildschirm, Kalender, Eingang, Drucker, Telefon, Rechner und mehr",
-    "Jede Rolle hat ihr eigenes Büro: Inhaber, Bezirksleitung, Hygiene & Qualität, Shopleitung, Stellvertretung, Hygieneberatung",
-    "Neue Ordner: Mein Bezirk, Schulungen & Belehrungen, Mitarbeiter, Urlaub & Einsatz, Bestellung, Hygieneregeln, Rezepte & Allergene, Artikel & Lieferanten, Betreiber & Franchise",
-    "Neue Rolle Bezirksleitung mit eigenen Filialen"
+    "Büro einrichten wie in der Club-App: Teile wackeln, zwei antippen oder eines auf ein anderes ziehen, dann tauschen sie die Plätze",
+    "Zusatzkatalog: Tischuhr, Dreh-Adressregister, Kopierer, frooters-Becher, Frootie-Figur, Teamfoto, Pflanze (bis zu 4 Teile, jedes mit Aufgabe)",
+    "Rückgängig und Grundaufstellung; die Einrichtung gilt je Person"
   ]
 }

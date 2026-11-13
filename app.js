@@ -1,4 +1,4 @@
-const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.15.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -166,7 +166,7 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu: Dein Büro wie in der Club-App, mit Aktenschrank, Ordnern und Schreibtisch. Jede Rolle hat ihr eigenes Büro.", go: "buero" };
+  const WAS_NEU = { text: "Neu: Richte dein Büro selbst ein. Teile umstellen und weitere aus dem Katalog dazustellen (✏️ Einrichten).", go: "buero" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -1198,6 +1198,15 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
   const schulungsLeute = () => S.personen.filter((p) => p.stammfiliale && p.aktiv !== false && (zentrale() || rolle() === "qualitaet" || meineFilialen().some((f) => f.id === p.stammfiliale)));
   const BU_LAMELLEN = 26, BU_SCHRIFT = "Team App";
   function jalousieLamellen() { const w = [...BU_SCHRIFT], ab = Math.floor((BU_LAMELLEN - w.length) / 2); return Array.from({ length: BU_LAMELLEN }, (_, i) => `<i class="bu-jal-lamelle">${w[i - ab] ? `<b>${w[i - ab]}</b>` : ""}</i>`).join(""); }
+  // ----- Büro einrichten (wie in der Club-App): Teile umstellen (zwei antippen oder ziehen), Zusatzkatalog -----
+  let buEinr = false, buWahl = null, buVorher = null, buZiehen = null, buKlickWeg = false;
+  const bueGo = (v, a) => erlaubteAnsicht(v) === v ? `data-go="${v}"${a ? ` data-arg="${a}"` : ""}` : null;
+  const bueOrdnerGo = (id) => darfO(id) ? `data-go="${id === "studio" ? "studio" : "ordner"}" data-arg="${id}"` : null;
+  const katalogZiel = (k) => k.deko ? `data-act="bue-deko" data-id="${k.id}"` : k.ordner ? bueOrdnerGo(k.ordner) : (bueGo(k.go) || (k.go2 ? bueGo(k.go2) : null));
+  const bueKatalog = () => B.KATALOG.filter((k) => katalogZiel(k));
+  const meineEinrichtung = () => { S.buero.einrichtung = S.buero.einrichtung || {}; return S.buero.einrichtung[ICH().id] || {}; };
+  const bueTeile = () => B.einrichtungAnwenden(meinBuero().dinge, meineEinrichtung(), bueKatalog().map((k) => k.id));
+  function bueSpeichern(folge, extra) { const e = meineEinrichtung(); S.buero.einrichtung[ICH().id] = { folge, extra: extra || e.extra || [] }; speichern(); }
   function bueroRaum() {
     const p = ICH(), def = meinBuero(), ord = ordnerSichtbar(), ein = bueroEingang(), auf = geraet.schrankZu !== true;
     const naechst = termineSichtbar().find((t) => !t.abgesagt);
@@ -1205,12 +1214,12 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
     const ruecken = (o) => `<button class="bu-ordner" style="--of:${o.farbe}" data-go="${ordnerZiel(o)}" data-arg="${o.id}" title="${esc(o.t + " – " + o.u)}" aria-label="${esc(o.t)}${zahl[o.id] ? `, ${zahl[o.id]} offen` : ""}"><span class="bu-osym" aria-hidden="true">${o.sym}</span><span class="bu-otext">${esc(o.t)}</span>${zahl[o.id] ? `<span class="bu-ozahl">${zahl[o.id]}</span>` : ""}<span class="bu-oloch" aria-hidden="true"></span></button>`;
     const nacht = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
     const monZeilen = [naechst ? `📅 ${esc(naechst.titel)} ${naechst.datum === heute() ? "heute" : L.datumKurz(naechst.datum)}` : "", ein.length ? `📥 ${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"}` : "", chatUngelesenGesamt() ? `💬 ${chatUngelesenGesamt()} ungelesen` : ""].filter(Boolean);
-    const ding = (id, inhalt, label, ziel, extra) => `<button type="button" class="bu-obj bu-o-${id}" ${ziel} aria-label="${esc(label)}">${inhalt}<span class="bu-olabel">${label}</span>${extra || ""}</button>`;
+    const ding = (id, inhalt, label, ziel, extra) => `<button type="button" class="bu-obj bu-o-${id}${buEinr && buWahl === id ? " gewaehlt" : ""}" data-id="${id}" ${buEinr ? `data-act="bue-tipp"` : ziel} aria-label="${esc(label)}${buEinr ? (buWahl === id ? " – ausgewählt" : " – antippen zum Umstellen") : ""}">${inhalt}<span class="bu-olabel">${label}</span>${extra || ""}</button>`;
     const go = (v, a) => erlaubteAnsicht(v) === v ? `data-go="${v}"${a ? ` data-arg="${a}"` : ""}` : null;
     const ordnerGo = (id) => darfO(id) ? `data-go="${id === "studio" ? "studio" : "ordner"}" data-arg="${id}"` : null;
     const DINGE = {
       lampe: () => ding("lampe", B.BU_SVG.lampe(nacht), nacht ? "Licht aus" : "Licht an", 'data-act="bu-lampe"'),
-      monitor: () => `<button type="button" class="bu-obj bu-o-monitor" data-act="bu-liste" aria-label="Bildschirm – Büro als Liste"><span class="bu-mon"><span class="bu-mon-schirm"><span class="bu-mon-uhr" id="bu-uhr">${new Date().toTimeString().slice(0, 5)}</span>${monZeilen.length ? monZeilen.map((z) => `<span class="bu-mon-zeile">${z}</span>`).join("") : '<span class="bu-mon-logo"><img src="logo.svg" alt=""><small>Alles erledigt 👍</small></span>'}</span></span><span class="bu-mon-fuss"></span><span class="bu-namensschild"><b>${esc(name(p))}</b><small>${esc(def.schild)}${FIL() && !zentrale() && rolle() !== "qualitaet" && rolle() !== "berater" ? " · " + esc(FIL().kurz) : ""}</small></span></button>`,
+      monitor: () => `<button type="button" class="bu-obj bu-o-monitor${buEinr && buWahl === "monitor" ? " gewaehlt" : ""}" data-id="monitor" ${buEinr ? 'data-act="bue-tipp"' : 'data-act="bu-liste"'} aria-label="Bildschirm${buEinr ? " – antippen zum Umstellen" : " – Büro als Liste"}"><span class="bu-mon"><span class="bu-mon-schirm"><span class="bu-mon-uhr" id="bu-uhr">${new Date().toTimeString().slice(0, 5)}</span>${monZeilen.length ? monZeilen.map((z) => `<span class="bu-mon-zeile">${z}</span>`).join("") : '<span class="bu-mon-logo"><img src="logo.svg" alt=""><small>Alles erledigt 👍</small></span>'}</span></span><span class="bu-mon-fuss"></span><span class="bu-namensschild"><b>${esc(name(p))}</b><small>${esc(def.schild)}${FIL() && !zentrale() && rolle() !== "qualitaet" && rolle() !== "berater" ? " · " + esc(FIL().kurz) : ""}</small></span></button>`,
       kalender: () => ding("kalender", naechst ? `<span class="bu-kal"><span class="bu-kmon">${new Date(naechst.datum + "T12:00").toLocaleDateString("de-DE", { month: "short" })}</span><span class="bu-ktag">${Number(naechst.datum.slice(8, 10))}</span><span class="bu-kwt">${L.TAG_NAME[L.wochentag(naechst.datum)].slice(0, 2)}</span></span>` : '<span class="bu-kal"><span class="bu-kmon">–</span><span class="bu-ktag">·</span></span>', "Termine", 'data-go="termine"', terminOffen() ? `<span class="bu-dzahl">${terminOffen()}</span>` : ""),
       korb: () => ding("korb", B.BU_SVG.korb, "Eingang", 'data-act="bu-eingang"', ein.length ? `<span class="bu-dzahl">${ein.length}</span>` : ""),
       drucker: () => { const z = ordnerGo("studio") || ordnerGo("hygiene"); return z ? ding("drucker", B.BU_SVG.drucker, darfO("studio") ? "Drucken" : "Bericht", z) : ""; },
@@ -1225,10 +1234,14 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
       landkarte: () => ordnerGo("bezirk") ? ding("landkarte", B.BU_SVG.landkarte, "Mein Bezirk", ordnerGo("bezirk")) : "",
       klemmbrett: () => { const z = rolle() === "qualitaet" ? go("regeln") : rolle() === "berater" ? ordnerGo("hygiene") : go("hygiene"); return z ? ding("klemmbrett", B.BU_SVG.klemmbrett, rolle() === "qualitaet" ? "Hygieneregeln" : rolle() === "berater" ? "Nachweise" : "Hygiene heute", z) : ""; },
     };
-    const dinge = def.dinge.map((k) => (DINGE[k] || (() => ""))()).filter(Boolean).join("");
+    for (const k of B.KATALOG) DINGE[k.id] = () => { const z = katalogZiel(k); return z ? ding(k.id, k.id === "uhr" ? `<span class="bu-tischuhr">${B.BU_SVG.uhr()}</span>` : B.BU_SVG[k.id], k.t, z) : ""; };
+    const teile = bueTeile(), extraAnzahl = (meineEinrichtung().extra || []).filter((id) => teile.includes(id)).length;
+    const dinge = teile.map((k) => (DINGE[k] || (() => ""))()).filter(Boolean).join("") + (buEinr && extraAnzahl < B.KATALOG_MAX ? `<button type="button" class="bu-leer" data-act="bue-katalog" aria-label="Freier Platz – Teil aus dem Katalog hinstellen">＋<small>Katalog</small></button>`.repeat(B.KATALOG_MAX - extraAnzahl) : "");
+    const leiste = buEinr ? `<div class="bu-einr-leiste karte"><p><b>✏️ Büro einrichten</b> – zwei Teile nacheinander antippen oder ein Teil auf ein anderes ziehen: Sie tauschen die Plätze.</p>
+      <div class="reihe">${buWahl ? `<button class="chip" data-act="bue-schieben" data-r="-1" aria-label="ausgewähltes Teil nach links">◀</button><button class="chip" data-act="bue-schieben" data-r="1" aria-label="ausgewähltes Teil nach rechts">▶</button>` : ""}<button class="chip" data-act="bue-katalog">🛒 Katalog</button><button class="chip" data-act="bue-zurueck">↩︎ Rückgängig</button><button class="chip" data-act="bue-grund">Grundaufstellung</button><button class="btn zwei" data-act="bue-fertig">✓ Fertig</button></div></div>` : "";
     return `${titel(esc(def.titel))}
       <div class="karte bu-gruss"><b>${tageszeitGruss()}, ${esc(p.vorname)}!</b> <span class="muted">${ein.length ? `${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"} im Eingang.` : "Im Eingang ist alles erledigt. 👍"}</span>
-        <div class="reihe"><button class="chip" data-act="bu-liste">☰ Als Liste</button>${rolle() === "zentrale" ? '<button class="chip" data-go="ordner" data-arg="freigaben">🔐 Wer sieht welchen Ordner?</button>' : ""}</div></div>
+        <div class="reihe"><button class="chip" data-act="bu-liste">☰ Als Liste</button>${buEinr ? "" : '<button class="chip" data-act="bue-start">✏️ Einrichten</button>'}${rolle() === "zentrale" ? '<button class="chip" data-go="ordner" data-arg="freigaben">🔐 Wer sieht welchen Ordner?</button>' : ""}</div></div>
       <div class="bu-raum">
         <div class="bu-schrank ${auf ? "auf" : ""}" id="bu-schrank">
           <button type="button" class="bu-schrank-zeile" data-act="bu-schrank" aria-expanded="${auf}"><span aria-hidden="true">🗄️</span><b>Aktenschrank</b><small>${ord.length} Ordner</small><span class="bu-schrank-pfeil" aria-hidden="true">${auf ? "⌃" : "⌄"}</span></button>
@@ -1242,7 +1255,7 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
             <button class="bu-zettel" ${naechst ? `data-go="termin" data-arg="${naechst.id}"` : 'data-go="termine"'}><b>Nächster Termin</b>${naechst ? `${esc(naechst.titel)} · ${L.datumKurz(naechst.datum)} ${naechst.von}` : "Keiner geplant"}</button>
             <button class="bu-zettel gruen" data-act="bu-eingang"><b>Eingang</b>${ein.length ? `${ein.length} ${ein.length === 1 ? "Sache wartet" : "Sachen warten"} auf dich` : "Alles erledigt 👍"}</button>
           </div></div>
-          <div class="bu-platte">${dinge}</div>
+          ${leiste}<div class="bu-platte${buEinr ? " bu-einrichten" : ""}">${dinge}</div>
         </div>
       </div>`;
   }
@@ -1801,7 +1814,7 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
 
   V.info = () => `${titel("Version")}<div class="karte"><p>frooters Team-App <b>${APP_VERSION}</b> (DEV, Testversion)</p><p class="muted">Daten: ${esc(A.name)}. Alles bleibt in diesem Browser.</p><button class="btn zwei" data-act="update-pruefen">🔄 Update prüfen</button></div>`;
 
-  setInterval(() => { const u = document.getElementById("bu-uhr"); if (u && !document.hidden) u.textContent = new Date().toTimeString().slice(0, 5); }, 30000);
+  setInterval(() => { if (document.hidden) return; const u = document.getElementById("bu-uhr"); if (u) u.textContent = new Date().toTimeString().slice(0, 5); document.querySelectorAll(".bu-tischuhr").forEach((x) => { x.innerHTML = B.BU_SVG.uhr(); }); }, 30000);
   let updateBand = "", wartend = null, letzteBreit = null, resizeTimer = null;
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (breit() !== letzteBreit) zeichnen(); }, 150); });
   // ---------- Zeichnen ----------
@@ -1816,6 +1829,7 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
     verlaufFenster(); appZaehler();
   }
   function gehe(v, a) {
+    if (v !== "buero") { buEinr = false; buWahl = null; }
     const ersetzen = fensterImVerlauf || v === ansicht; fensterImVerlauf = false;
     ansicht = v; arg = a || null; fenster = null; if (v !== "quiz") quizStand = null; zeichnen(); window.scrollTo(0, v === "chat" ? document.body.scrollHeight : 0);
     try { history[ersetzen ? "replaceState" : "pushState"](null, "", "#" + v); } catch (e) { /* egal */ }
@@ -2268,6 +2282,27 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
       const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
       kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
     },
+    "bue-start": () => { buEinr = true; buWahl = null; buVorher = JSON.parse(JSON.stringify(meineEinrichtung())); zeichnen(); },
+    "bue-fertig": () => { buEinr = false; buWahl = null; buVorher = null; meldung("Büro eingerichtet ✓"); zeichnen(); },
+    "bue-tipp": (el) => {
+      if (buKlickWeg) { buKlickWeg = false; return; }
+      const id = el.dataset.id;
+      if (!buWahl) buWahl = id; else if (buWahl === id) buWahl = null;
+      else { bueSpeichern(B.teileTauschen(bueTeile(), buWahl, id)); buWahl = null; }
+      zeichnen();
+    },
+    "bue-schieben": (el) => { if (!buWahl) return; bueSpeichern(B.teilSchieben(bueTeile(), buWahl, Number(el.dataset.r))); zeichnen(); },
+    "bue-zurueck": () => { if (buVorher) { S.buero.einrichtung[ICH().id] = JSON.parse(JSON.stringify(buVorher)); speichern(); } buWahl = null; meldung("Rückgängig"); zeichnen(); },
+    "bue-grund": () => { delete (S.buero.einrichtung || {})[ICH().id]; speichern(); buWahl = null; meldung("Grundaufstellung"); zeichnen(); },
+    "bue-katalog": () => {
+      const extra = (meineEinrichtung().extra || []).filter((id) => bueKatalog().some((k) => k.id === id)), voll = extra.length >= B.KATALOG_MAX;
+      fenster = `<div class="reihe zw"><h2>🛒 Katalog</h2><button class="chip" data-act="zu">✕</button></div><p class="klein muted">Bis zu ${B.KATALOG_MAX} weitere Teile auf den Schreibtisch stellen (${extra.length} von ${B.KATALOG_MAX}).</p>
+        <div class="bue-katalog">${bueKatalog().map((k) => { const da = extra.includes(k.id); return `<div class="bue-kat-teil${da ? " da" : ""}"><span class="bue-kat-bild">${k.id === "uhr" ? B.BU_SVG.uhr() : B.BU_SVG[k.id]}</span><span class="bue-kat-text"><b>${esc(k.t)}</b><small>${esc(k.u)}</small></span>${da ? `<button class="btn drei" data-act="bue-weg" data-id="${k.id}">Wegräumen</button>` : `<button class="btn zwei" data-act="bue-hin" data-id="${k.id}" ${voll ? "disabled" : ""}>Hinstellen</button>`}</div>`; }).join("")}</div>`;
+      zeichnen();
+    },
+    "bue-hin": (el) => { const e = meineEinrichtung(), extra = [...(e.extra || [])]; if (extra.length >= B.KATALOG_MAX) return meldung("Der Schreibtisch ist voll."); extra.push(el.dataset.id); bueSpeichern(e.folge || [], extra); AKT["bue-katalog"](); },
+    "bue-weg": (el) => { const e = meineEinrichtung(); bueSpeichern((e.folge || []).filter((x) => x !== el.dataset.id), (e.extra || []).filter((x) => x !== el.dataset.id)); AKT["bue-katalog"](); },
+    "bue-deko": () => meldung("💧 Gegossen – danke!"),
     "bu-lampe": () => { const dunkel = document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches); geraet.design = dunkel ? "hell" : "dunkel"; geraetMerken(); geraetAnwenden(); meldung(dunkel ? "☀️ Licht aus – heller Bildschirm" : "💡 Licht an – dunkler Bildschirm"); zeichnen(); },
     "bu-liste": () => { geraet.bueroListe = true; geraetMerken(); zeichnen(); },
     "bu-raum": () => { geraet.bueroListe = false; geraetMerken(); zeichnen(); },
@@ -2399,6 +2434,23 @@ const APP_VERSION = "0.14.0"; // gleich halten mit sw.js, version.json und ?v= i
   document.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && ev.target && ev.target.id === "ch-text") { ev.preventDefault(); const b = $('[data-act="chat-senden"]'); if (b) AKT["chat-senden"](b); } });
   document.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target && ev.target.id === "ff-frage") { ev.preventDefault(); AKT["ff-fragen"](); } });
   document.addEventListener("keydown", (ev) => { const tr = ev.target.closest && ev.target.closest("tr[data-go]"); if (tr && ev.target === tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); gehe(tr.dataset.go, tr.dataset.arg); } });
+  document.addEventListener("pointerdown", (ev) => {
+    const t = ev.target.closest && ev.target.closest(".bu-einrichten .bu-obj[data-id]"); if (!t || ev.button > 0) return;
+    buZiehen = { el: t, id: t.dataset.id, x: ev.clientX, y: ev.clientY, an: false };
+  });
+  document.addEventListener("pointermove", (ev) => {
+    if (!buZiehen) return; const dx = ev.clientX - buZiehen.x, dy = ev.clientY - buZiehen.y;
+    if (!buZiehen.an && Math.hypot(dx, dy) < 8) return;
+    buZiehen.an = true; buZiehen.el.classList.add("bu-zieht"); buZiehen.el.style.transform = `translate(${dx}px, ${dy}px)`; ev.preventDefault();
+  });
+  document.addEventListener("pointerup", (ev) => {
+    const z = buZiehen; buZiehen = null; if (!z || !z.an) return;
+    z.el.style.pointerEvents = "none"; const ziel = document.elementFromPoint(ev.clientX, ev.clientY); z.el.style.pointerEvents = "";
+    const auf = ziel && ziel.closest && ziel.closest(".bu-einrichten .bu-obj[data-id]");
+    buKlickWeg = true; setTimeout(() => { buKlickWeg = false; }, 400);
+    if (auf && auf.dataset.id !== z.id) { bueSpeichern(B.teileTauschen(bueTeile(), z.id, auf.dataset.id)); buWahl = null; meldung("Getauscht"); }
+    zeichnen();
+  });
   document.addEventListener("change", (ev) => {
     const el = ev.target;
     if (el.dataset.pp != null && el.type === "checkbox") { entwurf.werte[el.dataset.pp] = el.checked; zeichnen(); }
