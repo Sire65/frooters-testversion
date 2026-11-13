@@ -9,3 +9,4 @@ Diese Dateien werden aus dem eigentlichen Projekt übernommen und hier nicht von
 
 Oberflächen je Rolle (Konzeptvorschlag): https://sire65.github.io/frooters-testversion/oberflaechen.html
 Konzept PC-Version (Verwaltung): https://sire65.github.io/frooters-testversion/verwaltung.html
+Modulauswahl für den CEO (Ja/Nein/Vielleicht): https://sire65.github.io/frooters-testversion/auswahl.html
