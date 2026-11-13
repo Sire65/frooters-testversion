@@ -1,11 +1,12 @@
 {
-  "version": "0.16.0",
+  "version": "0.17.0",
   "datum": "2026-11-13",
   "stufe": "DEV",
   "neu": [
-    "Shop-Tablet: ein Gerät an der Theke als gemeinsame Stechuhr für die Filiale (Name antippen, PIN, Kommen/Pause/Gehen)",
-    "Hygiene, Pinnwand und Dienstplan am Tablet mit PIN; nach 90 Sekunden ohne Berührung automatisch abgemeldet",
-    "PIN-Schutz wie in der Club-App: 5 Fehlversuche, dann 5 Minuten Pause; eigene PIN in „Meine App“ ändern",
-    "Tablet-Modus beenden nur mit der PIN einer Leitung"
+    "Etiketten mit Barcode im Druckstudio, wie die Preisetiketten der Club-App",
+    "Maße 8×8, 7×7, 6×6, 5×5 cm, Regaletikett 7×4 cm, Lageretikett 5×3 cm; A4-Bogen, Probe mit 1 Etikett",
+    "Produkte: Name im Farbband der Warengruppe, Preise je Größe (nur für den Druck, nie geraten), Allergene und Spuren, Code (PLU) wird gespeichert",
+    "Lagerware: Lieferant, Gebinde, Soll/Min, Code = Bestellnummer oder interne Nummer",
+    "QR-Code oder Strichcode (Code 128), Bausteine einzeln abwählbar"
   ]
 }

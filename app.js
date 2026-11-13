@@ -1,4 +1,4 @@
-const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -88,6 +88,7 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
     chat: "Schreib unten deine Nachricht und tipp auf ➤. Bei deinen Nachrichten zeigt ✓✓, dass alle gelesen haben.",
     termine: "Hier stehen Teamsitzungen, Schulungen und Inventuren. Sag mit einem Tipp zu, ab oder vielleicht. Über „In meinen Kalender“ erinnert dich dein Handy.",
     einstellungen: "Hier stellst du die App für dich ein: einfache oder erweiterte Ansicht, große Schrift, Farben und die Reihenfolge deiner Kacheln. Das gilt nur auf diesem Gerät.",
+    etiketten: "Etiketten wie in der Club-App: Produkte mit Preis und Allergenen oder Lagerware für Regal und Inventur. Größe wählen, QR-Code oder Strichcode, Anzahl tippen, drucken. Erst eine Probe drucken und mit dem Scanner testen.",
     umsatz: "Hier siehst du, wann viel verkauft wird, und daneben, wie viele Leute laut Plan da sind. So erkennst du Stunden mit zu wenig oder zu viel Personal.",
     bestellung: "Erst den Bestand zählen, dann schlage ich vor, was fehlt: Soll minus Ist, auf volle Kartons gerundet. Du prüfst und gibst frei, verschickt wird nichts automatisch.",
     artikel: "Hier legt die Zentrale Artikel mit Lieferant, Gebinde und Lagerort an. Das Soll je Filiale stellt die Shopleitung ein.",
@@ -150,7 +151,7 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
     const nurLeitung = ["umsatz", "kasse-import", "bestellung", "inventur", "lagersoll", "plan", "antraege", "offen", "hygregeln", "stempelzeiten", "team", "export", "besetzung", "besetzung-tag", "matrix", "urlaubsuebersicht"];
     const nurZentrale = ["auswertung", "filialen", "artikel", "artikel-edit", "lieferanten", "lieferant-edit", "admin", "admin-edit", "admin-pinnwand"];
     if (r !== "login" && !ICH()) return "login";
-    if (["buero", "ordner", "studio", "druck-edit"].includes(r) && !bueroOrdner().length) r = "start";
+    if (["buero", "ordner", "studio", "druck-edit", "etiketten"].includes(r) && !bueroOrdner().length) r = "start";
     if (nurLeitung.includes(r) && !leitung()) r = "start";
     if (r === "hygkontrolle" && !(leitung() || uebergreifend())) r = "start";
     if (nurZentrale.includes(r) && !zentrale()) r = "start";
@@ -170,7 +171,7 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu: Shop-Tablet als gemeinsame Stechuhr mit PIN. Die Leitung richtet es unter „Meine App“ ein.", go: "einstellungen" };
+  const WAS_NEU = { text: "Neu: Etiketten mit Barcode im Druckstudio, für Produkte und Lagerware, von 5 × 3 bis 8 × 8 cm.", go: "etiketten" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -392,7 +393,7 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero", etiketten: "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -1391,11 +1392,85 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
     return isNaN(e) ? null : e;
   }
   V.buero = () => geraet.bueroListe ? bueroListe() : bueroRaum();
+  // ----- Etiketten mit Barcode (wie die Preisetiketten der Club-App): Produkte oder Lagerware, verschiedene Maße, QR-Code oder Strichcode -----
+  const ET_FARBEN = ["#c10230", "#4f8a12", "#2f6f7a", "#a1866f", "#7d4a63", "#8a7a4e", "#4a6a8a", "#7a5c3e"];
+  const LAGER_FARBE = { kuehl: "#2f6f7a", tk: "#4a6a8a", trocken: "#8a7a4e", verpackung: "#7d8360" };
+  const ET_BAUSTEINE = [["name", "Name im Farbband"], ["gruppe", "Warengruppe / Lager"], ["preis", "Preise (Produkte)"], ["details", "Lieferant, Gebinde (Ware)"], ["allergene", "Allergene"], ["code", "Code"], ["nummer", "Nummer unter dem Code"], ["rahmen", "Rahmen"]];
+  let et = { art: "produkt", format: "60x60", code: "qr", aus: { name: true, gruppe: true, preis: true, details: true, allergene: true, code: true, nummer: true, rahmen: true }, anzahl: {}, preise: {}, gruppe: "alle", vorschau: null };
+  let qrLaedt = false;
+  function qrLaden() {
+    if (window.qrcode || qrLaedt) return; qrLaedt = true;
+    const sc = document.createElement("script"); sc.src = "lib/qrcode/qrcode.js";
+    sc.onload = () => { qrLaedt = false; if (ansicht === "etiketten") zeichnen(); };
+    sc.onerror = () => { qrLaedt = false; meldung("QR-Baustein konnte nicht geladen werden. Strichcode geht trotzdem."); };
+    document.head.appendChild(sc);
+  }
+  const etCodes = () => { S.etiketten = S.etiketten || { codes: {} }; return S.etiketten.codes; };
+  function etArtikel() {
+    const f = FIL();
+    if (et.art === "produkt") {
+      const gr = S.rezepte.warengruppen;
+      return L.rezepteFreigegeben(S).filter((r) => !f.sortiment || f.sortiment.includes(r.gruppe)).map((r) => { const gi = gr.findIndex((g) => g.id === r.gruppe), g = gr[gi] || { name: "", sym: "" };
+        return { id: "rz:" + r.id, name: r.name, gruppe: g.name, gruppeId: r.gruppe, sym: g.sym, farbe: ET_FARBEN[gi % ET_FARBEN.length], groessen: r.groessen, allergene: L.allergeneVon(r), spuren: L.spurenVon(r), code: etCodes()["rz:" + r.id] || "", codeArt: "PLU/Art.-Nr." }; });
+    }
+    const W = L.waren(S), so = W.sortiment[f.id] || {};
+    return W.artikel.filter((a) => a.aktiv !== false && so[a.id]).map((a) => { const lf = W.lieferanten.find((x) => x.id === a.lieferant) || {}, lo = L.LAGERORTE.find((x) => x.id === a.lager) || {}, zt = S.rezepte.zutaten.find((z) => z.id === a.zutatId);
+      return { id: "ar:" + a.id, name: a.name, gruppe: lo.name || "", gruppeId: a.lager, sym: lo.sym || "", farbe: LAGER_FARBE[a.lager] || "#5f5a57", details: `${lf.name || ""}${a.gebinde && a.gebinde.menge > 1 ? ` · ${a.gebinde.name} à ${a.gebinde.menge} ${a.einheit}` : ` · ${a.einheit}`}`, soll: so[a.id], einheit: a.einheit,
+        allergene: zt ? L.zutatAllergene(zt).ja : null, spuren: zt ? L.zutatAllergene(zt).spuren : [], code: a.bestellNr || ("FR-" + a.id), codeArt: a.bestellNr ? "Best.-Nr." : "interne Nr." }; });
+  }
+  // Ein Etikett in echten Millimetern (Bildschirm und Druck); Schrift wächst mit dem Format (u = 1 bei 7 cm)
+  function etikettHtml(it, f) {
+    const O = et.aus, u = Math.sqrt(f.w * f.h) / 70, mm = (x) => `${(x * u).toFixed(2)}mm`, flach = f.h < f.w * 0.7;
+    const preise = et.art === "produkt" && O.preis ? B.etPreise(et.preise[it.id], it.groessen) : [];
+    const al = O.allergene ? (it.allergene == null ? '<span class="et-rot">Allergene: keine Zutat verknüpft</span>' : `<b>Allergene:</b> ${it.allergene.length ? esc(it.allergene.join(", ")) : "keines der 14 Hauptallergene"}${it.spuren && it.spuren.length ? ` · <b>Spuren:</b> ${esc(it.spuren.join(", "))}` : ""}`) : "";
+    const codeBox = !O.code ? "" : !it.code ? `<div class="et-code et-rot">⚠ Code fehlt</div>`
+      : et.code === "qr" ? (window.qrcode ? `<div class="et-code et-qr">${B.qrSvg(window.qrcode, it.code)}${O.nummer ? `<small>${esc(it.code)}</small>` : ""}</div>` : `<div class="et-code">QR wird geladen …</div>`)
+        : `<div class="et-code et-strichbox">${B.code128Svg(it.code, flach ? 8 * u : 11 * u) || '<span class="et-rot">Code enthält Zeichen, die ein Strichcode nicht kann</span>'}${O.nummer ? `<small>${esc(it.code)}</small>` : ""}</div>`;
+    const text = `${preise.length ? `<div class="et-preise">${preise.map((p) => `<span>${p.g ? `<i>${esc(p.g)}</i>` : ""}<b>${p.p}</b></span>`).join("")}</div>` : ""}
+      ${et.art === "ware" && O.details ? `<div class="et-details">${esc(it.details)}${it.soll ? `<br>Soll ${String(it.soll.soll).replace(".", ",")} ${esc(it.einheit)} · Min. ${String(it.soll.min).replace(".", ",")} ${esc(it.einheit)}` : ""}</div>` : ""}
+      ${al ? `<div class="et-allergene">${al}</div>` : ""}`;
+    const nebeneinander = et.code === "qr" && !flach;
+    return `<div class="et ${O.rahmen ? "rahmen" : ""} ${flach ? "flach" : ""}" style="width:${f.w}mm;height:${f.h}mm;--etf:${it.farbe};font-size:${mm(3)}">
+      ${O.name ? `<div class="et-band" style="padding:${mm(1.2)} ${mm(2.4)}">${O.gruppe && it.gruppe ? `<small style="font-size:${mm(2.1)}">${esc(it.sym)} ${esc(it.gruppe)}</small>` : ""}<b style="font-size:${mm(it.name.length > 22 ? 3.6 : 4.6)}">${esc(it.name)}</b></div>` : ""}
+      <div class="et-rumpf ${nebeneinander ? "neben" : "unter"}" style="padding:${mm(1.6)} ${mm(2.4)};gap:${mm(1.4)}"><div class="et-text">${text}</div>${codeBox}</div></div>`;
+  }
+  V.etiketten = () => {
+    if (!darfO("studio")) return V.buero();
+    if (et.code === "qr") qrLaden();
+    const f = B.ET_FORMATE.find((x) => x.id === et.format), r = B.etRaster(f), alle = etArtikel();
+    const gruppen = [...new Set(alle.map((a) => a.gruppe))];
+    const sicht = alle.filter((a) => et.gruppe === "alle" || a.gruppe === et.gruppe);
+    const n = alle.reduce((s, a) => s + (et.anzahl[a.id] || 0), 0), je = r.sp * r.ze;
+    const vor = alle.find((a) => a.id === et.vorschau) || alle.find((a) => et.anzahl[a.id]) || sicht[0];
+    const skala = Math.min(1, 240 / (Math.max(f.w, f.h) * 3.78));
+    const chip = (k, v, t, an) => `<button class="${an ? "an" : ""}" data-act="et-wahl" data-k="${k}" data-v="${v}">${t}</button>`;
+    return `${titel("🏷️ Etiketten mit Barcode", "studio")}${frootie(FROOTIE_TIPPS.etiketten)}
+      <div class="karte"><div class="feld"><span class="lbl">Was?</span><div class="wahl">${chip("art", "produkt", "🍦 Produkte (Preisetikett)", et.art === "produkt")}${chip("art", "ware", "📦 Lagerware (Regal, Inventur)", et.art === "ware")}</div></div>
+        <div class="feld"><span class="lbl">Größe</span><div class="wahl">${B.ET_FORMATE.map((x) => chip("format", x.id, x.t, et.format === x.id)).join("")}</div></div>
+        <div class="feld"><span class="lbl">Code</span><div class="wahl">${chip("code", "qr", "▦ QR-Code", et.code === "qr")}${chip("code", "strich", "▮▯▮ Strichcode (Code 128)", et.code === "strich")}</div></div>
+        <div class="feld"><span class="lbl">Auf dem Etikett</span><div class="wahl">${ET_BAUSTEINE.filter(([k]) => et.art === "produkt" ? k !== "details" : k !== "preis").map(([k, t]) => chip("aus", k, (et.aus[k] ? "✓ " : "") + t, et.aus[k])).join("")}</div></div></div>
+      <div class="et-oben"><div class="et-vorschau karte"><div class="et-skala" style="width:${(f.w * 3.78 * skala).toFixed(0)}px;height:${(f.h * 3.78 * skala).toFixed(0)}px"><div style="transform:scale(${skala.toFixed(3)});transform-origin:0 0">${vor ? etikettHtml(vor, f) : ""}</div></div><small class="muted">Vorschau ${vor ? esc(vor.name) : ""} · ${esc(f.t)}</small></div>
+        <div class="karte et-info"><b>${n} Etikett${n === 1 ? "" : "en"}</b><span class="muted">${r.sp} × ${r.ze} = ${je} je A4-Blatt${n ? ` · ${Math.ceil(n / je)} Blatt` : ""}</span>
+          <div class="reihe"><button class="btn" data-act="et-drucken" ${n ? "" : "disabled"}>🖨️ Drucken</button><button class="btn drei" data-act="et-probe" ${vor ? "" : "disabled"}>🎯 Probe (1 Etikett)</button></div>
+          <p class="klein muted">Drucken mit <b>100 %</b> (nicht „an Seite anpassen“), dann stimmen die Maße. Erst eine Probe drucken und den Code mit dem Scanner testen.</p></div></div>
+      <div class="karte"><div class="reihe zw"><div class="wahl"><button class="${et.gruppe === "alle" ? "an" : ""}" data-act="et-wahl" data-k="gruppe" data-v="alle">Alle</button>${gruppen.map((g) => `<button class="${et.gruppe === g ? "an" : ""}" data-act="et-wahl" data-k="gruppe" data-v="${esc(g)}">${esc(g)}</button>`).join("")}</div>
+          <span class="reihe"><button class="chip" data-act="et-alle" data-v="1">＋1 für alle hier</button><button class="chip" data-act="et-alle" data-v="0">Alle auf 0</button></span></div>
+        <div class="et-liste">${sicht.map((a) => `<div class="et-zeile ${et.anzahl[a.id] ? "an" : ""}"><button class="et-name" data-act="et-vorschau" data-id="${a.id}"><b>${esc(a.name)}</b><small>${esc(a.gruppe)} · ${a.code ? `${esc(a.codeArt)} ${esc(a.code)}` : '<span class="et-rot">Code fehlt</span>'}</small></button>
+          ${et.art === "produkt" ? `<label class="et-feld">Preise ${esc(a.groessen.join("/"))}<input type="text" inputmode="decimal" data-et-preis="${a.id}" value="${esc(et.preise[a.id] || "")}" placeholder="z. B. 3,50 / 4,90 / 5,90"></label><label class="et-feld">Code<input type="text" data-et-code="${a.id}" value="${esc(a.code)}" maxlength="20" placeholder="PLU aus der Kasse"></label>` : ""}
+          <span class="et-anz"><button class="chip" data-act="et-anz" data-id="${a.id}" data-r="-1" aria-label="weniger">−</button><b>${et.anzahl[a.id] || 0}</b><button class="chip" data-act="et-anz" data-id="${a.id}" data-r="1" aria-label="mehr">＋</button></span></div>`).join("") || '<p class="leer">Keine Artikel.</p>'}</div>
+        <p class="klein muted">${et.art === "produkt" ? "Preise gelten nur für diesen Druck und werden nie geraten: leer bleibt „… €“. Der Code (z. B. die PLU aus der Kasse) wird gespeichert." : "Code = Bestellnummer des Lieferanten, sonst die interne Nummer der App (für die Inventur mit Scanner)."}</p></div>`;
+  }
+  // Bogen: Etiketten stoßen aneinander, A4 mit 6 mm Rand, je Blatt eine Seite
+  function etBoegen(liste, f) {
+    const r = B.etRaster(f), je = r.sp * r.ze, boegen = [];
+    for (let i = 0; i < liste.length; i += je) boegen.push(`<div class="et-bogen" style="grid-template-columns:repeat(${r.sp}, ${f.w}mm);grid-auto-rows:${f.h}mm">${liste.slice(i, i + je).map((a) => etikettHtml(a, f)).join("")}</div>`);
+    return boegen.join("");
+  }
   V.studio = () => {
     if (!darfO("studio")) return V.buero();
     const f = FIL(), gesp = ablage().filter((x) => x.ordner === "studio" && !x.entfernt && (zentrale() || x.filiale === f.id || x.filiale === null)).sort((a, b) => b.zeit.localeCompare(a.zeit));
     return `${titel("Grafik & Druck", "buero")}${frootie(FROOTIE_TIPPS.studio)}
-      <div class="abschnitt"><h2>Neues Blatt</h2><div class="kacheln">${B.VORLAGEN.map((v) => `<button class="kachel" data-act="druck-neu" data-v="${v.id}"><span class="sym">${v.sym}</span><b>${esc(v.t)}</b><span>${esc(v.u)}</span></button>`).join("")}</div></div>
+      <div class="abschnitt"><h2>Neues Blatt</h2><div class="kacheln">${B.VORLAGEN.map((v) => `<button class="kachel" data-act="druck-neu" data-v="${v.id}"><span class="sym">${v.sym}</span><b>${esc(v.t)}</b><span>${esc(v.u)}</span></button>`).join("")}<button class="kachel" data-go="etiketten"><span class="sym">🏷️</span><b>Etiketten mit Barcode</b><span>Preis- und Lageretiketten, 5×3 bis 8×8 cm</span></button></div></div>
       <div class="abschnitt"><h2>Gespeicherte Blätter (${gesp.length})</h2><div class="liste">${gesp.map((x) => { const v = B.VORLAGEN.find((y) => y.id === x.daten.vorlage) || {};
         return `<div class="zeile"><span style="font-size:1.4rem">${v.sym || "📄"}</span><span><b>${esc(x.titel)}</b><small>${esc(v.t || "")} · ${x.filiale ? esc(filiale(x.filiale).kurz) : "alle Filialen"} · ${L.datumKurz(x.zeit.slice(0, 10))} · ${esc(name(person(x.vonId)))}</small></span>
           <span class="reihe"><button class="chip" data-act="druck-oeffnen" data-id="${x.id}">öffnen</button><button class="chip" data-act="druck-direkt" data-id="${x.id}">🖨️</button></span></div>`; }).join("") || '<p class="leer">Noch nichts gespeichert.</p>'}</div></div>`;
@@ -2358,6 +2433,24 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
       const fid = kasseFiliale || FIL().id, n = L.kassenUebernehmen(S, fid, kasseErgebnis.posten, "csv");
       kasseText = ""; kasseErgebnis = null; kasseZuordnung = null; speichern(); meldung(`${n} Tag${n > 1 ? "e" : ""} Kassendaten für ${filiale(fid).kurz} gespeichert`); gehe("umsatz");
     },
+    "et-wahl": (el) => {
+      const k = el.dataset.k, v = el.dataset.v;
+      if (k === "aus") et.aus[v] = !et.aus[v]; else { et[k] = v; if (k === "art") { et.gruppe = "alle"; et.vorschau = null; } }
+      zeichnen();
+    },
+    "et-anz": (el) => { et.anzahl[el.dataset.id] = Math.max(0, Math.min(200, (et.anzahl[el.dataset.id] || 0) + Number(el.dataset.r))); et.vorschau = el.dataset.id; zeichnen(); },
+    "et-alle": (el) => { for (const a of etArtikel().filter((x) => et.gruppe === "alle" || x.gruppe === et.gruppe)) et.anzahl[a.id] = el.dataset.v === "1" ? Math.min(200, (et.anzahl[a.id] || 0) + 1) : 0; zeichnen(); },
+    "et-vorschau": (el) => { et.vorschau = el.dataset.id; zeichnen(); },
+    "et-drucken": () => {
+      if (et.code === "qr" && !window.qrcode) return meldung("Der QR-Baustein lädt noch – gleich noch einmal.");
+      const f = B.ET_FORMATE.find((x) => x.id === et.format), liste = etArtikel().flatMap((a) => Array(et.anzahl[a.id] || 0).fill(a));
+      if (liste.length) drucken(etBoegen(liste, f), false);
+    },
+    "et-probe": () => {
+      if (et.code === "qr" && !window.qrcode) return meldung("Der QR-Baustein lädt noch – gleich noch einmal.");
+      const f = B.ET_FORMATE.find((x) => x.id === et.format), alle = etArtikel(), a = alle.find((x) => x.id === et.vorschau) || alle.find((x) => et.anzahl[x.id]) || alle[0];
+      if (a) drucken(etBoegen([a], f), false);
+    },
     "tablet-an": () => {
       if (!(leitung() || zentrale())) return;
       geraet.tablet = { filiale: FIL().id, seit: jetztIso() }; geraetMerken();
@@ -2583,6 +2676,8 @@ const APP_VERSION = "0.16.0"; // gleich halten mit sw.js, version.json und ?v= i
     else if (el.dataset.kmap) { kasseZuordnung = { ...(kasseErgebnis ? kasseErgebnis.zuordnung : {}), [el.dataset.kmap]: Number(el.value) }; kasseErgebnis = L.kassenImport(kasseText, kasseZuordnung); zeichnen(); }
     else if (el.dataset.kasseFil != null) { const t = $("#ka-text"); if (t) kasseText = t.value; kasseFiliale = el.value; zeichnen(); }
     else if (el.id === "ka-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { kasseText = String(r.result || ""); kasseZuordnung = null; kasseErgebnis = L.kassenImport(kasseText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
+    else if (el.dataset.etPreis) { et.preise[el.dataset.etPreis] = el.value.trim(); et.vorschau = el.dataset.etPreis; zeichnen(); }
+    else if (el.dataset.etCode) { const c = el.value.trim(); if (c) etCodes()[el.dataset.etCode] = c; else delete etCodes()[el.dataset.etCode]; speichern(); et.vorschau = el.dataset.etCode; zeichnen(); }
     else if (el.dataset.mafilter) { maFilter[el.dataset.mafilter] = el.value; zeichnen(); }
     else if (el.id === "imp-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { importText = String(r.result || ""); importErgebnis = L.mitarbeiterImport(S, importText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
     else if (el.dataset.land) { filiale(el.dataset.land).bundesland = el.value || null; speichern(); meldung("Bundesland gespeichert"); zeichnen(); }

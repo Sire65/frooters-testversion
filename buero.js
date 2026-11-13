@@ -51,6 +51,42 @@
     return r && r[rolle] != null ? !!r[rolle] : o.rollen.includes(rolle);
   }
 
+  // ---------- Etiketten mit Barcode (wie die Preisetiketten der Club-App, in verschiedenen Maßen) ----------
+  // Code 128 (Strichcode): Zeichensatz B für Text, C für gerade Ziffernfolgen. Liefert die Breiten der Striche und Lücken (Module) mit Ruhezone.
+  const C128 = ["212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313", "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412", "211214", "211232", "2331112"];
+  function code128(text) {
+    const t = String(text || "");
+    if (!t || /[^\x20-\x7e]/.test(t)) return null;
+    const werte = [];
+    if (/^\d+$/.test(t) && t.length % 2 === 0 && t.length >= 4) { werte.push(105); for (let i = 0; i < t.length; i += 2) werte.push(Number(t.slice(i, i + 2))); }
+    else { werte.push(104); for (const z of t) werte.push(z.charCodeAt(0) - 32); }
+    let summe = werte[0]; for (let i = 1; i < werte.length; i++) summe += werte[i] * i;
+    werte.push(summe % 103, 106);
+    return werte.map((w) => C128[w]).join("").split("").map(Number);
+  }
+  function code128Svg(text, hoeheMm) {
+    const b = code128(text); if (!b) return "";
+    const ruhe = 10, gesamt = b.reduce((a, x) => a + x, 0) + 2 * ruhe;
+    let x = ruhe, r = "";
+    b.forEach((w, i) => { if (i % 2 === 0) r += `<rect x="${x}" y="0" width="${w}" height="40"/>`; x += w; });
+    return `<svg class="et-strich" viewBox="0 0 ${gesamt} 40" preserveAspectRatio="none" style="height:${hoeheMm}mm" role="img" aria-label="Strichcode ${esc(text)}"><rect width="${gesamt}" height="40" fill="#fff"/><g fill="#000">${r}</g></svg>`;
+  }
+  // QR-Code als SVG über den QR-Baustein (lib/qrcode, wie in der Club-App); ohne Baustein leer
+  function qrSvg(qr, text) {
+    if (!qr || !text) return "";
+    try { const q = qr(0, "M"); q.addData(String(text)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch (e) { return ""; }
+  }
+  // Maße in Millimetern (Breite × Höhe): quadratisch wie in der Club-App, dazu Regal- und Lageretiketten
+  const ET_FORMATE = [{ id: "80x80", w: 80, h: 80, t: "8 × 8 cm" }, { id: "70x70", w: 70, h: 70, t: "7 × 7 cm" }, { id: "60x60", w: 60, h: 60, t: "6 × 6 cm" }, { id: "50x50", w: 50, h: 50, t: "5 × 5 cm" },
+    { id: "70x40", w: 70, h: 40, t: "7 × 4 cm (Regal)" }, { id: "50x30", w: 50, h: 30, t: "5 × 3 cm (Lager)" }];
+  // A4 (210 × 297 mm), rundum mindestens 6 mm Rand, Etiketten stoßen aneinander
+  const etRaster = (f) => ({ sp: Math.floor(198 / f.w), ze: Math.floor(285 / f.h) });
+  // Preise „3,5 / 4,9 / 5,9“ je Größe; leere oder fehlende Preise bleiben „… €“ (nie geraten)
+  function etPreise(text, groessen) {
+    const teile = String(text || "").split("/").map((x) => x.trim());
+    return (groessen && groessen.length ? groessen : [""]).map((g, i) => ({ g, p: preisTxt(teile[i] || "") }));
+  }
+
   // ---------- Büro einrichten (wie in der Club-App): Teile umstellen, Zusatzkatalog ----------
   // Katalog: weitere Teile mit Aufgabe (go = Bereich, ordner = Büro-Ordner, deko = nur zum Anschauen). Höchstens KATALOG_MAX Stück.
   const KATALOG_MAX = 4;
@@ -226,5 +262,5 @@
       <div class="dp-fuss"><span>Erstellt mit der frooters Team-App (Testversion, Beispieldaten). Nicht erledigte Aufgaben sind markiert.</span></div></div>`;
   }
 
-  return { ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, KATALOG, KATALOG_MAX, einrichtungAnwenden, teileTauschen, teilSchieben, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
+  return { code128, code128Svg, qrSvg, ET_FORMATE, etRaster, etPreise, ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, KATALOG, KATALOG_MAX, einrichtungAnwenden, teileTauschen, teilSchieben, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
 });

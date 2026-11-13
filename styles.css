@@ -512,6 +512,32 @@ main.tb-main { max-width: 1100px; }
 .tb-band { background: var(--red); color: var(--on-red); display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 12px; font-size: .9rem; } .tb-band .chip { background: rgba(255,255,255,.9); color: #1d1d1b; border: 0; }
 .tb-warn { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9000; background: #1d1d1b; color: #fff; border-radius: 99px; padding: 12px 20px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 @media (max-width: 560px) { .tb-kopf { grid-template-columns: 1fr auto; } .tb-kopf .logo-plate { display: none; } }
+
+/* ---------- 0.17.0: Etiketten mit Barcode (Maße in mm, Bildschirm und Druck gleich) ---------- */
+.et { position: relative; box-sizing: border-box; background: #fff; color: #1d1d1b; display: flex; flex-direction: column; overflow: hidden; font-family: var(--f-body); line-height: 1.2; }
+.et.rahmen { border: .3mm solid var(--etf); border-radius: 2.5mm; }
+.et-band { background: var(--etf); color: #fff; display: grid; text-align: center; } .et-band small { font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .9; } .et-band b { font-family: var(--f-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.et-rumpf { flex: 1; min-height: 0; display: flex; } .et-rumpf.neben { flex-direction: row; } .et-rumpf.unter { flex-direction: column; }
+.et-text { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: .8mm; overflow: hidden; }
+.et-preise { display: grid; gap: .3mm; } .et-preise span { display: flex; justify-content: space-between; align-items: baseline; gap: 1mm; } .et-preise i { font-style: normal; font-weight: 700; color: var(--etf); } .et-preise b { font-family: var(--f-display); font-size: 1.7em; }
+.et-preise span:only-child { justify-content: center; } .et-preise span:only-child b { font-size: 2.6em; }
+.et-details { font-size: .9em; color: #3b3d32; } .et-allergene { font-size: .78em; } .et-rot { color: #b91c1c; font-weight: 700; }
+.et-code { display: grid; justify-items: center; align-content: end; gap: .3mm; } .et-code small { font-size: .78em; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+.et-rumpf.neben .et-qr { flex: 0 0 42%; } .et-qr svg { width: 100%; height: auto; display: block; } .et-rumpf.unter .et-qr svg { width: auto; max-height: 100%; }
+.et-rumpf.unter .et-qr { flex: 1; min-height: 0; } .et-rumpf.unter .et-qr svg { height: 100%; }
+.et-strichbox { width: 100%; } .et-strich { width: 100%; display: block; }
+.et-oben { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 14px; align-items: start; } @media (max-width: 560px) { .et-oben { grid-template-columns: minmax(0, 1fr); } }
+.et-vorschau { justify-items: center; } .et-skala { overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.18); border-radius: 4px; background: #fff; }
+.et-info { display: grid; gap: 6px; }
+.et-liste { display: grid; gap: 6px; } .et-zeile { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--tint); } .et-zeile.an { outline: 2px solid var(--green); }
+.et-name { flex: 1 1 180px; border: 0; background: none; text-align: left; display: grid; color: var(--ink); padding: 0; } .et-name small { color: var(--muted); }
+.et-feld { display: grid; font-size: .75rem; color: var(--muted); } .et-feld input { width: 150px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .9rem; }
+.et-anz { display: inline-flex; gap: 6px; align-items: center; } .et-anz b { min-width: 1.8em; text-align: center; }
+#druckbereich .et-bogen { display: none; }
+@media print {
+  #druckbereich .et-bogen { display: grid; width: 210mm; height: 297mm; padding: 6mm; box-sizing: border-box; justify-content: center; align-content: start; break-after: page; page-break-after: always; }
+  #druckbereich .et-bogen:last-child { break-after: auto; page-break-after: auto; }
+}
 @media print {
   body > *:not(#druckbereich) { display: none !important; }
   #druckbereich { display: block; container-type: inline-size; width: 100%; }
