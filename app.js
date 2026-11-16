@@ -1,4 +1,4 @@
-const APP_VERSION = "0.19.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.19.1"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -2882,10 +2882,14 @@ const APP_VERSION = "0.19.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   if (swDa()) {
     try {
-      navigator.serviceWorker.register("sw.js").then((reg) => {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
         const zeigen = (w) => { wartend = w; updateBand = `<div class="update">Neue Version bereit <button data-act="update-jetzt">Jetzt aktualisieren</button></div>`; zeichnen(); };
         if (reg.waiting && navigator.serviceWorker.controller) zeigen(reg.waiting);
         reg.addEventListener("updatefound", () => { const n = reg.installing; n && n.addEventListener("statechange", () => { if (n.state === "installed" && navigator.serviceWorker.controller) zeigen(n); }); });
+        // Gleich beim Öffnen und bei jeder Rückkehr zur App nach einer neuen Version fragen (nicht erst beim nächsten Neuladen)
+        reg.update().catch(() => {});
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+        setInterval(() => reg.update().catch(() => {}), 30 * 60000);
       }).catch(() => { /* ohne Service Worker läuft die App trotzdem */ });
       let neu = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => { if (neu) return; neu = true; location.reload(); });
