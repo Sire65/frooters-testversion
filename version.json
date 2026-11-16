@@ -1,12 +1,10 @@
 {
-  "version": "0.18.0",
+  "version": "0.19.0",
   "datum": "2026-11-16",
   "stufe": "DEV",
   "neu": [
-    "Aus der Club-App: Tagesordnung, Besprechungsvorlage und Protokoll für Teamsitzungen (Druck auf frooters-Briefkopf, Hinweis mit Aufgaben im Chat)",
-    "Termin ergänzen: im Chat nur die neuen Punkte",
-    "Einsatzplan je Tag zum Aushängen (A4 quer): Wunsch, Dienst als Balken, besetzt/nötig je halbe Stunde",
-    "Bereitschaft selbst in den Dienstwünschen eintragen; gerechtere Planung nach Auslastung",
-    "👀 Ausgeblendete Kacheln mit einem Knopf zeigen und zurückholen; Frag Frootie kennt die neuen Bereiche"
+    "PC-Version: Menü links in Gruppen zum Aufklappen (Mein Bereich, Infos & Termine, Planung, Personal, Hygiene, Rezepte, Ware & Umsatz, Büro, Zentrale) statt 24–30 einzelner Punkte",
+    "Menü mit « ganz einklappbar zur Symbolleiste, bleibt auf dem Gerät gemerkt; Zähler je Gruppe",
+    "Die Gruppe der geöffneten Seite klappt automatisch auf, es ist immer nur eine Gruppe offen"
   ]
 }

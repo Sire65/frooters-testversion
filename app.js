@@ -1,4 +1,4 @@
-const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.19.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -181,7 +181,7 @@ const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu aus der Club-App: Tagesordnung und Protokoll für Teamsitzungen, Tagesplan zum Aushängen, Bereitschaft selbst eintragen und gerechtere Planung.", go: "termine" };
+  const WAS_NEU = { text: "Am PC ist das Menü links jetzt aufgeräumt: wenige Gruppen zum Aufklappen, mit « ganz einklappbar.", go: "start" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -339,9 +339,10 @@ const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= i
     ["Wie richte ich mein Büro ein?", "buero", "Im Büro „✏️ Einrichten“: zwei Teile antippen oder ziehen, dann tauschen sie. Im Katalog gibt es weitere Teile."],
     ["Wie hole ich eine ausgeblendete Kachel zurück?", "start", "Auf der Startseite oben „👀 ausgeblendete“ antippen, dann die Kachel antippen."],
     ["Wie wird die Schrift größer?", "einstellungen", "In „Meine App“ Schrift „Groß“ wählen."],
+    ["Wie klappe ich das Menü am PC ein?", "start", "Am PC links oben auf « tippen: Das Menü wird zur schmalen Symbolleiste. Mit » oder einem Symbol klappt es wieder auf. Die Gruppen (Planung, Hygiene …) öffnen sich mit einem Klick."],
     ["Wie sortiere ich meine Kacheln?", "kacheln", "In „Meine App“ → „Kacheln sortieren und ausblenden“."],
   ];
-  const FROOTIE_SYN = { protokoll: "termine tagesordnung", tagesordnung: "termine protokoll", besprechung: "termine protokoll", etikett: "etiketten barcode", etiketten: "barcode", barcode: "etiketten", aufkleber: "etiketten", tablet: "stechuhr pin", pin: "einstellungen tablet", bereitschaft: "wuensche", aushang: "tagesplan", tagesplan: "besetzung", ausgeblendet: "kachel zurück", krank: "krankmeldung abwesenheit", krankmeldung: "abwesenheit", urlaub: "abwesenheit urlaubskonto", frei: "urlaub abwesenheit", schicht: "dienst dienstplan", dienste: "dienst", arbeitszeit: "dienst stechuhr", stempeln: "stechuhr einstempeln", einstempeln: "stechuhr", ausstempeln: "stechuhr", pause: "stechuhr", tauschen: "tausch tauschbörse", tausch: "tauschbörse", temperatur: "hygiene", putzen: "hygiene reinigen", reinigung: "hygiene", allergie: "allergene", allergen: "allergene", zutat: "zutaten allergene", rezept: "rezepte", quiz: "rezepte lernen", zettel: "pinnwand", chat: "nachrichten", schreiben: "nachrichten", nachricht: "nachrichten", treffen: "termine", sitzung: "termine teamsitzung", schulung: "termine", plan: "einsatzplan dienstplan", ware: "bestellung", bestellen: "bestellung", lager: "bestand bestellung", inventur: "bestand bestellung", drucken: "preisliste druck büro", schild: "druck büro", schrift: "einstellungen groß", kacheln: "einstellungen sortieren", dunkel: "einstellungen farben" };
+  const FROOTIE_SYN = { menü: "menü einklappen pc", menue: "menü einklappen pc", seitenleiste: "menü einklappen pc", einklappen: "menü pc", protokoll: "termine tagesordnung", tagesordnung: "termine protokoll", besprechung: "termine protokoll", etikett: "etiketten barcode", etiketten: "barcode", barcode: "etiketten", aufkleber: "etiketten", tablet: "stechuhr pin", pin: "einstellungen tablet", bereitschaft: "wuensche", aushang: "tagesplan", tagesplan: "besetzung", ausgeblendet: "kachel zurück", krank: "krankmeldung abwesenheit", krankmeldung: "abwesenheit", urlaub: "abwesenheit urlaubskonto", frei: "urlaub abwesenheit", schicht: "dienst dienstplan", dienste: "dienst", arbeitszeit: "dienst stechuhr", stempeln: "stechuhr einstempeln", einstempeln: "stechuhr", ausstempeln: "stechuhr", pause: "stechuhr", tauschen: "tausch tauschbörse", tausch: "tauschbörse", temperatur: "hygiene", putzen: "hygiene reinigen", reinigung: "hygiene", allergie: "allergene", allergen: "allergene", zutat: "zutaten allergene", rezept: "rezepte", quiz: "rezepte lernen", zettel: "pinnwand", chat: "nachrichten", schreiben: "nachrichten", nachricht: "nachrichten", treffen: "termine", sitzung: "termine teamsitzung", schulung: "termine", plan: "einsatzplan dienstplan", ware: "bestellung", bestellen: "bestellung", lager: "bestand bestellung", inventur: "bestand bestellung", drucken: "preisliste druck büro", schild: "druck büro", schrift: "einstellungen groß", kacheln: "einstellungen sortieren", dunkel: "einstellungen farben" };
   const normWort = (w) => w.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, "");
   const woerter = (t) => String(t || "").split(/[\s,.;:!?„“"()/–-]+/).map(normWort).filter((w) => w.length > 2 && !["wie", "ich", "der", "die", "das", "und", "ein", "eine", "mein", "meine", "was", "wer", "wo", "wann", "kann", "mit", "fuer", "ist", "den", "dem"].includes(w));
   // Tippfehler verzeihen: gleicher Wortanfang oder höchstens ein Buchstabe anders (wie die Suche der Club-App)
@@ -409,13 +410,52 @@ const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   // PC-Ansicht: ab 1100 Pixel Breite für Leitung, Zentrale und Qualität mit Seitenleiste
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
+  // PC-Seitenleiste: wenige Gruppen zum Aufklappen statt einer langen Liste; ganz einklappbar zur Symbolleiste
+  const NAV_GRUPPEN = [
+    { id: "ich", sym: "🙋", t: "Mein Bereich", go: ["dienst", "wuensche", "stechuhr", "abwesenheit", "tausch"] },
+    { id: "komm", sym: "💬", t: "Infos & Termine", go: ["nachrichten", "termine", "pinnwand"] },
+    { id: "plan", sym: "📅", t: "Planung", go: ["plan", "besetzung", "offen", "antraege", "urlaubsuebersicht"] },
+    { id: "pers", sym: "👥", t: "Personal", go: ["ma", "team", "stempelzeiten", "export"] },
+    { id: "hyg", sym: "🧼", t: "Hygiene", go: ["hygiene", "hygkontrolle", "hygregeln", "regeln"] },
+    { id: "rez", sym: "🍦", t: "Rezepte", go: ["rezepte", "quiz", "rezeptpflege"] },
+    { id: "ware", sym: "📦", t: "Ware & Umsatz", go: ["bestellung", "umsatz", "artikel"] },
+    { id: "buero", sym: "🗂️", t: "Büro", go: ["buero"] },
+    { id: "zentrale", sym: "🏢", t: "Zentrale", go: ["auswertung", "filialen", "admin"] },
+  ];
+  const NAV_UNTEN = ["hilfe", "einstellungen", "info"];
+  // Kürzere Namen in der Leiste, die Gruppe sagt schon, worum es geht
+  const NAV_KURZ = { hygiene: "Heute abhaken", hygkontrolle: "Kontrolle", hygregeln: "Regeln & Geräte (Shop)", regeln: "Regeln für alle Filialen", rezepte: "Rezeptbuch", quiz: "Quiz", rezeptpflege: "Pflegen & freigeben", plan: "Einsatzplan", urlaubsuebersicht: "Urlaubsübersicht", stempelzeiten: "Stempelzeiten", export: "Stundenliste", ma: "Mitarbeiter", nachrichten: "Nachrichten", hilfe: "Frag Frootie", einstellungen: "Meine App", info: "Version" };
+  let navOffen, navAktiv, navFuer; // Gruppe, die gerade aufgeklappt ist (undefined = die Gruppe der aktuellen Seite)
   function pcNav() {
+    if (navFuer !== ansicht) { navOffen = undefined; navFuer = ansicht; }
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", "termin-protokoll": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero", etiketten: "buero" }[ansicht] || ansicht;
-    const gesehen = new Set();
-    return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
-      ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
-        return `<h3>${esc(ab.querySelector("h2").textContent)}</h3>${ks.map((k) => `<button class="${aktiv === k.dataset.go ? "an" : ""}" data-go="${k.dataset.go}"><span aria-hidden="true">${esc(k.querySelector(".sym").textContent)}</span><span>${esc(k.querySelector("b").textContent)}</span>${k.querySelector(".zahl") ? `<span class="zahl">${esc(k.querySelector(".zahl").textContent)}</span>` : ""}</button>`).join("")}`; }).join("")}</nav>`;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", "termin-protokoll": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero", etiketten: "buero", krank: "abwesenheit", urlaub: "abwesenheit", matrix: "besetzung" }[ansicht] || ansicht;
+    // Was diese Person darf, steht in den Kacheln der Startseite (ohne eigene Ausblendungen)
+    const da = new Map();
+    for (const k of tmp.querySelectorAll(".kachel[data-go]")) if (!da.has(k.dataset.go)) da.set(k.dataset.go, { sym: k.querySelector(".sym").textContent, t: k.querySelector("b").textContent, zahl: k.querySelector(".zahl") ? Number(k.querySelector(".zahl").textContent) || 0 : 0 });
+    const bekannt = new Set([...NAV_GRUPPEN.flatMap((g) => g.go), ...NAV_UNTEN]);
+    const gruppen = NAV_GRUPPEN.map((g) => ({ ...g, punkte: g.go.filter((x) => da.has(x)) })).filter((g) => g.punkte.length);
+    const rest = [...da.keys()].filter((x) => !bekannt.has(x));
+    if (rest.length) gruppen.push({ id: "weitere", sym: "➕", t: "Weitere", punkte: rest });
+    const aktivGruppe = (gruppen.find((g) => g.punkte.includes(aktiv)) || {}).id;
+    navAktiv = aktivGruppe;
+    const offen = navOffen === undefined ? aktivGruppe : navOffen;
+    const schmal = !!geraet.navSchmal;
+    const zahl = (n) => n ? `<span class="zahl">${n}</span>` : "";
+    const punkt = (go, kurz) => { const x = da.get(go); const t = (kurz && NAV_KURZ[go]) || x.t;
+      return `<button class="${aktiv === go ? "an" : ""}" data-go="${go}" title="${esc(x.t)}"${aktiv === go ? ' aria-current="page"' : ""}><span class="sym" aria-hidden="true">${esc(x.sym)}</span><span class="txt">${esc(t)}</span>${zahl(x.zahl)}</button>`; };
+    const teile = gruppen.map((g) => {
+      if (g.punkte.length === 1) return `<div class="nav-gruppe einzeln">${punkt(g.punkte[0], false)}</div>`;
+      const auf = !schmal && offen === g.id, summe = g.punkte.reduce((n, x) => n + da.get(x).zahl, 0);
+      return `<div class="nav-gruppe ${auf ? "auf" : ""} ${aktivGruppe === g.id ? "drin" : ""}">
+        <button class="kopf-g" data-act="nav-gruppe" data-id="${g.id}" aria-expanded="${auf}" title="${esc(g.t)}"><span class="sym" aria-hidden="true">${g.sym}</span><span class="txt">${esc(g.t)}</span>${auf ? "" : zahl(summe)}<span class="pfeil" aria-hidden="true">▸</span></button>
+        ${auf ? `<div class="unter">${g.punkte.map((x) => punkt(x, true)).join("")}</div>` : ""}</div>`;
+    }).join("");
+    const unten = NAV_UNTEN.filter((x) => da.has(x)).map((x) => punkt(x, true)).join("");
+    return `<nav class="pc-nav ${schmal ? "schmal" : ""}" aria-label="Bereiche">
+      <div class="nav-oben"><button class="${aktiv === "start" ? "an" : ""}" data-go="start" title="Übersicht"><span class="sym" aria-hidden="true">🏠</span><span class="txt">Übersicht</span></button>
+      <button class="nav-klapp" data-act="nav-schmal" aria-label="${schmal ? "Menü ausklappen" : "Menü einklappen"}" title="${schmal ? "Menü ausklappen" : "Menü einklappen"}">${schmal ? "»" : "«"}</button></div>
+      ${teile}<div class="nav-unten">${unten}</div></nav>`;
   }
   function kachel(sym, t, u, go, zahl) { return `<button class="kachel" data-go="${go}"><span class="sym" aria-hidden="true">${sym}</span><b>${t}</b><span>${u}</span>${zahl ? `<span class="zahl">${zahl}</span>` : ""}</button>`; }
 
@@ -2081,7 +2121,7 @@ const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= i
     const pc = breit(); letzteBreit = pc;
     document.body.classList.toggle("pc", pc);
     const kiosk = ansicht.startsWith("tablet");
-    $("#app").innerHTML = `${updateBand}${kiosk ? `<div class="demo-band">Testversion ${APP_VERSION} · Shop-Tablet · Beispieldaten nur in diesem Browser</div>` : kopf() + tabletBand()}${kiosk ? `<main class="tb-main">${inhalt}</main>` : pc ? `<div class="pc-rahmen">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
+    $("#app").innerHTML = `${updateBand}${kiosk ? `<div class="demo-band">Testversion ${APP_VERSION} · Shop-Tablet · Beispieldaten nur in diesem Browser</div>` : kopf() + tabletBand()}${kiosk ? `<main class="tb-main">${inhalt}</main>` : pc ? `<div class="pc-rahmen ${geraet.navSchmal ? "schmal" : ""}">${pcNav()}<main>${inhalt}</main></div>` : `<main>${inhalt}</main>`}${fenster ? `<div class="fenster-hg" data-act="zu-hg"><div class="fenster" role="dialog" aria-modal="true">${fenster}</div></div>` : ""}`;
     einpassen($("#app"));
     verlaufFenster(); appZaehler();
   }
@@ -2571,6 +2611,8 @@ const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= i
     "prot-top-weg": (el) => { protMerken(); protEntwurf.tops.splice(Number(el.dataset.i), 1); zeichnen(); },
     "prot-speichern": () => { protAblegen(false); meldung("Entwurf gespeichert"); zeichnen(); },
     "prot-senden": () => { protAblegen(true); meldung("Protokoll verschickt – steht beim Termin und im Chat"); gehe("termin", protEntwurf.terminId); },
+    "nav-gruppe": (el) => { const id = el.dataset.id; if (geraet.navSchmal) { geraet.navSchmal = false; geraetMerken(); navOffen = id; } else { const jetzt = navOffen === undefined ? navAktiv : navOffen; navOffen = jetzt === id ? null : id; } zeichnen(); },
+    "nav-schmal": () => { geraet.navSchmal = !geraet.navSchmal; geraetMerken(); zeichnen(); },
     "ausgeblendet-zeigen": () => { nurAusgeblendet = !nurAusgeblendet; zeichnen(); },
     "kachel-einblenden": (el) => { const k = meinGeraet().kacheln; k.aus = (k.aus || []).filter((x) => x !== el.dataset.go2); geraetMerken(); meldung("Wieder eingeblendet"); zeichnen(); },
     "tablet-an": () => {
