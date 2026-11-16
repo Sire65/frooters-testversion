@@ -230,6 +230,31 @@
       <div class="dp-fuss"><span>frooters · Bestellung ${esc(b.id)}</span><img src="${bild.frootie}" alt=""></div>
     </div>`;
   }
+  // Besprechungsvorlage und Protokoll auf dem frooters-Briefkopf (wie in der Club-App)
+  function besprechungHtml(t, art, d, bild) {
+    const z = (x) => esc(x || "");
+    const kopf = `<div class="bs-kopf"><div><small>Anlass</small><b>${z(t.titel)}</b></div><div><small>Termin</small><b>${z(d.datum)}, ${z(t.von)}–${z(t.bis)} Uhr</b>${t.ort ? `<br>${z(t.ort)}` : ""}</div></div>`;
+    let inhalt;
+    if (art === "vorlage") {
+      inhalt = `<h1>Besprechung</h1>${kopf}<p class="bp-zeile">Protokoll: ______________________</p>
+        <h3>Teilnehmer</h3><div class="bp-teiln">${d.teilnehmer.map((x) => `<span>☐ ${z(x.name)}${x.antwort ? ` <i>(${z(x.antwort)})</i>` : ""}</span>`).join("")}</div>
+        <h3>Tagesordnung</h3><table class="dp-bestell bp-tab"><thead><tr><th>TOP</th><th>Punkt / Notizen / Ergebnis</th><th>Wer?</th><th>Bis wann?</th></tr></thead><tbody>
+        ${[...d.punkte, "Verschiedenes"].map((p, i) => `<tr><td>${i + 1}</td><td><b>${z(p)}</b><div class="bp-linien"></div></td><td></td><td></td></tr>`).join("")}</tbody></table>
+        <p class="bp-zeile">Nächster Termin: ______________________</p>`;
+    } else {
+      const pr = d.protokoll;
+      inhalt = `<h1>Protokoll</h1>${kopf}<p class="bp-zeile"><b>Anwesend:</b> ${pr.anwesend.map(z).join(", ") || "–"}${d.fehlt.length ? `<br><b>Entschuldigt/nicht da:</b> ${d.fehlt.map(z).join(", ")}` : ""}<br><b>Protokoll:</b> ${z(d.verfasser)}</p>
+        <table class="dp-bestell bp-tab"><thead><tr><th>TOP</th><th>Punkt und Ergebnis</th><th>Wer?</th><th>Bis wann?</th></tr></thead><tbody>
+        ${pr.tops.map((x, i) => `<tr><td>${i + 1}</td><td><b>${z(x.text)}</b>${x.ergebnis ? `<br>${z(x.ergebnis).replace(/\n/g, "<br>")}` : ""}</td><td>${z(x.wer)}</td><td>${z(x.bis)}</td></tr>`).join("")}
+        ${pr.sonstiges ? `<tr><td>${pr.tops.length + 1}</td><td><b>Verschiedenes</b><br>${z(pr.sonstiges).replace(/\n/g, "<br>")}</td><td></td><td></td></tr>` : ""}</tbody></table>
+        ${pr.naechster ? `<p class="bp-zeile"><b>Nächster Termin:</b> ${z(pr.naechster)}</p>` : ""}`;
+    }
+    const zeilenHoehe = Math.max(1.6, Math.min(5.5, 34 / (d.punkte.length + 1)));
+    return `<div class="druckblatt hoch bestellblatt bespr${art === "vorlage" ? " ohne-einpassen" : ""}" style="--dp:#c10230;--dp-hell:#fbe5ea;--bp-lh:${zeilenHoehe.toFixed(2)}cqw">
+      <div class="dp-kopf"><img src="${bild.logo}" alt="frooters"><span>${z(d.filiale)}</span></div>
+      <div class="dp-rumpf">${inhalt}</div>
+      <div class="dp-fuss"><span>frooters · ${art === "vorlage" ? "Besprechungsvorlage" : "Protokoll"} · ${z(d.stand)}</span><img src="${bild.frootie}" alt=""></div></div>`;
+  }
   // Briefbogen im frooters-Design
   function briefHtml(d, absender, bild) {
     return `<div class="druckblatt hoch brief" style="--dp:#c10230;--dp-hell:#fbe5ea">
@@ -262,5 +287,5 @@
       <div class="dp-fuss"><span>Erstellt mit der frooters Team-App (Testversion, Beispieldaten). Nicht erledigte Aufgaben sind markiert.</span></div></div>`;
   }
 
-  return { code128, code128Svg, qrSvg, ET_FORMATE, etRaster, etPreise, ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, KATALOG, KATALOG_MAX, einrichtungAnwenden, teileTauschen, teilSchieben, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml };
+  return { code128, code128Svg, qrSvg, ET_FORMATE, etRaster, etPreise, ORDNER, FREIGABE_ROLLEN, BUEROS, BU_SVG, KATALOG, KATALOG_MAX, einrichtungAnwenden, teileTauschen, teilSchieben, darfOrdner, FARBEN, SYMBOLE, VORLAGEN, postenVorschlag, oeffnungText, neuerDruck, preisTxt, blattHtml, briefHtml, hygieneBerichtHtml, bestellungHtml, besprechungHtml };
 });

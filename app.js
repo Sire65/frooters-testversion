@@ -1,4 +1,4 @@
-const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
+const APP_VERSION = "0.18.0"; // gleich halten mit sw.js, version.json und ?v= in index.html (Versionsvertrag wie Club-App)
 // frooters Team-App – Oberfläche. Logik: logik.js (FRL), Daten: daten.js (FRD).
 (function () {
   "use strict";
@@ -9,7 +9,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
   }
   const A = D.adapter("demo");
   let S = A.laden();
-  if (!S || S.version !== 13) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
+  if (!S || S.version !== 14) { S = D.demoDaten(L.iso(new Date())); A.speichern(S); }
   let sitzung = {};
   try { sitzung = JSON.parse(localStorage.getItem("frooters_sitzung") || "{}"); } catch (e) { sitzung = {}; }
   const merke = () => { try { localStorage.setItem("frooters_sitzung", JSON.stringify(sitzung)); } catch (e) { /* nur Komfort */ } };
@@ -130,15 +130,25 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
   // In der einfachen Ansicht nur das Nötigste (wie „Einfach“ in der Club-App)
   const EINFACH_KACHELN = ["dienst", "stechuhr", "abwesenheit", "tausch", "hygiene", "rezepte", "pinnwand", "nachrichten", "termine", "plan", "offen", "antraege", "bestellung", "ma", "freigaben", "rezeptpflege", "hilfe", "einstellungen"];
   // Startseite nach Wunsch: eigene Reihenfolge, ausgeblendete Kacheln, einfache Ansicht
+  let nurAusgeblendet = false;
   function startAnpassen(html) {
     const t = document.createElement("template"); t.innerHTML = html;
     const k = meinGeraet().kacheln, folge = k.folge || [], aus = new Set(k.aus || []);
     for (const gruppe of t.content.querySelectorAll(".kacheln")) {
       const ks = [...gruppe.children];
       ks.sort((a, b) => { const ia = folge.indexOf(a.dataset.go), ib = folge.indexOf(b.dataset.go); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
-      for (const x of ks) { if (aus.has(x.dataset.go) || (einfach() && !EINFACH_KACHELN.includes(x.dataset.go))) x.remove(); else gruppe.appendChild(x); }
+      for (const x of ks) {
+        const versteckt = aus.has(x.dataset.go);
+        if (nurAusgeblendet ? !versteckt : (versteckt || (einfach() && !EINFACH_KACHELN.includes(x.dataset.go)))) x.remove();
+        else { if (nurAusgeblendet) { x.setAttribute("data-act", "kachel-einblenden"); x.setAttribute("data-go2", x.dataset.go); x.removeAttribute("data-go"); x.classList.add("versteckt"); } gruppe.appendChild(x); }
+      }
       if (!gruppe.children.length) { const ab = gruppe.closest(".abschnitt"); if (ab) ab.remove(); }
     }
+    const n = aus.size;
+    if (n) { const erst = t.content.querySelector(".abschnitt") || t.content.firstElementChild; const b = document.createElement("div"); b.className = "reihe kachel-schalter";
+      b.innerHTML = `<button class="chip ${nurAusgeblendet ? "an-rot" : ""}" data-act="ausgeblendet-zeigen" aria-pressed="${nurAusgeblendet}">${nurAusgeblendet ? "🙈 Zurück" : `👀 ${n} ausgeblendete`}</button>${nurAusgeblendet ? '<span class="klein muted">Antippen blendet die Kachel wieder ein.</span>' : ""}`;
+      if (erst) erst.parentNode.insertBefore(b, erst); }
+    if (nurAusgeblendet && !n) nurAusgeblendet = false;
     return t.innerHTML;
   }
   // Rechte je Ansicht an einer Stelle (für Zeichnen, Suche und „Zeig es mir“)
@@ -159,7 +169,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     if (["regeln", "regel-edit"].includes(r) && !qualitaet()) r = "start";
     if (["rezeptpflege", "rezept-edit", "zutaten", "zutat-edit", "freigaben"].includes(r) && !rezeptRecht()) r = "start";
     if (berater() && ["quiz", "pinnwand", "nachrichten", "chat"].includes(r)) r = "start";
-    if (r === "termin-edit" && !(leitung() || zentrale())) r = "termine";
+    if ((r === "termin-edit" || r === "termin-protokoll") && !(leitung() || zentrale())) r = "termine";
     if (uebergreifend() && ["dienst", "wuensche", "krank", "urlaub", "abwesenheit", "stechuhr", "tausch"].includes(r)) r = "start";
     return r;
   }
@@ -171,7 +181,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]+>/g, " ")); u.lang = "de-DE"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) { meldung("Vorlesen nicht möglich."); }
   }
   // Was ist neu (ein Satz, mit Sprungknopf). Ruhe-Regel: höchstens EIN Info-Fenster pro Öffnen; die Pinnwand geht vor.
-  const WAS_NEU = { text: "Neu: Etiketten mit Barcode im Druckstudio, für Produkte und Lagerware, von 5 × 3 bis 8 × 8 cm.", go: "etiketten" };
+  const WAS_NEU = { text: "Neu aus der Club-App: Tagesordnung und Protokoll für Teamsitzungen, Tagesplan zum Aushängen, Bereitschaft selbst eintragen und gerechtere Planung.", go: "termine" };
   function wasNeuPruefen() {
     if (fenster || !ICH() || geraet.wasNeu === APP_VERSION) return;
     geraet.wasNeu = APP_VERSION; geraetMerken();
@@ -320,10 +330,18 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     ["Wie drucke ich eine Preisliste?", "studio", "Büro, Ordner „Grafik & Druck“, Vorlage „Preisliste“. Drucken oder als PDF speichern."],
     ["Wie ändere ich ein Allergen?", "zutaten", "Unter „Rezepte pflegen“ die Zutat öffnen. Die Änderung gilt nach der Freigabe durch eine zweite Person."],
     ["Wie lege ich einen Mitarbeiter an?", "ma", "Kachel „Mitarbeiter“, „+ Mitarbeiter anlegen“ oder aus Excel einlesen."],
+    ["Wie stemple ich am Shop-Tablet?", "stechuhr", "Am Tablet an der Theke: Namen antippen, PIN eingeben, Kommen, Pause oder Gehen. Die Leitung richtet das Tablet unter „Meine App“ ein."],
+    ["Wie ändere ich meine PIN?", "einstellungen", "In „Meine App“ unter „Meine PIN für das Shop-Tablet“: bisherige PIN, dann zweimal die neue."],
+    ["Wie trage ich Bereitschaft ein?", "wuensche", "In den Dienstwünschen beim Tag auf „🛎 Bereitschaft“ tippen und die Zeit einstellen. Die Leitung fragt dich dann zuerst, wenn jemand ausfällt."],
+    ["Wie drucke ich den Tagesplan zum Aushängen?", "besetzung", "In der Besetzung den Tag antippen, dann „🖨️ Tagesplan zum Aushängen“: alle Personen mit Wunsch, Dienst als Balken und besetzt/nötig."],
+    ["Wie mache ich eine Tagesordnung und ein Protokoll?", "termine", "Beim Termin unter „✏️ Ändern“ die Tagesordnung eintragen. Dann „🗂️ Besprechungsvorlage drucken“ und danach „📝 Protokoll schreiben“ und senden."],
+    ["Wie drucke ich Etiketten mit Barcode?", "etiketten", "Büro → Grafik & Druck → „🏷️ Etiketten mit Barcode“: Größe, QR- oder Strichcode wählen, Anzahl tippen, erst eine Probe drucken."],
+    ["Wie richte ich mein Büro ein?", "buero", "Im Büro „✏️ Einrichten“: zwei Teile antippen oder ziehen, dann tauschen sie. Im Katalog gibt es weitere Teile."],
+    ["Wie hole ich eine ausgeblendete Kachel zurück?", "start", "Auf der Startseite oben „👀 ausgeblendete“ antippen, dann die Kachel antippen."],
     ["Wie wird die Schrift größer?", "einstellungen", "In „Meine App“ Schrift „Groß“ wählen."],
     ["Wie sortiere ich meine Kacheln?", "kacheln", "In „Meine App“ → „Kacheln sortieren und ausblenden“."],
   ];
-  const FROOTIE_SYN = { krank: "krankmeldung abwesenheit", krankmeldung: "abwesenheit", urlaub: "abwesenheit urlaubskonto", frei: "urlaub abwesenheit", schicht: "dienst dienstplan", dienste: "dienst", arbeitszeit: "dienst stechuhr", stempeln: "stechuhr einstempeln", einstempeln: "stechuhr", ausstempeln: "stechuhr", pause: "stechuhr", tauschen: "tausch tauschbörse", tausch: "tauschbörse", temperatur: "hygiene", putzen: "hygiene reinigen", reinigung: "hygiene", allergie: "allergene", allergen: "allergene", zutat: "zutaten allergene", rezept: "rezepte", quiz: "rezepte lernen", zettel: "pinnwand", chat: "nachrichten", schreiben: "nachrichten", nachricht: "nachrichten", treffen: "termine", sitzung: "termine teamsitzung", schulung: "termine", plan: "einsatzplan dienstplan", ware: "bestellung", bestellen: "bestellung", lager: "bestand bestellung", inventur: "bestand bestellung", drucken: "preisliste druck büro", schild: "druck büro", schrift: "einstellungen groß", kacheln: "einstellungen sortieren", dunkel: "einstellungen farben" };
+  const FROOTIE_SYN = { protokoll: "termine tagesordnung", tagesordnung: "termine protokoll", besprechung: "termine protokoll", etikett: "etiketten barcode", etiketten: "barcode", barcode: "etiketten", aufkleber: "etiketten", tablet: "stechuhr pin", pin: "einstellungen tablet", bereitschaft: "wuensche", aushang: "tagesplan", tagesplan: "besetzung", ausgeblendet: "kachel zurück", krank: "krankmeldung abwesenheit", krankmeldung: "abwesenheit", urlaub: "abwesenheit urlaubskonto", frei: "urlaub abwesenheit", schicht: "dienst dienstplan", dienste: "dienst", arbeitszeit: "dienst stechuhr", stempeln: "stechuhr einstempeln", einstempeln: "stechuhr", ausstempeln: "stechuhr", pause: "stechuhr", tauschen: "tausch tauschbörse", tausch: "tauschbörse", temperatur: "hygiene", putzen: "hygiene reinigen", reinigung: "hygiene", allergie: "allergene", allergen: "allergene", zutat: "zutaten allergene", rezept: "rezepte", quiz: "rezepte lernen", zettel: "pinnwand", chat: "nachrichten", schreiben: "nachrichten", nachricht: "nachrichten", treffen: "termine", sitzung: "termine teamsitzung", schulung: "termine", plan: "einsatzplan dienstplan", ware: "bestellung", bestellen: "bestellung", lager: "bestand bestellung", inventur: "bestand bestellung", drucken: "preisliste druck büro", schild: "druck büro", schrift: "einstellungen groß", kacheln: "einstellungen sortieren", dunkel: "einstellungen farben" };
   const normWort = (w) => w.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, "");
   const woerter = (t) => String(t || "").split(/[\s,.;:!?„“"()/–-]+/).map(normWort).filter((w) => w.length > 2 && !["wie", "ich", "der", "die", "das", "und", "ein", "eine", "mein", "meine", "was", "wer", "wo", "wann", "kann", "mit", "fuer", "ist", "den", "dem"].includes(w));
   // Tippfehler verzeihen: gleicher Wortanfang oder höchstens ein Buchstabe anders (wie die Suche der Club-App)
@@ -393,7 +411,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
   const breit = () => window.innerWidth >= 1100 && !!ICH() && ansicht !== "login" && (leitung() || zentrale() || qualitaet());
   function pcNav() {
     const tmp = document.createElement("div"); tmp.innerHTML = V.start();
-    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero", etiketten: "buero" }[ansicht] || ansicht;
+    const aktiv = { "ma-edit": "ma", "ma-import": "ma", "regel-edit": "regeln", "rezept-edit": "rezeptpflege", "besetzung-tag": "besetzung", "admin-edit": "admin", "admin-pinnwand": "admin", zutaten: "rezeptpflege", "zutat-edit": "rezeptpflege", freigaben: "rezeptpflege", chat: "nachrichten", termin: "termine", "termin-edit": "termine", "termin-protokoll": "termine", inventur: "bestellung", lagersoll: "bestellung", "kasse-import": "umsatz", "artikel-edit": "artikel", lieferanten: "artikel", "lieferant-edit": "artikel", ordner: "buero", studio: "buero", "druck-edit": "buero", etiketten: "buero" }[ansicht] || ansicht;
     const gesehen = new Set();
     return `<nav class="pc-nav" aria-label="Bereiche"><button class="${aktiv === "start" ? "an" : ""}" data-go="start"><span aria-hidden="true">🏠</span><span>Übersicht</span></button>
       ${[...tmp.querySelectorAll(".abschnitt")].map((ab) => { const ks = [...ab.querySelectorAll(".kachel")].filter((k) => !gesehen.has(k.dataset.go) && gesehen.add(k.dataset.go)); if (!ks.length) return "";
@@ -524,7 +542,8 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
           ${zu ? "" : `<div class="wahl">${[["moechte", "😀 möchte"], ["kann", "👍 kann"], ["nicht", "✋ kann nicht"]].map(([a, t]) =>
             `<button class="${w.art === a ? "an" : ""} ${a === "nicht" ? "nein" : ""}" data-act="wunsch" data-datum="${d}" data-art="${a}">${t}</button>`).join("")}</div>
           ${w.art && w.art !== "nicht" ? `<div class="wahl">${[["egal", "egal"], ["frueh", "Frühdienst"], ["spaet", "Spätdienst"]].map(([s, t]) =>
-            `<button class="${(w.schicht || "egal") === s ? "an" : ""}" data-act="wunsch-schicht" data-datum="${d}" data-schicht="${s}">${t}</button>`).join("")}</div>` : ""}`}
+            `<button class="${(w.schicht || "egal") === s ? "an" : ""}" data-act="wunsch-schicht" data-datum="${d}" data-schicht="${s}">${t}</button>`).join("")}</div>` : ""}
+          ${w.art !== "nicht" ? `<div class="reihe"><button class="chip ${w.bereit ? "an-bereit" : ""}" data-act="wunsch-bereit" data-datum="${d}">🛎 Bereitschaft${w.bereit ? " ✓" : ""}</button>${w.bereit ? `<input type="time" data-bereit="${d}|von" value="${esc(w.bereit.von)}" aria-label="Bereitschaft von"><span>–</span><input type="time" data-bereit="${d}|bis" value="${esc(w.bereit.bis)}" aria-label="Bereitschaft bis">` : '<span class="klein muted">kurzfristig einspringen</span>'}</div>` : ""}`}
         </div>`;
       }).join("")}</div>`;
   };
@@ -884,7 +903,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     const stunden = []; for (let h = Math.ceil(t.auf / 60); h * 60 <= t.zu; h++) stunden.push(h);
     const bl = L.bedarfBloecke(f, d);
     const personen = t.personen.slice().sort((a, b) => a.von - b.von);
-    return `${titel(datumLang(d) + " · " + esc(f.kurz), "besetzung")}
+    return `${titel(datumLang(d) + " · " + esc(f.kurz), "besetzung")}<div class="reihe"><button class="btn drei" data-act="tagesplan-druck" data-datum="${d}">🖨️ Tagesplan zum Aushängen (A4 quer)</button></div>
       <div class="karte"><div class="reihe zw"><button class="chip" data-go="besetzung-tag" data-arg="${L.plusTage(d, -1)}">‹</button><b>${L.minZuZeit(t.auf)}–${L.minZuZeit(t.zu)}${t.ort ? " · 📍 " + esc(t.ort) : ""}</b><button class="chip" data-go="besetzung-tag" data-arg="${L.plusTage(d, 1)}">›</button></div>
         <div class="gantt">
           <div class="g-zeile g-kopf"><span></span><div class="g-bahn">${stunden.map((h) => `<i style="left:${pos(h * 60)}%">${h}</i>`).join("")}</div></div>
@@ -1230,7 +1249,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
   let druckEntwurf = null, briefEntwurf = null;
   // Verkleinert die Schrift von Tabellen und Texten, bis alles aufs Blatt passt (nichts wird abgeschnitten).
   function einpassen(wurzel) {
-    for (const blatt of (wurzel || document).querySelectorAll(".druckblatt:not(.bericht)")) {
+    for (const blatt of (wurzel || document).querySelectorAll(".druckblatt:not(.bericht):not(.ohne-einpassen)")) {
       const rumpf = blatt.querySelector(".dp-rumpf"); if (!rumpf) continue;
       const ziel = rumpf.querySelector("table") || rumpf.querySelector(".dp-text"); if (!ziel) continue;
       const breite = blatt.getBoundingClientRect().width || 1;
@@ -1851,6 +1870,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
       <div class="karte"><p><b>${datumLang(t.datum)}</b>, ${t.von}–${t.bis} Uhr</p>${t.ort ? `<p>📍 ${esc(t.ort)}</p>` : ""}
         <p class="klein muted">${esc(art.name)} · ${t.filiale ? esc(filiale(t.filiale).kurz) : "alle Filialen"} · für ${t.fuer === "leitung" ? "die Leitung" : t.fuer === "personen" ? "bestimmte Personen" : "alle"}${t.pflicht ? " · <b>Pflichttermin</b>" : ""} · von ${esc((person(t.vonId) || {}).vorname || "?")}</p>
         ${t.notiz ? `<p>${esc(t.notiz).replace(/\n/g, "<br>")}</p>` : ""}</div>
+      ${tagesordnungKarte(t)}
       ${ein && !t.abgesagt && t.datum >= heute() ? `<div class="karte"><h2>Kommst du?</h2><div class="wahl">${Object.entries(ANTW).map(([k, [sym, txt]]) => `<button class="${meine && meine.a === k ? "an" : ""} ${k === "nein" && meine && meine.a === k ? "nein" : ""}" data-act="termin-antwort" data-id="${t.id}" data-a="${k}">${sym} ${txt}</button>`).join("")}</div>${t.pflicht && meine && meine.a === "nein" ? '<p class="hinweis">Pflichttermin: Bitte sprich die Absage mit deiner Shopleitung ab.</p>' : ""}</div>` : ""}
       ${!t.abgesagt ? `<div class="karte"><h2>Erinnerung</h2><div class="reihe"><select id="tm-erinnern" aria-label="Erinnerung"><option value="15">15 Min. vorher</option><option value="60" selected>1 Std. vorher</option><option value="1440">am Vortag</option><option value="0">ohne Erinnerung</option></select><button class="btn drei" data-act="termin-ics" data-id="${t.id}">📅 In meinen Kalender</button></div><p class="klein muted">Lädt eine Kalender-Datei. Dein Handy-Kalender erinnert dich dann.</p></div>` : ""}
       <div class="karte"><h2>Antworten</h2><p>✅ ${st.ja.length} · 🤔 ${st.vielleicht.length} · ❌ ${st.nein.length} · ⏳ ${st.offen.length} offen</p>
@@ -1874,8 +1894,9 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
         <div class="feld"><label for="te-fuer">Eingeladen</label><select id="te-fuer"><option value="alle" ${t.fuer === "alle" ? "selected" : ""}>alle im Team</option><option value="leitung" ${t.fuer === "leitung" ? "selected" : ""}>nur Leitung</option><option value="personen" ${t.fuer === "personen" ? "selected" : ""}>bestimmte Personen</option></select></div></div>
       <details ${t.fuer === "personen" ? "open" : ""}><summary class="klein">Bestimmte Personen auswählen (bei „bestimmte Personen“)</summary><div class="wahl-liste">${leute.map((p) => `<label class="haken"><input type="checkbox" data-te-person="${p.id}" ${(t.personen || []).includes(p.id) ? "checked" : ""}><span>${esc(name(p))}</span></label>`).join("")}</div></details>
       <label class="haken"><input type="checkbox" id="te-pflicht" ${t.pflicht ? "checked" : ""}><span>Pflichttermin</span></label>
-      <div class="feld"><label for="te-notiz">Notiz / Tagesordnung</label><textarea id="te-notiz" rows="4" maxlength="1000">${esc(t.notiz || "")}</textarea></div>
-      <label class="haken"><input type="checkbox" id="te-chat" ${arg ? "" : "checked"}><span>Im Chat ankündigen</span></label>
+      <div class="feld"><label for="te-notiz">Notiz</label><textarea id="te-notiz" rows="3" maxlength="1000">${esc(t.notiz || "")}</textarea></div>
+      <div class="feld"><label for="te-to">📋 Tagesordnung (ein Punkt je Zeile)</label><textarea id="te-to" rows="4" maxlength="2000" placeholder="Wintersortiment&#10;Neue Hygiene-Liste&#10;Dienstwünsche Dezember">${esc(L.terminPunkte(t).join("\n"))}</textarea></div>
+      <label class="haken"><input type="checkbox" id="te-chat" checked><span>Im Chat Bescheid geben (bei Ergänzungen nur die neuen Punkte)</span></label>
       <button class="btn gross" data-act="termin-speichern" data-id="${arg || ""}">Speichern</button></div>`;
   };
   function icsSpeichern(dateiname, text) {
@@ -1891,6 +1912,91 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     const c = t.fuer === "leitung" ? S.chats.find((x) => x.art === "leitung") : t.filiale ? S.chats.find((x) => x.art === "filiale" && x.filiale === t.filiale) : null;
     const ziele = c ? [c] : S.chats.filter((x) => x.art === "filiale");
     for (const z of ziele) L.nachrichtSenden(S, z.id, ICH().id, text, jetztIso(), () => neueId("nc"));
+  }
+  // ----- Aus der Club-App 2.932–2.946: Tagesordnung, Besprechungsvorlage, Protokoll (für Teamsitzungen) -----
+  let protEntwurf = null;
+  const ANTW_TXT = { ja: "Zusage", vielleicht: "vielleicht", nein: "Absage" };
+  function besprechungDaten(t) {
+    const ein = L.terminEingeladen(S, t), a = t.antworten || {};
+    const pr = t.protokoll || protEntwurf;
+    return { datum: datumLang(t.datum), filiale: t.filiale ? filiale(t.filiale).name : "alle Filialen", stand: L.datumKurz(heute()),
+      teilnehmer: ein.map((id) => ({ name: name(person(id)), antwort: a[id] ? ANTW_TXT[a[id].a] : "" })), punkte: L.terminPunkte(t),
+      protokoll: pr ? { ...pr, anwesend: pr.anwesend.map((id) => name(person(id))) } : null,
+      fehlt: pr ? ein.filter((id) => !pr.anwesend.includes(id)).map((id) => name(person(id))) : [], verfasser: pr && pr.von ? name(person(pr.von)) : name(ICH()) };
+  }
+  function tagesordnungKarte(t) {
+    const punkte = L.terminPunkte(t), recht = darfTerminAendern(t);
+    if (!punkte.length && !recht) return "";
+    const pr = t.protokoll;
+    return `<div class="karte"><h2>📋 Tagesordnung</h2>${punkte.length ? `<ol class="schritte">${punkte.map((p) => `<li>${esc(p)}</li>`).join("")}</ol>` : '<p class="muted">Noch keine Punkte. Unter „✏️ Ändern“ eintragen, ein Punkt je Zeile.</p>'}
+      ${recht && !t.abgesagt ? `<div class="reihe"><button class="btn drei" data-act="bespr-vorlage" data-id="${t.id}">🗂️ Besprechungsvorlage drucken</button><button class="btn zwei" data-go="termin-protokoll" data-arg="${t.id}">📝 Protokoll ${pr ? (pr.gesendet ? "ansehen / ändern" : "weiterschreiben") : "schreiben"}</button></div>` : ""}</div>
+      ${pr && pr.gesendet ? `<div class="karte"><h2>📝 Protokoll</h2><p class="klein muted">verschickt ${zeitKurz(pr.gesendet)} von ${wer(pr.von)}</p>
+        <ol class="schritte">${pr.tops.map((x) => `<li><b>${esc(x.text)}</b>${x.ergebnis ? `<br>${esc(x.ergebnis).replace(/\n/g, "<br>")}` : ""}${x.wer || x.bis ? `<br><span class="marke-s">👉 ${esc(x.wer || "?")}${x.bis ? " bis " + esc(L.datumKurz(x.bis)) : ""}</span>` : ""}</li>`).join("")}</ol>
+        ${pr.sonstiges ? `<p><b>Verschiedenes:</b> ${esc(pr.sonstiges)}</p>` : ""}${pr.naechster ? `<p><b>Nächster Termin:</b> ${esc(pr.naechster)}</p>` : ""}
+        <button class="btn drei" data-act="prot-druck" data-id="${t.id}">🖨️ Protokoll drucken / PDF</button></div>` : ""}`;
+  }
+  V["termin-protokoll"] = () => {
+    const t = termin(arg);
+    if (!t || !darfTerminAendern(t)) return `${titel("Protokoll", "termine")}<p class="leer">Nicht gefunden.</p>`;
+    if (!protEntwurf || protEntwurf.terminId !== t.id) protEntwurf = { ...L.protokollEntwurf(S, t), terminId: t.id };
+    const pr = protEntwurf, ein = L.terminEingeladen(S, t), namen = ein.map((id) => name(person(id)));
+    return `${titel("📝 Protokoll", "termine")}<p class="muted"><b>${esc(t.titel)}</b> · ${datumLang(t.datum)}, ${t.von}–${t.bis}${t.ort ? " · " + esc(t.ort) : ""}</p>
+      <div class="karte"><h2>Anwesend</h2><div class="wahl-liste">${ein.map((id) => `<label class="haken"><input type="checkbox" data-pr-anw="${id}" ${pr.anwesend.includes(id) ? "checked" : ""}><span>${esc(name(person(id)))}</span></label>`).join("")}</div></div>
+      ${pr.tops.map((x, i) => `<div class="karte"><div class="reihe zw"><h3>TOP ${i + 1}</h3><button class="chip" data-act="prot-top-weg" data-i="${i}" aria-label="Punkt entfernen">✕</button></div>
+        <div class="feld"><label for="pt-t${i}">Punkt</label><input type="text" id="pt-t${i}" data-top="${i}|text" value="${esc(x.text)}" maxlength="120"></div>
+        <div class="feld"><label for="pt-e${i}">Ergebnis</label><textarea id="pt-e${i}" data-top="${i}|ergebnis" rows="2" maxlength="800">${esc(x.ergebnis)}</textarea></div>
+        <div class="gitter2"><div class="feld"><label for="pt-w${i}">Wer?</label><input type="text" id="pt-w${i}" data-top="${i}|wer" value="${esc(x.wer)}" list="pr-namen" maxlength="60"></div><div class="feld"><label for="pt-b${i}">Bis wann?</label><input type="date" id="pt-b${i}" data-top="${i}|bis" value="${esc(x.bis)}"></div></div></div>`).join("")}
+      <datalist id="pr-namen">${["alle", ...namen].map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+      <button class="btn drei" data-act="prot-top-neu">+ Punkt</button>
+      <div class="karte"><div class="feld"><label for="pr-sonst">Verschiedenes</label><textarea id="pr-sonst" rows="2" maxlength="800">${esc(pr.sonstiges)}</textarea></div>
+        <div class="feld"><label for="pr-naechst">Nächster Termin</label><input type="text" id="pr-naechst" value="${esc(pr.naechster)}" maxlength="80" placeholder="z. B. Di 15.12., 18:30 Uhr"></div></div>
+      <div class="reihe"><button class="btn drei" data-act="prot-speichern">💾 Entwurf speichern</button><button class="btn drei" data-act="prot-druck" data-id="${t.id}">🖨️ Ansehen / PDF</button><button class="btn" data-act="prot-senden">📨 ${pr.gesendet ? "Erneut senden" : "Protokoll senden"}</button></div>
+      <p class="klein muted">Senden: Das Protokoll steht danach beim Termin für alle Eingeladenen, und im Chat kommt ein Hinweis mit den Aufgaben (Wer? Bis wann?).</p>`;
+  };
+  function protMerken() {
+    if (!protEntwurf) return;
+    const pr = protEntwurf;
+    const anw = [...document.querySelectorAll("[data-pr-anw]")]; if (anw.length) pr.anwesend = anw.filter((x) => x.checked).map((x) => x.dataset.prAnw);
+    for (const el of document.querySelectorAll("[data-top]")) { const [i, k] = el.dataset.top.split("|"); if (pr.tops[i]) pr.tops[i][k] = el.value.trim(); }
+    const so = $("#pr-sonst"); if (so) pr.sonstiges = so.value.trim(); const na = $("#pr-naechst"); if (na) pr.naechster = na.value.trim();
+  }
+  function protAblegen(senden) {
+    protMerken(); const t = termin(protEntwurf.terminId); if (!t) return;
+    const { terminId, ...rest } = protEntwurf; rest.tops = rest.tops.filter((x) => x.text);
+    t.protokoll = { ...rest, von: ICH().id, stand: jetztIso(), gesendet: senden ? jetztIso() : rest.gesendet || null };
+    if (senden) {
+      const aufgaben = t.protokoll.tops.filter((x) => x.wer).map((x) => `• ${x.wer}: ${x.text}${x.bis ? " bis " + L.datumKurz(x.bis) : ""}`);
+      chatAnkuendigen(t, `📝 Protokoll „${t.titel}“ vom ${L.datumKurz(t.datum)} ist da – unter Termine ansehen.${aufgaben.length ? "\nAufgaben:\n" + aufgaben.join("\n") : ""}`);
+    }
+    protEntwurf = { ...JSON.parse(JSON.stringify(t.protokoll)), terminId: t.id }; speichern();
+  }
+
+  // ----- Aus der Club-App 2.944: Einsatzplan je Tag auf A4 quer zum Aushängen -----
+  const WUNSCH_TXT = { moechte: "😀 möchte", kann: "👍 kann", nicht: "✋ kann nicht" };
+  function tagesplanHtml(f, d) {
+    const t = L.besetzungTag(S, f.id, d), o = L.oeffnung(f, d);
+    if (!o) return "";
+    const dauer = o.zu - o.auf + 60, start = o.auf - 30, pos = (m) => Math.max(0, Math.min(100, ((m - start) / dauer) * 100));
+    const leute = L.tabletLeute(S, f.id, d).concat(S.personen.filter((p) => p.aktiv !== false && L.darfInFiliale(p, f.id) && L.abwesenheitAm(S, p.id, d)).map((p) => ({ person: p, schichten: [], geplant: false, abwesend: true })))
+      .filter((x, i, a) => x.person.rolle !== "bezirk" && a.findIndex((y) => y.person.id === x.person.id) === i);
+    const stunden = []; for (let h = Math.ceil(start / 60); h * 60 <= start + dauer; h++) stunden.push(h);
+    const soll = t.slots.reduce((n, s) => n + (s.bedarf ? s.bedarf.gesamt : 0), 0) / 2, ist = t.slots.reduce((n, s) => n + Math.min(s.zahl.gesamt, s.bedarf ? s.bedarf.gesamt : s.zahl.gesamt), 0) / 2;
+    const zeile = (x) => {
+      const p = x.person, w = L.wunschAm(S, p.id, d), abw = L.abwesenheitAm(S, p.id, d), bereit = L.bereitschaftAm(S, p, d, null);
+      const min = x.schichten.reduce((n, y) => n + (y.z.ende - y.z.start), 0);
+      return `<tr><td class="tp-name"><b>${esc(p.vorname)} ${esc(p.nachname.slice(0, 1))}.</b><small>${esc(L.ROLLEN[p.rolle].name)}</small></td>
+        <td class="tp-wunsch">${abw ? `${L.abwArt(abw.art).sym} abwesend` : w ? `${WUNSCH_TXT[w.art] || ""}${w.schicht && w.schicht !== "egal" ? " " + (w.schicht === "frueh" ? "früh" : "spät") : ""}` : "–"}${bereit ? " · 🛎" : ""}</td>
+        <td class="tp-bahn">${stunden.map((h) => `<i style="left:${pos(h * 60)}%"></i>`).join("")}${x.schichten.map((y) => `<span class="tp-balken r-${p.rolle}" style="left:${pos(y.z.start)}%;width:${pos(y.z.ende) - pos(y.z.start)}%">${L.minZuZeit(y.z.start)}–${L.minZuZeit(y.z.ende)}${y.z.ende - y.z.start >= 360 ? " ☕" : ""}</span>`).join("")}</td>
+        <td class="tp-std">${min ? (min / 60).toFixed(1).replace(".", ",") : ""}</td></tr>`;
+    };
+    return `<div class="druckblatt quer bestellblatt tagesplan" style="--dp:#c10230;--dp-hell:#fbe5ea">
+      <div class="dp-kopf"><img src="${BILD.logo}" alt="frooters"><span>${esc(f.name)} · Einsatzplan ${esc(datumLang(d))}</span></div>
+      <div class="dp-rumpf"><div class="tp-info">Geöffnet ${L.minZuZeit(o.auf)}–${L.minZuZeit(o.zu)} Uhr${o.ort ? " · " + esc(o.ort) : ""} · Personalstunden laut Vorgabe ${String(soll).replace(".", ",")} · eingeteilt ${String(ist).replace(".", ",")} · <b>${soll > ist ? `fehlt ${String(soll - ist).replace(".", ",")}` : "vollständig"}</b></div>
+        <table class="tp-tab"><thead><tr><th>Person</th><th>Wunsch</th><th class="tp-bahn tp-skala">${stunden.map((h) => `<i style="left:${pos(h * 60)}%"><em>${h}</em></i>`).join("")}</th><th>Std.</th></tr></thead>
+        <tbody>${leute.map(zeile).join("")}</tbody>
+        <tfoot><tr><td colspan="2"><b>besetzt / nötig</b></td><td class="tp-bahn">${t.slots.map((s) => `<span class="tp-slot st-${s.status}" style="left:${pos(s.m)}%;width:${pos(s.m + 30) - pos(s.m)}%">${s.zahl.gesamt}/${s.bedarf ? s.bedarf.gesamt : "–"}</span>`).join("")}</td><td></td></tr></tfoot></table>
+        <p class="dp-klein">😀 möchte · 👍 kann · ✋ kann nicht · 🛎 Bereitschaft · ☕ ab 6 Std. Pause · Farbe: Rolle. Stand ${L.datumKurz(heute())}, ${new Date().toTimeString().slice(0, 5)} Uhr.</p></div>
+      <div class="dp-fuss"><span>frooters · Einsatzplan zum Aushängen</span><img src="${BILD.frootie}" alt=""></div></div>`;
   }
   V.export = () => {
     const f = FIL(), monat = arg || heute().slice(0, 7);
@@ -2014,6 +2120,13 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
       if (w && w.art === el.dataset.art) S.wuensche = S.wuensche.filter((x) => x !== w);
       else if (w) w.art = el.dataset.art;
       else S.wuensche.push({ id: neueId("w"), personId: p.id, datum: d, art: el.dataset.art, schicht: "egal" });
+      speichern(); zeichnen();
+    },
+    "wunsch-bereit": (el) => {
+      const p = ICH(), d = el.dataset.datum, f = filiale(p.stammfiliale) || FIL(), o = L.oeffnung(f, d);
+      let w = L.wunschAm(S, p.id, d);
+      if (!w) { w = { id: neueId("w"), personId: p.id, datum: d, art: "kann", schicht: "egal" }; S.wuensche.push(w); }
+      w.bereit = w.bereit ? null : { von: o ? L.minZuZeit(o.auf) : "10:00", bis: o ? L.minZuZeit(o.zu) : "20:00" };
       speichern(); zeichnen();
     },
     "wunsch-schicht": (el) => { const w = L.wunschAm(S, ICH().id, el.dataset.datum); if (w) { w.schicht = el.dataset.schicht; speichern(); zeichnen(); } },
@@ -2451,6 +2564,15 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
       const f = B.ET_FORMATE.find((x) => x.id === et.format), alle = etArtikel(), a = alle.find((x) => x.id === et.vorschau) || alle.find((x) => et.anzahl[x.id]) || alle[0];
       if (a) drucken(etBoegen([a], f), false);
     },
+    "tagesplan-druck": (el) => { const h = tagesplanHtml(FIL(), el.dataset.datum); if (!h) return meldung("An diesem Tag geschlossen."); drucken(h, true); },
+    "bespr-vorlage": (el) => { const t = termin(el.dataset.id); drucken(B.besprechungHtml(t, "vorlage", besprechungDaten(t), BILD), false); },
+    "prot-druck": (el) => { if (ansicht === "termin-protokoll") protMerken(); const t = termin(el.dataset.id || (protEntwurf || {}).terminId); if (!t) return; const d = besprechungDaten(t); if (!d.protokoll) return meldung("Noch kein Protokoll."); drucken(B.besprechungHtml(t, "protokoll", d, BILD), false); },
+    "prot-top-neu": () => { protMerken(); protEntwurf.tops.push({ text: "", ergebnis: "", wer: "", bis: "" }); zeichnen(); },
+    "prot-top-weg": (el) => { protMerken(); protEntwurf.tops.splice(Number(el.dataset.i), 1); zeichnen(); },
+    "prot-speichern": () => { protAblegen(false); meldung("Entwurf gespeichert"); zeichnen(); },
+    "prot-senden": () => { protAblegen(true); meldung("Protokoll verschickt – steht beim Termin und im Chat"); gehe("termin", protEntwurf.terminId); },
+    "ausgeblendet-zeigen": () => { nurAusgeblendet = !nurAusgeblendet; zeichnen(); },
+    "kachel-einblenden": (el) => { const k = meinGeraet().kacheln; k.aus = (k.aus || []).filter((x) => x !== el.dataset.go2); geraetMerken(); meldung("Wieder eingeblendet"); zeichnen(); },
     "tablet-an": () => {
       if (!(leitung() || zentrale())) return;
       geraet.tablet = { filiale: FIL().id, seit: jetztIso() }; geraetMerken();
@@ -2575,12 +2697,14 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
       if (daten.bis <= daten.von) return meldung("„Bis“ muss nach „Von“ liegen.");
       if (daten.fuer === "personen" && !daten.personen.length) return meldung("Bitte mindestens eine Person auswählen.");
       let t = el.dataset.id ? termin(el.dataset.id) : null;
+      daten.tagesordnung = L.tagesordnungAus($("#te-to").value);
+      const neuTop = t ? L.neuePunkte(L.terminPunkte(t), daten.tagesordnung) : [];
       if (t) Object.assign(t, daten);
       else { t = { id: neueId("tm"), ...daten, vonId: ICH().id, antworten: {} }; (S.termine = S.termine || []).push(t); }
-      if ($("#te-chat").checked) chatAnkuendigen(t, `📅 ${el.dataset.id ? "Geändert" : "Neuer Termin"}: ${t.titel}, ${datumLang(t.datum)}, ${t.von}–${t.bis}${t.ort ? ", " + t.ort : ""}. Bitte in „Termine“ zu- oder absagen.`);
+      if ($("#te-chat").checked) chatAnkuendigen(t, el.dataset.id && neuTop.length ? `✏️ Ergänzt: ${t.titel} (${datumLang(t.datum)}). Neue Punkte auf der Tagesordnung:\n${neuTop.map((x) => "• " + x).join("\n")}` : `📅 ${el.dataset.id ? "Geändert" : "Neuer Termin"}: ${t.titel}, ${datumLang(t.datum)}, ${t.von}–${t.bis}${t.ort ? ", " + t.ort : ""}. Bitte in „Termine“ zu- oder absagen.`);
       terminEntwurf = null; speichern(); meldung("Termin gespeichert"); gehe("termin", t.id);
     },
-    "termin-absagen": (el) => { const t = termin(el.dataset.id); t.abgesagt = { am: jetztIso(), von: ICH().id }; chatAnkuendigen(t, `❌ Abgesagt: ${t.titel} am ${datumLang(t.datum)}.`); speichern(); meldung("Termin abgesagt, im Chat angekündigt"); zeichnen(); },
+    "termin-absagen": (el) => { const t = termin(el.dataset.id); t.abgesagt = { am: jetztIso(), von: ICH().id }; chatAnkuendigen(t, `❌ Abgesagt: ${t.titel} am ${datumLang(t.datum)}`); speichern(); meldung("Termin abgesagt, im Chat angekündigt"); zeichnen(); },
     "termin-erinnern": (el) => { const t = termin(el.dataset.id), offen = L.terminStand(S, t).offen; chatAnkuendigen(t, `⏳ Bitte noch zu- oder absagen: ${t.titel} am ${datumLang(t.datum)} (offen: ${offen.map((id) => (person(id) || {}).vorname).join(", ")}).`); speichern(); meldung("Im Chat erinnert"); zeichnen(); },
     "dienst-ics": () => {
       const p = ICH(), bis = L.plusTage(heute(), 28);
@@ -2678,6 +2802,7 @@ const APP_VERSION = "0.17.0"; // gleich halten mit sw.js, version.json und ?v= i
     else if (el.id === "ka-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { kasseText = String(r.result || ""); kasseZuordnung = null; kasseErgebnis = L.kassenImport(kasseText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
     else if (el.dataset.etPreis) { et.preise[el.dataset.etPreis] = el.value.trim(); et.vorschau = el.dataset.etPreis; zeichnen(); }
     else if (el.dataset.etCode) { const c = el.value.trim(); if (c) etCodes()[el.dataset.etCode] = c; else delete etCodes()[el.dataset.etCode]; speichern(); et.vorschau = el.dataset.etCode; zeichnen(); }
+    else if (el.dataset.bereit) { const [d, k] = el.dataset.bereit.split("|"), w = L.wunschAm(S, ICH().id, d); if (w && w.bereit && el.value) { w.bereit[k] = el.value; speichern(); meldung("Bereitschaft gespeichert"); } }
     else if (el.dataset.mafilter) { maFilter[el.dataset.mafilter] = el.value; zeichnen(); }
     else if (el.id === "imp-datei" && el.files && el.files[0]) { const r = new FileReader(); r.onload = () => { importText = String(r.result || ""); importErgebnis = L.mitarbeiterImport(S, importText); zeichnen(); }; r.readAsText(el.files[0], "utf-8"); }
     else if (el.dataset.land) { filiale(el.dataset.land).bundesland = el.value || null; speichern(); meldung("Bundesland gespeichert"); zeichnen(); }

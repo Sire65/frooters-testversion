@@ -196,6 +196,12 @@
     const tag = wochentag(datum);
     return ((p.profil || {}).bereitschaft || []).some((b) => b.tag === tag && (!zeit || (zeitZuMin(b.von) < zeit.ende && zeit.start < zeitZuMin(b.bis))));
   }
+  // Bereitschaft: selbst eingetragen im Dienstwunsch (wie in der Club-App) oder fest im Profil
+  function bereitschaftAm(state, p, datum, zeit) {
+    const w = wunschAm(state, p.id, datum);
+    if (w && w.bereit && w.bereit.von && w.bereit.bis && (!zeit || (zeitZuMin(w.bereit.von) < zeit.ende && zeit.start < zeitZuMin(w.bereit.bis)))) return true;
+    return inBereitschaft(p, datum, zeit);
+  }
   function arbeitstageImJahr(state, personId, jahr) {
     return new Set((state.plan || []).filter((s) => s.personId === personId && s.datum.slice(0, 4) === jahr).map((s) => s.datum)).size;
   }
@@ -348,10 +354,12 @@
       if (profil.length) { punkte -= 5; gruende.push("Profil: " + profil.join(", ")); }
       const gesetz = gesetzHinweise(state, p, datum, z);
       if (gesetz.length) { punkte -= 3; gruende.push(...gesetz); }
-      if (inBereitschaft(p, datum, z)) { punkte += 2; gruende.push("in Bereitschaft"); }
+      if (bereitschaftAm(state, p, datum, z)) { punkte += 2; gruende.push("in Bereitschaft"); }
       if (p.stammfiliale !== filialeId) { punkte -= 1; gruende.push("Springer"); }
-      return { person: p, moeglich, punkte, stunden: std, stand, gruende, profil, gesetz };
-    }).sort((a, b) => (b.moeglich - a.moeglich) || (b.punkte - a.punkte) || (a.stunden - b.stunden) || a.person.vorname.localeCompare(b.person.vorname));
+      // Gerecht verteilen (wie „Wunschzeiten zuerst, gerecht gekürzt“ in der Club-App): bei gleichen Punkten zuerst, wer im Verhältnis zu seinem Umfang am wenigsten hat
+      const auslastung = stand.soll ? stand.ist / stand.soll : std / 40;
+      return { person: p, moeglich, punkte, stunden: std, stand, auslastung, gruende, profil, gesetz };
+    }).sort((a, b) => (b.moeglich - a.moeglich) || (b.punkte - a.punkte) || (a.auslastung - b.auslastung) || (a.stunden - b.stunden) || a.person.vorname.localeCompare(b.person.vorname));
   }
   function abdeckung(state, filialeId, datum, schichtId) {
     const f = state.filialen.find((x) => x.id === filialeId);
@@ -796,6 +804,20 @@
     for (const id of ein) (r[(a[id] || {}).a] || r.offen).push(id);
     return r;
   }
+  // Tagesordnung aus einem Text: je Zeile oder „;“ ein Punkt, Aufzählungszeichen und Nummern weg (wie die Terminanfrage der Club-App)
+  function tagesordnungAus(text) {
+    return String(text || "").split(/\r?\n|;/).map((z) => z.replace(/^\s*(?:[-–•*·]|\d{1,2}[.)]|TOP\s*\d+[.:)]?)\s*/i, "").trim()).filter((z) => z.length > 1).slice(0, 30);
+  }
+  function terminPunkte(t) { return t.tagesordnung && t.tagesordnung.length ? t.tagesordnung : []; }
+  // Nur die neu dazugekommenen Punkte (für „Bescheid geben“)
+  function neuePunkte(alt, neu) { const a = new Set((alt || []).map((x) => x.toLowerCase())); return (neu || []).filter((x) => !a.has(x.toLowerCase())); }
+  // Protokoll-Entwurf: Anwesend = Zusagen, je Punkt Ergebnis, Wer, Bis wann
+  function protokollEntwurf(state, t) {
+    if (t.protokoll) return JSON.parse(JSON.stringify(t.protokoll));
+    const st = terminStand(state, t);
+    return { anwesend: [...st.ja], tops: terminPunkte(t).map((x) => ({ text: x, ergebnis: "", wer: "", bis: "" })), sonstiges: "", naechster: "", gesendet: null };
+  }
+
   // Kalender-Datei (ICS) mit Erinnerung, z. B. für Dienste und Termine im Handy-Kalender
   function ics(eintraege, erinnerungMin) {
     const e = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/[,;]/g, (m) => "\\" + m).replace(/\r?\n/g, "\\n");
@@ -1257,7 +1279,7 @@
     TAGE, TAG_NAME, SCHICHTEN, ROLLEN, UEBERGREIFEND, iso, ausIso, plusTage, wochentag, montag, woche, minZuZeit, zeitZuMin, datumKurz, zwischen,
     oeffnung, schicht, schichtZeit, bedarf, istLeitung, darfInFiliale, filialenVon, abwesenheitAm,
     ABW_ARTEN, abwArt, abwGilt, urlaubsTage, urlaubskonto, stundenImMonat, stundenStand,
-    BESCHAEFTIGUNG, beschaeftigung, EINSATZ_ZEIT, QUALI, GRENZEN_STANDARD, grenzen, darfUeberschreiten, profilPruefen, inBereitschaft, arbeitstageImJahr, gesetzHinweise, qualiAblauf, IMPORT_SPALTEN, csvZeilen, mitarbeiterImport,
+    BESCHAEFTIGUNG, beschaeftigung, EINSATZ_ZEIT, QUALI, GRENZEN_STANDARD, grenzen, darfUeberschreiten, profilPruefen, inBereitschaft, bereitschaftAm, arbeitstageImJahr, gesetzHinweise, qualiAblauf, IMPORT_SPALTEN, csvZeilen, mitarbeiterImport,
     planZeit, teilPruefen, tauschPruefen, tauschAusfuehren,
     matrixTyp, bedarfBloecke, slotPruefen, besetzungTag, besetzungsLuecken, passendeSchicht,
     PIN_STANDARD, pinEinstellungen, pinEmpfaenger, pinAktiv, pinSichtbar, pinStand, pinUngelesen, pinEigeneAktiv, pinErinnern,
@@ -1266,7 +1288,7 @@
     tabletLeute, PIN_VERSUCHE, PIN_SPERRE_MS, pinPruefen, pinGueltig,
     stempelAm, stempelStatus, stempelSumme, arbeitszeitHinweise, stundenliste, csv,
     chatsSicherstellen, chatMitglieder, chatsFuer, chatNachrichten, chatUngelesen, nachrichtSenden, chatGelesen, lesestand, direktChat,
-    TERMIN_ARTEN, terminEingeladen, termineFuer, terminAntwort, terminStand, ics,
+    TERMIN_ARTEN, terminEingeladen, termineFuer, terminAntwort, terminStand, ics, tagesordnungAus, terminPunkte, neuePunkte, protokollEntwurf,
     WOCHEN_JE_MONAT, monatsuebersicht, KASSE_FELDER, zahlDe, datumDe, stundeDe, kassenSpalten, kassenImport, kassenUebernehmen, umsatzJeStunde, personalJeStunde,
     regelGilt, geraeteFuer, zustaendig, pruefeWert, bewerte, tagesliste, tagesSumme,
     LAGERORTE, BESTELL_STATUS, waren, letzteInventur, unterwegs, bestellVorschlag, bestellungenAnlegen, wareneingang, mengeText,

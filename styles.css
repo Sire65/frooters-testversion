@@ -534,6 +534,26 @@ main.tb-main { max-width: 1100px; }
 .et-feld { display: grid; font-size: .75rem; color: var(--muted); } .et-feld input { width: 150px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .9rem; }
 .et-anz { display: inline-flex; gap: 6px; align-items: center; } .et-anz b { min-width: 1.8em; text-align: center; }
 #druckbereich .et-bogen { display: none; }
+
+/* ---------- 0.18.0: aus der Club-App (Tagesordnung, Protokoll, Tagesplan, ausgeblendete Kacheln) ---------- */
+.chip.an-bereit { background: var(--green-soft); border-color: var(--green); color: var(--green); font-weight: 700; } .chip.an-rot { background: var(--red); color: var(--on-red); border-color: transparent; }
+.kachel.versteckt { opacity: .7; border-style: dashed; }
+.kachel-schalter { margin-bottom: -6px; }
+.bp-zeile { font-size: 2.2cqw; margin: 1cqw 0; } .bespr h3 { font-size: 2.4cqw; margin-top: 2cqw; }
+.bp-teiln { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6cqw 2cqw; font-size: 2.1cqw; } .bp-teiln i { color: #5d604f; }
+.bp-tab td:first-child { width: 6%; } .bp-tab td:nth-child(3), .bp-tab td:nth-child(4) { width: 14%; }
+.bp-linien { height: var(--bp-lh, 5cqw); background: repeating-linear-gradient(180deg, transparent 0 2.2cqw, #d8dccb 2.2cqw 2.35cqw); margin-top: .4cqw; }
+.bespr .dp-rumpf { gap: 1.2cqw; } .bespr h1 { font-size: 6.5cqw; }
+.tagesplan .dp-rumpf { gap: 1cqw; } .tp-info { font-size: 1.5cqw; }
+.tp-tab { width: 100%; border-collapse: collapse; font-size: 1.3cqw; table-layout: fixed; }
+.tp-tab th { text-align: left; font-size: 1.1cqw; color: #5d604f; padding: .4cqw; border-bottom: .15cqw solid #a3a983; } .tp-tab td { padding: .35cqw .4cqw; border-bottom: .1cqw solid #e2e3d6; vertical-align: middle; }
+.tp-tab th:nth-child(1) { width: 15%; } .tp-tab th:nth-child(2) { width: 15%; } .tp-tab th:nth-child(4) { width: 5%; text-align: right; } .tp-std { text-align: right; font-variant-numeric: tabular-nums; }
+.tp-name small { display: block; color: #5d604f; font-size: .85em; } .tp-wunsch { font-size: .9em; }
+.tp-bahn { position: relative; height: 2.4cqw; } .tp-bahn > i { position: absolute; top: 0; bottom: 0; width: .08cqw; background: #e2e3d6; } .tp-skala > i em { position: absolute; top: -.2cqw; left: .2cqw; font-style: normal; font-size: .95cqw; color: #5d604f; }
+.tp-balken { position: absolute; top: .3cqw; bottom: .3cqw; border-radius: .5cqw; color: #fff; font-size: 1.05cqw; font-weight: 700; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; background: #4f8a12; }
+.tp-balken.r-shopleitung { background: #c10230; } .tp-balken.r-stv { background: #e0365c; } .tp-balken.r-aushilfe { background: repeating-linear-gradient(135deg, #7d8360 0 .6cqw, #959b78 .6cqw 1.2cqw); }
+.tp-slot { position: absolute; top: .3cqw; bottom: .3cqw; font-size: .85cqw; display: flex; align-items: center; justify-content: center; border-right: .1cqw solid #fff; background: #eef6e2; color: #2f4d12; }
+.tp-slot.st-rot { background: #fbe5ea; color: #9e0227; font-weight: 700; } .tp-slot.st-gelb { background: #fdf0db; color: #8a5200; } .tp-slot.st-ueber { background: #e3ecf5; }
 @media print {
   #druckbereich .et-bogen { display: grid; width: 210mm; height: 297mm; padding: 6mm; box-sizing: border-box; justify-content: center; align-content: start; break-after: page; page-break-after: always; }
   #druckbereich .et-bogen:last-child { break-after: auto; page-break-after: auto; }

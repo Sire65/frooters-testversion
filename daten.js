@@ -6,7 +6,7 @@
   else root.FRD = fabrik(root.FRL);
 })(typeof self !== "undefined" ? self : this, function (L) {
   "use strict";
-  const SCHLUESSEL = "frooters_demo_v13";
+  const SCHLUESSEL = "frooters_demo_v14";
 
   const ALLERGENE = ["Gluten", "Krebstiere", "Ei", "Fisch", "Erdnüsse", "Soja", "Milch", "Schalenfrüchte", "Sellerie", "Senf", "Sesam", "Schwefeldioxid", "Lupinen", "Weichtiere"];
 
@@ -245,7 +245,7 @@
     const pidT = (v) => personen.find((p) => p.vorname === v).id;
     const naechsterTag = (tag) => { let d = L.plusTage(heuteIso, 1); while (L.wochentag(d) !== tag) d = L.plusTage(d, 1); return d; };
     const termine = [
-      { id: id("tm"), titel: "Teamsitzung Ochtrup", art: "teamsitzung", datum: naechsterTag("di"), von: "18:30", bis: "19:30", ort: "Ochtrup, Pausenraum", filiale: "och", fuer: "alle", personen: [], pflicht: true, notiz: "Themen: Wintersortiment, neue Hygiene-Liste, Dienstwünsche Dezember.", vonId: pidT("Sandra"), antworten: { [pidT("Tom")]: { a: "ja", zeit: heuteIso + "T09:00" }, [pidT("Leonie")]: { a: "vielleicht", zeit: heuteIso + "T09:30" } } },
+      { id: id("tm"), titel: "Teamsitzung Ochtrup", art: "teamsitzung", datum: naechsterTag("di"), von: "18:30", bis: "19:30", ort: "Ochtrup, Pausenraum", filiale: "och", fuer: "alle", personen: [], pflicht: true, notiz: "Bitte pünktlich, es gibt Pizza.", tagesordnung: ["Wintersortiment", "Neue Hygiene-Liste", "Dienstwünsche Dezember"], vonId: pidT("Sandra"), antworten: { [pidT("Tom")]: { a: "ja", zeit: heuteIso + "T09:00" }, [pidT("Leonie")]: { a: "vielleicht", zeit: heuteIso + "T09:30" } } },
       { id: id("tm"), titel: "Hygieneschulung (jährlich)", art: "schulung", datum: L.plusTage(naechsterTag("mo"), 7), von: "09:00", bis: "11:00", ort: "Oberhausen, Centro (Beispiel)", filiale: null, fuer: "alle", personen: [], pflicht: true, notiz: "Mit dem Hygieneberater. Bitte Belehrung § 43 IfSG mitbringen.", vonId: pidT("Inhaber"), antworten: {} },
       { id: id("tm"), titel: "Inventur zum Monatsende", art: "inventur", datum: L.iso(new Date(Number(heuteIso.slice(0, 4)), Number(heuteIso.slice(5, 7)), 0)), von: "20:00", bis: "21:30", ort: "jede Filiale", filiale: null, fuer: "leitung", personen: [], pflicht: true, notiz: "Bestand in der App zählen (Bestellung → Bestand aufnehmen).", vonId: pidT("Inhaber"), antworten: {} },
     ];
@@ -257,7 +257,7 @@
     ];
 
     const state = {
-      version: 13, verkauf, termine, nachrichten, chats: [], erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
+      version: 14, verkauf, termine, nachrichten, chats: [], erstellt: heuteIso, filialen, personen, wuensche: [], plan: [], abwesenheiten: [], stempel: [], pinnwand: [], tausch: [],
       // Büro: Ablage (Drucke, Notizen, Briefe), Adressbuch (Beispiele), Personalakte, Freigaben der Ordner
       buero: { ablage: [], adressen: [], personal: {}, rechte: {} },
       waren: { lieferanten, artikel, sortiment: sortimentWaren, inventuren, bestellungen },
@@ -286,13 +286,17 @@
     state.abwesenheiten.push({ id: id("a"), personId: pid("Paul"), art: "urlaub", von: L.plusTage(naechste, 2), bis: L.plusTage(naechste, 4), status: "beantragt", notiz: "Familienfeier" });
     // Plan dieser Woche automatisch füllen und veröffentlichen
     // erst alle Filialen mit eigenem Team, dann Lücken mit Springern füllen
+    // Vorwoche auch (damit es an jedem Wochentag vergangene Dienste mit Stempelzeiten gibt, auch montags)
+    const vorwoche = L.plusTage(mo, -7);
+    for (const f of filialen) state.plan.push(...L.planVorschlag(state, f.id, vorwoche, () => id("s"), { nurStamm: true }));
+    for (const f of filialen) { state.plan.push(...L.planVorschlag(state, f.id, vorwoche, () => id("s"))); state.veroeffentlicht[`${f.id}|${vorwoche}`] = true; }
     for (const f of filialen) state.plan.push(...L.planVorschlag(state, f.id, mo, () => id("s"), { nurStamm: true }));
     for (const f of filialen) {
       state.plan.push(...L.planVorschlag(state, f.id, mo, () => id("s")));
       state.veroeffentlicht[`${f.id}|${mo}`] = true;
     }
     state.abwesenheiten.push({ id: id("a"), personId: pid("Lukas"), art: "krank", von: heuteIso, bis: L.plusTage(heuteIso, 1), status: "gemeldet", notiz: "" });
-    // Beispiel-Stempelzeiten der vergangenen Tage dieser Woche (für Stundenliste und Export)
+    // Beispiel-Stempelzeiten der vergangenen Tage (Vorwoche und diese Woche, für Stundenliste und Export)
     for (const sc of state.plan) {
       if (sc.datum >= heuteIso) continue;
       const f = filialen.find((x) => x.id === sc.filiale), z = L.schichtZeit(f, sc.datum, sc.schicht);

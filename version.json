@@ -1,12 +1,12 @@
 {
-  "version": "0.17.0",
-  "datum": "2026-11-13",
+  "version": "0.18.0",
+  "datum": "2026-11-16",
   "stufe": "DEV",
   "neu": [
-    "Etiketten mit Barcode im Druckstudio, wie die Preisetiketten der Club-App",
-    "Maße 8×8, 7×7, 6×6, 5×5 cm, Regaletikett 7×4 cm, Lageretikett 5×3 cm; A4-Bogen, Probe mit 1 Etikett",
-    "Produkte: Name im Farbband der Warengruppe, Preise je Größe (nur für den Druck, nie geraten), Allergene und Spuren, Code (PLU) wird gespeichert",
-    "Lagerware: Lieferant, Gebinde, Soll/Min, Code = Bestellnummer oder interne Nummer",
-    "QR-Code oder Strichcode (Code 128), Bausteine einzeln abwählbar"
+    "Aus der Club-App: Tagesordnung, Besprechungsvorlage und Protokoll für Teamsitzungen (Druck auf frooters-Briefkopf, Hinweis mit Aufgaben im Chat)",
+    "Termin ergänzen: im Chat nur die neuen Punkte",
+    "Einsatzplan je Tag zum Aushängen (A4 quer): Wunsch, Dienst als Balken, besetzt/nötig je halbe Stunde",
+    "Bereitschaft selbst in den Dienstwünschen eintragen; gerechtere Planung nach Auslastung",
+    "👀 Ausgeblendete Kacheln mit einem Knopf zeigen und zurückholen; Frag Frootie kennt die neuen Bereiche"
   ]
 }
